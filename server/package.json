@@ -1,0 +1,44 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+  "dev": "nodemon src/index.js",
+  "start": "node src/index.js",
+  "lint": "eslint . --ext .js",
+  "lint:fix": "eslint . --ext .js --fix",
+  "format": "prettier --write .",
+  "format:check": "prettier --check .",
+  "test": "jest --runInBand --detectOpenHandles --forceExit",
+  "test:watch": "jest --watchAll --runInBand",
+  "test:coverage": "jest --coverage --runInBand"
+},
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jest": "^30.0.5",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "prisma": "^6.13.0",
+    "supertest": "^7.1.4"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.13.0",
+    "bcrypt": "^6.0.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
+    "winston": "^3.17.0",
+    "xss-clean": "^0.1.4"
+  }
+}
