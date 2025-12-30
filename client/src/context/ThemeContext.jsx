@@ -1,10 +1,10 @@
 // src/context/ThemeContext.jsx
 import React, { createContext, useState } from "react";
-import themes from "./themes.js";
+import THEMES from "@/constants/THEMES";
 
 const ThemeContext = createContext();
 
-const themeKeys = Object.keys(themes);
+const themeKeys = Object.keys(THEMES);
 
 const ThemeProvider = ({ children }) => {
   const [themeKey, setThemeKey] = useState("default"); // Default theme key
@@ -16,11 +16,11 @@ const ThemeProvider = ({ children }) => {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme: themes[themeKey], switchTheme }}>
+    <ThemeContext.Provider value={{ theme: THEMES[themeKey], switchTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export { ThemeContext };
+export { ThemeContext, ThemeProvider };
 export default ThemeProvider;

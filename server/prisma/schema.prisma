@@ -1,8 +1,3 @@
-// Prisma schema for Invenso Inventory Management System
-
-// ----------------------------
-// Generator & Datasource Block
-// ----------------------------
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,274 +7,484 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ----------------------------
 // Enums
-// ----------------------------
-enum GST {
-  NONE
-  GST_5
-  GST_12
-  GST_18
-  GST_28
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+  EMPLOYEE
+  DRIVER
+  OTHER
 }
 
-enum ExpenseCategory {
-  SALARY
-  RENT
-  ELECTRICITY
-  MAINTENANCE
+enum UnitType {
+  PCS
+  METER
+  KG
+  LITER
+  BOX
+  PACKET
+  ROLL
+  SHEET
+  SQF
+  SQM
+  OTHER
+}
+
+enum BalanceType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum PaymentMode {
+  NONE
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  UPI
+  CARD
+  CREDIT
+  ONLINE
+}
+
+enum PaymentType {
+  RECEIVED
+  PAID
+}
+
+enum PaymentReferenceType {
+  PURCHASE
+  SALE
+  PURCHASE_RETURN
+  SALE_RETURN
+  GENERAL
   TRANSPORT
   OTHER
 }
 
-// ----------------------------
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum InventoryReferenceType {
+  PURCHASE
+  SALE
+  PURCHASE_RETURN
+  SALE_RETURN
+  OPENING_STOCK
+  ADJUSTMENT
+  DAMAGE
+  TRANSFER
+  OTHER
+}
+
+enum InventoryLogType {
+  ADD
+  SUBTRACT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum CategoryType {
+  PRODUCT
+  EXPENSE
+}
+
+enum TransactionStatus {
+  PAID
+  PARTIAL
+  UNPAID
+  CANCELLED
+  DRAFT
+}
+
+enum AcpSheetSize {
+  NONE
+  S4x4
+  S6x4
+  S8x4
+  S10x4
+  S12x4
+  OTHER
+}
+
 // Models
-// ----------------------------
 
-model Product {
-  id                Int      @id @default(autoincrement())
-  name              String
-  category          Category @relation(fields: [categoryId], references: [id])
-  categoryId        Int
-  HSN_code          String?
-  unit_of_measure   String
-  avg_price         Float
-  SKU               String?  @unique
-  description       String?
-  reorder_threshold Int      @default(0)
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      UserRole @default(STAFF)
+  fullName  String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  purchaseItems   PurchaseItem[]
-  salesItems      SalesItem[]
-  stockBalances   StockOpeningBalance[]
-  inventoryLogs   InventoryLog[]
-  prasoACPSheets  PrasoACPSheet[]
-  currentStock    CurrentStock?
-  purchaseReturns PurchaseReturn[]
-  salesReturns    SalesReturn[]
+  auditLogs AuditLog[]
+
+  @@map("users")
 }
 
 model Category {
-  id          Int     @id @default(autoincrement())
-  name        String
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  type        CategoryType @default(PRODUCT)
   description String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   products Product[]
+  expenses Expense[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  name          String
+  categoryId    Int
+  hsnCode       String?
+  size          AcpSheetSize   @default(NONE)
+  unit          UnitType      @default(PCS)
+  openingStock  Decimal  @default(0) @db.Decimal(10, 3)
+  currentStock  Decimal  @default(0) @db.Decimal(10, 3)
+  avgCostPrice  Decimal  @default(0) @db.Decimal(10, 2)
+  avgSellPrice  Decimal  @default(0) @db.Decimal(10, 2)
+  threshold     Decimal  @default(0) @db.Decimal(10, 2)
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category            Category             @relation(fields: [categoryId], references: [id])
+  inventoryLogs       InventoryLog[]
+  purchaseItems       PurchaseItem[]
+  saleItems           SaleItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+  saleReturnItems     SaleReturnItem[]
+
+  @@unique([name, categoryId, size])
+  @@map("products")
 }
 
 model Party {
-  id             Int      @id @default(autoincrement())
+  id             Int         @id @default(autoincrement())
   name           String
-  type           String // supplier or customer
-  gst_number     String?
-  contact_number String?
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  identifier     String?     // PAN/Aadhar/License
+  type           PartyType
+  phone          String?
+  gstNumber      String?
+  openingBalance Decimal     @default(0) @db.Decimal(15, 2)
+  currentBalance Decimal     @default(0) @db.Decimal(15, 2)
+  balanceType    BalanceType @default(RECEIVABLE)
+  address        String?
+  remark         String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   purchases       Purchase[]
-  sales           Sale[]
-  payments        Payment[]
-  openingPayments OpeningBalancePayment[]
-  transportations Transportation[]
-}
+  purchaseReturns PurchaseReturn[]
+  sales          Sale[]
+  saleReturns    SaleReturn[]
+  payments       Payment[]
+  transports     Transport[] @relation("TransportParty")
+  drives         Transport[] @relation("TransportDriver")
 
-model StockOpeningBalance {
-  id         Int      @id @default(autoincrement())
-  product    Product  @relation(fields: [productId], references: [id])
-  productId  Int
-  quantity   Int
-  unit       String
-  unit_price Float
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model OpeningBalancePayment {
-  id      Int      @id @default(autoincrement())
-  party   Party    @relation(fields: [partyId], references: [id])
-  partyId Int
-  amount  Float
-  type    String // credit or debit
-  remarks String?
-  date    DateTime
+  @@map("parties")
 }
 
 model Purchase {
-  id           Int      @id @default(autoincrement())
-  party        Party    @relation(fields: [partyId], references: [id])
-  partyId      Int
-  invoice_no   String
-  date         DateTime
-  total_amount Float
-  gst          GST      @default(NONE)
-  remarks      String?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id                 Int               @id @default(autoincrement())
+  date               DateTime          @default(now())
+  partyId            Int
+  invoiceNumber      Int               @unique @default(autoincrement())
+  totalAmount        Decimal           @db.Decimal(15, 2)
+  totalGstAmount     Decimal           @db.Decimal(15, 2)
+  totalTaxableAmount Decimal           @db.Decimal(15, 2)
+  paidAmount         Decimal           @default(0) @db.Decimal(15, 2)
+  paymentMode        PaymentMode       @default(NONE)
+  paymentReference   String?
+  remarks            String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  items   PurchaseItem[]
-  returns PurchaseReturn[]
+  party           Party             @relation(fields: [partyId], references: [id])
+  purchaseItems   PurchaseItem[]
+  purchaseReturns PurchaseReturn[]
+  payments       Payment[]          @relation("PurchasePayments")
+  inventoryLogs  InventoryLog[]      @relation("PurchaseInventoryLogs")
+
+  @@map("purchases")
 }
 
 model PurchaseItem {
-  id         Int      @id @default(autoincrement())
-  purchase   Purchase @relation(fields: [purchaseId], references: [id])
-  purchaseId Int
-  product    Product  @relation(fields: [productId], references: [id])
-  productId  Int
-  hsn        String?
-  quantity   Int
-  unit       String
-  unit_price Float
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  purchaseId    Int
+  productId    Int
+  size          AcpSheetSize   @default(NONE)
+  quantity    Decimal       @db.Decimal(10, 3)
+  pricePerUnit Decimal       @db.Decimal(10, 2)
+  gstRate      Decimal       @db.Decimal(5, 2)
+  gstAmount     Decimal        @db.Decimal(15, 2)
+  taxableAmount Decimal       @db.Decimal(15, 2)
+  totalAmount  Decimal       @db.Decimal(15, 2)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@map("purchase_items")
 }
 
 model PurchaseReturn {
-  id         Int      @id @default(autoincrement())
-  purchase   Purchase @relation(fields: [purchaseId], references: [id])
-  purchaseId Int
-  product    Product  @relation(fields: [productId], references: [id])
-  productId  Int
-  hsn        String?
-  quantity   Int
-  reason     String?
-  date       DateTime
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id                 Int               @id @default(autoincrement())
+  date               DateTime          @default(now())
+  partyId            Int
+  purchaseId          Int?
+  totalAmount        Decimal           @db.Decimal(15, 2)
+  totalGstAmount     Decimal           @db.Decimal(15, 2)
+  totalTaxableAmount Decimal           @db.Decimal(15, 2)
+  receivedAmount     Decimal           @default(0) @db.Decimal(15, 2)
+  paymentMode        PaymentMode       @default(NONE)
+  paymentReference   String?
+  reason             String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  party           Party             @relation(fields: [partyId], references: [id])
+  purchase        Purchase?         @relation(fields: [purchaseId], references: [id])
+  purchaseReturnItems PurchaseReturnItem[]
+  payments        Payment[]          @relation("PurchaseReturnPayments")
+  inventoryLogs   InventoryLog[]       @relation("PurchaseReturnInventoryLogs")
+
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id            Int      @id @default(autoincrement())
+  purchaseReturnId Int
+  productId    Int
+  size          AcpSheetSize   @default(NONE)
+  quantity    Decimal       @db.Decimal(10, 3)
+  pricePerUnit Decimal       @db.Decimal(10, 2)
+  gstRate      Decimal       @db.Decimal(5, 2)
+  gstAmount     Decimal        @db.Decimal(15, 2)
+  taxableAmount Decimal       @db.Decimal(15, 2)
+  totalAmount  Decimal       @db.Decimal(15, 2)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  product     Product          @relation(fields: [productId], references: [id])
+
+  @@map("purchase_return_items")
 }
 
 model Sale {
-  id           Int      @id @default(autoincrement())
-  party        Party    @relation(fields: [partyId], references: [id])
-  partyId      Int
-  sale_date    DateTime
-  total_amount Float
-  total_profit Float    @default(0) // ✅ New field
-  gst          GST      @default(NONE)
-  remarks      String?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id                 Int               @id @default(autoincrement())
+  date               DateTime          @default(now())
+  partyId            Int
+  invoiceNumber      Int               @unique @default(autoincrement())
+  totalAmount        Decimal           @db.Decimal(15, 2)
+  totalGstAmount     Decimal           @db.Decimal(15, 2)
+  totalTaxableAmount Decimal           @db.Decimal(15, 2)
+  receivedAmount     Decimal           @default(0) @db.Decimal(15, 2)
+  paymentMode        PaymentMode       @default(NONE)
+  paymentReference   String?
+  totalProfit        Decimal           @default(0) @db.Decimal(15, 2)
+  remarks            String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  items   SalesItem[]
-  returns SalesReturn[]
+  party         Party             @relation(fields: [partyId], references: [id])
+  saleItems    SaleItem[]
+  saleReturns SaleReturn[]
+  payments    Payment[]       @relation("SalePayments")
+  inventoryLogs InventoryLog[]   @relation("SaleInventoryLogs")
+
+  @@map("sales")
 }
 
-model SalesItem {
-  id         Int      @id @default(autoincrement())
-  sale       Sale     @relation(fields: [saleId], references: [id])
-  saleId     Int
-  product    Product  @relation(fields: [productId], references: [id])
-  productId  Int
-  hsn        String?
-  quantity   Int
-  unit       String
-  unit_price Float
-  profit     Float    @default(0) // ✅ New field
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+model SaleItem {
+  id            Int      @id @default(autoincrement())
+  saleId        Int
+  productId    Int
+  size          AcpSheetSize   @default(NONE)
+  quantity    Decimal      @db.Decimal(10, 3)
+  pricePerUnit Decimal      @db.Decimal(10, 2)
+  gstRate      Decimal      @db.Decimal(5, 2)
+  gstAmount     Decimal      @db.Decimal(15, 2)
+  taxableAmount Decimal      @db.Decimal(15, 2)
+  totalAmount  Decimal      @db.Decimal(15, 2)
+  profit       Decimal      @db.Decimal(15, 2) @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  sale      Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product   Product       @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
 }
 
-model SalesReturn {
-  id         Int      @id @default(autoincrement())
-  sale       Sale     @relation(fields: [saleId], references: [id])
-  saleId     Int
-  product    Product  @relation(fields: [productId], references: [id])
-  productId  Int
-  hsn        String?
-  quantity   Int
-  reason     String?
-  date       DateTime
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+model SaleReturn {
+  id                 Int               @id @default(autoincrement())
+  date               DateTime          @default(now())
+  partyId            Int
+  saleId             Int
+  totalAmount        Decimal           @db.Decimal(15, 2)
+  totalGstAmount     Decimal           @db.Decimal(15, 2)
+  totalTaxableAmount Decimal           @db.Decimal(15, 2)
+  paidAmount         Decimal           @default(0) @db.Decimal(15, 2)
+  paymentMode        PaymentMode       @default(NONE)
+  paymentReference   String?
+  totalProfitLoss    Decimal           @default(0) @db.Decimal(15, 2)
+  reason             String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  party           Party             @relation(fields: [partyId], references: [id])
+  sale            Sale              @relation(fields: [saleId], references: [id])
+  saleReturnItems SaleReturnItem[]
+  payments       Payment[]       @relation("SaleReturnPayments")
+  inventoryLogs  InventoryLog[]  @relation("SaleReturnInventoryLogs")
+
+  @@map("sale_returns")
 }
 
-model InventoryLog {
-  id              Int      @id @default(autoincrement())
-  product         Product  @relation(fields: [productId], references: [id])
-  productId       Int
-  quantity_change Int
-  source_type     String // sale, purchase, return, manual
-  reference_id    Int?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+model SaleReturnItem {
+  id            Int      @id @default(autoincrement())
+  saleReturnId Int
+  productId    Int
+  size          AcpSheetSize   @default(NONE)
+  quantity    Decimal       @db.Decimal(10, 3)
+  pricePerUnit Decimal       @db.Decimal(10, 2)
+  gstRate      Decimal       @db.Decimal(5, 2)
+  gstAmount     Decimal       @db.Decimal(15, 2)
+  taxableAmount Decimal       @db.Decimal(15, 2)
+  totalAmount  Decimal       @db.Decimal(15, 2)
+  profitLoss   Decimal       @db.Decimal(15, 2) @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  saleReturn SaleReturn        @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  product    Product           @relation(fields: [productId], references: [id])
+
+  @@map("sale_return_items")
 }
 
 model Payment {
-  id                Int      @id @default(autoincrement())
-  party             Party    @relation(fields: [partyId], references: [id])
-  partyId           Int
-  amount            Float
-  type              String // incoming/outgoing
-  payment_mode      String
-  payment_reference String?
-  date              DateTime
-  remarks           String?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  id               Int                  @id @default(autoincrement())
+  date             DateTime             @default(now())
+  partyId          Int?
+  type             PaymentType
+  amount           Decimal              @db.Decimal(15, 2)
+  paymentReference String?
+  remark           String?
+  referenceType    PaymentReferenceType
+  referenceId      Int?
+  paymentMode      PaymentMode          @default(CASH)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  party           Party?             @relation(fields: [partyId], references: [id])
+  purchase        Purchase?          @relation("PurchasePayments", fields: [referenceId], references: [invoiceNumber], map: "payment_purchase_fkey")
+  sale            Sale?              @relation("SalePayments", fields: [referenceId], references: [invoiceNumber], map: "payment_sale_fkey")
+  purchaseReturn  PurchaseReturn?    @relation("PurchaseReturnPayments", fields: [referenceId], references: [id], map: "payment_purchase_return_fkey")
+  saleReturn      SaleReturn?        @relation("SaleReturnPayments", fields: [referenceId], references: [id], map: "payment_sale_return_fkey")
+  transport       Transport?         @relation("TransportPayments", fields: [referenceId], references: [id], map: "payment_transport_fkey")
+
+  @@map("payments")
 }
 
 model Expense {
-  id           Int             @id @default(autoincrement())
-  category     ExpenseCategory
-  amount       Float
-  payment_mode String
-  date         DateTime
-  description  String?
-  created_at   DateTime        @default(now())
-  updated_at   DateTime        @updatedAt
+  id              Int               @id @default(autoincrement())
+  categoryId      Int
+  date            DateTime          @default(now())
+  amount          Decimal           @db.Decimal(15, 2)
+  paymentMode     PaymentMode       @default(CASH)
+  paymentReference String?
+  remark          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  category        Category          @relation(fields: [categoryId], references: [id])
+
+  @@map("expenses")
 }
 
-model Transportation {
-  id             Int      @id @default(autoincrement())
-  date           DateTime
-  party          Party    @relation(fields: [partyId], references: [id])
-  partyId        Int
-  location_from  String
-  location_to    String
-  driver_name    String
-  transport_cost Float
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+model Transport {
+  id              Int               @id @default(autoincrement())
+  partyId         Int
+  date            DateTime          @default(now())
+  driverId        Int
+  shift           String?
+  fromLocation    String
+  toLocation      String
+  amount          Decimal           @db.Decimal(15, 2)
+  receivedAmount  Decimal           @default(0) @db.Decimal(15, 2)
+  paymentMode     PaymentMode       @default(NONE)
+  paymentReference String?
+  remark          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  party           Party             @relation("TransportParty", fields: [partyId], references: [id])
+  driver          Party             @relation("TransportDriver", fields: [driverId], references: [id])
+  payments        Payment[]         @relation("TransportPayments")
+
+  @@map("transports")
 }
 
-model User {
-  id            Int       @id @default(autoincrement())
-  username      String    @unique
-  password_hash String
-  role          String
-  last_login    DateTime?
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+model InventoryLog {
+  id              Int               @id @default(autoincrement())
+  productId       Int
+  type            InventoryLogType
+  quantity        Decimal           @db.Decimal(10, 3)
+  referenceType   InventoryReferenceType
+  referenceId     Int?
+  balanceBefore   Decimal?          @db.Decimal(10, 3)
+  balanceAfter    Decimal?          @db.Decimal(10, 3)
+  remark          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  product         Product           @relation(fields: [productId], references: [id])
+  purchase        Purchase?         @relation("PurchaseInventoryLogs", fields: [referenceId], references: [invoiceNumber], map: "inventory_purchase_fkey")
+  sale            Sale?             @relation("SaleInventoryLogs", fields: [referenceId], references: [invoiceNumber], map: "inventory_sale_fkey")
+  purchaseReturn  PurchaseReturn?   @relation("PurchaseReturnInventoryLogs", fields: [referenceId], references: [id], map: "inventory_purchase_return_fkey")
+  saleReturn      SaleReturn?       @relation("SaleReturnInventoryLogs", fields: [referenceId], references: [id], map: "inventory_sale_return_fkey")
+
+  @@map("inventory_logs")
 }
 
 model AuditLog {
-  id           Int      @id @default(autoincrement())
-  table_name   String
-  record_id    Int
-  action       String // create, update, delete
-  old_value    String?
-  new_value    String?
-  performed_by String
-  timestamp    DateTime @default(now())
-}
+  id              Int              @id @default(autoincrement())
+  tableName       String
+  recordId        String?
+  action          AuditAction
+  fieldName       String?
+  oldValue        String?
+  newValue        String?
+  userId          Int?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime         @default(now())
 
-model PrasoACPSheet {
-  id          Int      @id @default(autoincrement())
-  product     Product  @relation(fields: [productId], references: [id])
-  productId   Int
-  batch_no    String
-  color_code  String
-  size        String
-  rack_number String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-}
+  user            User?            @relation(fields: [userId], references: [id])
 
-model CurrentStock {
-  id        Int      @id @default(autoincrement())
-  product   Product  @relation(fields: [productId], references: [id])
-  productId Int      @unique
-  quantity  Int
-  updatedAt DateTime @updatedAt
+  @@index([tableName, recordId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

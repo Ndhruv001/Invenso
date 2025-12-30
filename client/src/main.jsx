@@ -1,14 +1,19 @@
-import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter as Router } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
+import QueryProvider from "./lib/config/QueryProvider.jsx";
+import ThemeProvider from "./context/ThemeContext.jsx";
 import "react-toastify/dist/ReactToastify.css";
 import "./index.css";
 import App from "./App.jsx";
 
 createRoot(document.getElementById("root")).render(
   <Router>
-    <App />
-    <ToastContainer position="bottom-right" autoClose={3000} />
+    <QueryProvider>
+      <ThemeProvider>
+        <App />
+        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop />
+      </ThemeProvider>
+    </QueryProvider>
   </Router>
 );

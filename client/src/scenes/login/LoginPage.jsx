@@ -1,7 +1,4 @@
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import loginSchema from "../../validation-schema/login.schema.js";
 import {
   Eye,
   EyeOff,
@@ -13,60 +10,84 @@ import {
   TrendingUp,
   CheckCircle
 } from "lucide-react";
+import useLogin from "@/hooks/useAuth";
+import { login } from "@/services/authServices";
+import { useNavigate   } from "react-router-dom";
+import useTheme from "@/hooks/useTheme";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors }
-  } = useForm({
-    resolver: yupResolver(loginSchema),
-    defaultValues: {
-      username: "accountant",
-      password: "admin123"
-    }
+  const [formData, setFormData] = useState({
+    username: "",
+    password: ""
   });
+  const [errors, setErrors] = useState({});
+  const navigate = useNavigate();
+  const {theme, globalColors, orbColors: orbs } = useTheme();
 
-  const onSubmit = async data => {
+  const handleInputChange = e => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const onSubmit = async e => {
+    e.preventDefault();
+    setErrors({});
+
+    // Simple validation
+    const newErrors = {};
+    if (!formData.username.trim()) {
+      newErrors.username = "Username is required";
+    }
+    if (!formData.password.trim()) {
+      newErrors.password = "Password is required";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      console.log("Login successful:", data);
-      alert(`Welcome to Invenso! Logged in as: ${data.username}`);
-      setIsLoading(false);
-    }, 1500);
+    await login(formData);
+    setIsLoading(false);
+    navigate("/dashboard")
+  
   };
 
   return (
-    <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex overflow-hidden">
+   <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex overflow-auto">
       {/* Animated Background Effects */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Floating Orbs */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-64 h-64 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-4000"></div>
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 md:w-48 md:h-48 xl:w-64 xl:h-64 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-32 h-32 md:w-48 md:h-48 xl:w-64 xl:h-64 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 w-48 h-48 md:w-64 md:h-64 xl:w-96 xl:h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-4000"></div>
 
         {/* Animated Grid */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent transform -skew-y-12 animate-shimmer"></div>
       </div>
 
       {/* Left Side - Welcome Section (60%) */}
-      <div className="flex-[3] relative z-10 p-8 flex flex-col justify-center">
+      <div className="w-full lg:w-3/5 relative z-10 p-6 md:p-8 xl:p-12 flex flex-col justify-center ">
         {/* Glassmorphism Background */}
-        <div className="absolute inset-4 bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl"></div>
+        <div className="absolute inset-4 md:inset-6 bg-white/10 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-white/20 shadow-2xl"></div>
 
         {/* Content */}
-        <div className="relative z-20 max-w-lg mx-auto text-white">
+        <div className="relative z-20 max-w-2xl mx-auto text-white">
           {/* Logo and Brand - Animated Entry */}
-          <div className="mb-8 transform transition-all duration-1000 animate-fade-in-up">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-cyan-400 rounded-xl flex items-center justify-center mr-3 shadow-lg transform hover:scale-110 transition-transform duration-300">
-                <Package className="w-7 h-7 text-white" />
+          <div className="mb-6 md:mb-8 transform transition-all duration-1000 animate-fade-in-up">
+            <div className="flex items-center mb-4 justify-center lg:justify-start">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-purple-400 to-cyan-400 rounded-xl flex items-center justify-center mr-3 shadow-lg transform hover:scale-110 transition-transform duration-300">
+                <Package className="w-6 h-6 md:w-7 md:h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
+                <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
                   Invenso
                 </h1>
                 <p className="text-gray-300 text-sm">Inventory Management</p>
@@ -75,21 +96,21 @@ const LoginPage = () => {
           </div>
 
           {/* Welcome Message - Staggered Animation */}
-          <div className="mb-8 transform transition-all duration-1000 animate-fade-in-up animation-delay-500">
-            <h2 className="text-3xl font-bold mb-4 leading-tight">
+          <div className="mb-6 md:mb-8 transform transition-all duration-1000 animate-fade-in-up animation-delay-500 text-center lg:text-left">
+            <h2 className="text-2xl md:text-3xl xl:text-4xl font-bold mb-4 leading-tight">
               Welcome to the Future of
               <span className="block bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
                 Inventory Management
               </span>
             </h2>
-            <p className="text-lg text-gray-300 leading-relaxed">
+            <p className="text-base md:text-lg xl:text-xl text-gray-300 leading-relaxed max-w-xl mx-auto lg:mx-0">
               Streamline operations, optimize stock, and grow your business with our comprehensive
               solution.
             </p>
           </div>
 
           {/* Features - Sequential Animation */}
-          <div className="space-y-4 transform transition-all duration-1000 animate-fade-in-up animation-delay-1000">
+          <div className="space-y-4 transform transition-all duration-1000 animate-fade-in-up animation-delay-1000 mb-6 md:mb-8">
             <div className="flex items-center group hover:bg-white/5 rounded-lg p-3 transition-all duration-300">
               <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-300">
                 <BarChart3 className="w-5 h-5 text-white" />
@@ -122,22 +143,22 @@ const LoginPage = () => {
           </div>
 
           {/* Company Info */}
-          <div className="mt-8 pt-6 border-t border-white/20 transform transition-all duration-1000 animate-fade-in-up animation-delay-1500">
+          <div className="pt-6 border-t border-white/20 transform transition-all duration-1000 animate-fade-in-up animation-delay-1500 text-center lg:text-left">
             <p className="text-gray-400 text-sm">Trusted by 10,000+ businesses worldwide</p>
           </div>
         </div>
       </div>
 
       {/* Right Side - Login Form (40%) */}
-      <div className="flex-[2] relative z-10 flex items-center justify-center p-6">
+      <div className="w-full lg:w-2/5 relative z-10 flex items-center justify-center p-6 lg:p-8">
         {/* Glassmorphism Login Card */}
-        <div className="w-full max-w-sm transform transition-all duration-1000 animate-fade-in-right">
+        <div className="w-full max-w-md transform transition-all duration-1000 animate-fade-in-right">
           {/* Login Header */}
           <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg transform hover:scale-110 transition-all duration-300">
-              <User className="w-8 h-8 text-white" />
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg transform hover:scale-110 transition-all duration-300">
+              <User className="w-7 h-7 md:w-8 md:h-8 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-1">Sign In</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-1">Sign In</h2>
             <p className="text-gray-300 text-sm">Access your dashboard</p>
           </div>
 
@@ -152,16 +173,16 @@ const LoginPage = () => {
                     <User className="h-4 w-4 text-gray-400 group-focus-within:text-purple-400 transition-colors duration-200" />
                   </div>
                   <input
-                    {...register("username")}
+                    name="username"
                     type="text"
+                    value={formData.username}
+                    onChange={handleInputChange}
                     placeholder="Enter username"
                     className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 hover:bg-white/20 transition-all duration-200"
                   />
                 </div>
                 {errors.username && (
-                  <p className="text-red-400 text-xs mt-1 animate-shake">
-                    {errors.username.message}
-                  </p>
+                  <p className="text-red-400 text-xs mt-1 animate-shake">{errors.username}</p>
                 )}
               </div>
 
@@ -173,8 +194,10 @@ const LoginPage = () => {
                     <Lock className="h-4 w-4 text-gray-400 group-focus-within:text-purple-400 transition-colors duration-200" />
                   </div>
                   <input
-                    {...register("password")}
+                    name="password"
                     type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleInputChange}
                     placeholder="Enter password"
                     className="w-full pl-10 pr-11 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 hover:bg-white/20 transition-all duration-200"
                   />
@@ -187,9 +210,7 @@ const LoginPage = () => {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-red-400 text-xs mt-1 animate-shake">
-                    {errors.password.message}
-                  </p>
+                  <p className="text-red-400 text-xs mt-1 animate-shake">{errors.password}</p>
                 )}
               </div>
 
@@ -206,9 +227,9 @@ const LoginPage = () => {
 
               {/* Submit Button */}
               <button
-                onClick={handleSubmit(onSubmit)}
+                onClick={onSubmit}
                 disabled={isLoading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-transparent transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl animate-fade-in-up animation-delay-3500"
+                className="w-full py-3 cursor-pointer px-4 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-transparent transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl animate-fade-in-up animation-delay-3500"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center space-x-2">
@@ -315,6 +336,15 @@ const LoginPage = () => {
           }
           75% {
             transform: translateX(5px);
+          }
+        }
+
+        @media (max-width: 1023px) {
+          .w-full.lg\\:w-3\\/5 {
+            display: none;
+          }
+          .w-full.lg\\:w-2\\/5 {
+            width: 100% !important;
           }
         }
       `}</style>
