@@ -1,145 +1,145 @@
 /**
- * validations/purchaseValidations.js
- * Validation rules for Purchase resource using express-validator.
+ * @file express-validator middlewares for purchase resource.
  */
 
 import { body, param, query } from "express-validator";
-import { createListValidation } from "../middlewares/listValidation.js";
+import { PaymentMode, AcpSheetSize } from "@prisma/client";
 
-const paymentModes = [
-  "NONE",
-  "CASH",
-  "BANK_TRANSFER",
-  "CHEQUE",
-  "UPI",
-  "CARD",
-  "CREDIT",
-  "ONLINE",
+// Convert Prisma enums → arrays
+const PAYMENT_MODES = Object.values(PaymentMode);
+const ACP_SHEET_SIZES = Object.values(AcpSheetSize);
+
+// --------------------
+// Validate purchase ID param
+// --------------------
+const validatePurchaseId = [
+  param("id")
+    .exists().withMessage("Purchase ID param is required")
+    .isInt({ gt: 0 }).withMessage("Purchase ID must be a positive integer")
+    .toInt(),
 ];
 
-// Validate purchase create/update
+// --------------------
+// Validate purchase create/update body
+// --------------------
 const validatePurchase = [
+  // ---- Core purchase fields ----
   body("partyId")
-    .notEmpty()
-    .withMessage("Party ID is required")
+    .exists().withMessage("Party ID is required")
     .isInt({ gt: 0 })
-    .withMessage("Party ID must be a positive integer"),
-  body("date").optional().isISO8601().withMessage("Date must be ISO8601 format"),
-  body("invoiceNumber").optional().isString(),
+    .withMessage("Party ID must be a positive integer")
+    .toInt(),
+
+  body("date")
+    .optional()
+    .isISO8601()
+    .withMessage("Date must be in ISO8601 format"),
+
+  // invoiceNumber is auto-generated → do NOT require
+  body("invoiceNumber")
+    .optional()
+    .isInt({ gt: 0 })
+    .toInt(),
+
   body("paymentMode")
     .optional()
-    .isIn(paymentModes)
-    .withMessage(`Payment Mode must be one of: ${paymentModes.join(", ")}`),
-  body("paymentReference").optional().isString(),
-  body("remarks").optional().isString(),
+    .isIn(PAYMENT_MODES)
+    .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
+
+  body("paymentReference")
+    .optional()
+    .isString()
+    .trim(),
+
+  body("remarks")
+    .optional()
+    .isString()
+    .trim(),
+
   body("paidAmount")
     .optional()
-    .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Paid amount must be a decimal with up to 2 decimals"),
+    .isDecimal()
+    .withMessage("Paid amount must be a decimal")
+    .toFloat(),
+
   body("totalAmount")
-    .optional()
-    .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Total amount must be a decimal with up to 2 decimals"),
+    .exists().withMessage("Total amount is required")
+    .isDecimal()
+    .withMessage("Total amount must be a decimal")
+    .toFloat(),
+
   body("totalTaxableAmount")
-    .optional()
-    .isDecimal({ decimal_digits: "0,2" }),
+    .exists().withMessage("Total taxable amount is required")
+    .isDecimal()
+    .toFloat(),
+
   body("totalGstAmount")
-    .optional()
-    .isDecimal({ decimal_digits: "0,2" }),
+    .exists().withMessage("Total GST amount is required")
+    .isDecimal()
+    .toFloat(),
 
-  // Validate purchase items array
+  // ---- Purchase items ----
   body("purchaseItems")
+    .exists().withMessage("Purchase items are required")
     .isArray({ min: 1 })
-    .withMessage("Purchase items must be an array with at least 1 item"),
+    .withMessage("Purchase items must be an array with at least one item"),
+
   body("purchaseItems.*.productId")
-    .notEmpty()
-    .withMessage("Product ID is required for each purchase item")
-    .isInt({ gt: 0 }),
-  body("purchaseItems.*.size").optional().isString(),
-  body("purchaseItems.*.quantity")
-    .notEmpty()
-    .withMessage("Quantity is required for each purchase item")
-    .isDecimal({ decimal_digits: "0,3" }),
-  body("purchaseItems.*.pricePerUnit")
-    .notEmpty()
-    .withMessage("Price per unit is required for each purchase item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseItems.*.gstRate")
-    .notEmpty()
-    .withMessage("GST rate is required for each purchase item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseItems.*.gstAmount")
-    .notEmpty()
-    .withMessage("GST amount is required for each purchase item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseItems.*.taxableAmount")
-    .notEmpty()
-    .withMessage("Taxable amount is required for each purchase item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseItems.*.totalAmount")
-    .notEmpty()
-    .withMessage("Total amount is required for each purchase item")
-    .isDecimal({ decimal_digits: "0,2" }),
-];
-
-// Validate purchase ID param
-const validatePurchaseId = [
-  param("id").isInt({ gt: 0 }).withMessage("Valid purchase ID is required"),
-];
-
-// Validate query params for list
-const validatePurchaseQuery = createListValidation({
-  // ✅ Allowed filter keys based on your filter config
-  allowedFilterKeys: ["partyId", "paymentStatus", "invoiceNumber", "dateRange"],
-
-  // ✅ Custom validation for specific filters
-  customFilterValidators: {
-    paymentStatus: (value) => {
-      const PAYMENT_STATUSES = ["PAID", "PARTIAL", "NOT PAID"];
-      if (!PAYMENT_STATUSES.includes(value)) {
-        throw new Error(
-          `Invalid paymentStatus filter: ${value}. Allowed: ${PAYMENT_STATUSES.join(", ")}`
-        );
-      }
-    },
-    dateRange: (value) => {
-      // Expected value format: { from: "YYYY-MM-DD", to: "YYYY-MM-DD" }
-      if (
-        typeof value !== "object" ||
-        !value.from ||
-        !value.to
-      ) {
-        throw new Error("dateRange filter must contain 'from' and 'to' fields");
-      }
-
-      // Optionally, you could also check for valid date formats
-      const isValidDate = (dateStr) => !isNaN(Date.parse(dateStr));
-      if (!isValidDate(value.from) || !isValidDate(value.to)) {
-        throw new Error("Invalid date format in dateRange filter");
-      }
-    },
-  },
-});
-
-// Validate bulk delete request body
-const validateBulkDelete = [
-  body("ids")
-    .isArray({ min: 1 })
-    .withMessage("Array of purchase IDs is required"),
-  body("ids.*")
+    .exists().withMessage("Product ID is required for each item")
     .isInt({ gt: 0 })
-    .withMessage("Each purchase ID must be a positive integer"),
+    .toInt(),
+
+  body("purchaseItems.*.size")
+    .optional()
+    .isIn(ACP_SHEET_SIZES)
+    .withMessage(`Size must be one of: ${ACP_SHEET_SIZES.join(", ")}`),
+
+  body("purchaseItems.*.quantity")
+    .exists().withMessage("Quantity is required for each item")
+    .isDecimal()
+    .withMessage("Quantity must be a decimal")
+    .toFloat(),
+
+  body("purchaseItems.*.pricePerUnit")
+    .exists().withMessage("Price per unit is required for each item")
+    .isDecimal()
+    .withMessage("Price per unit must be a decimal")
+    .toFloat(),
+
+  body("purchaseItems.*.gstRate")
+    .exists().withMessage("GST rate is required for each item")
+    .isDecimal()
+    .withMessage("GST rate must be a decimal")
+    .toFloat(),
+
+  body("purchaseItems.*.gstAmount")
+    .exists().withMessage("GST amount is required for each item")
+    .isDecimal()
+    .withMessage("GST amount must be a decimal")
+    .toFloat(),
+
+  body("purchaseItems.*.taxableAmount")
+    .exists().withMessage("Taxable amount is required for each item")
+    .isDecimal()
+    .withMessage("Taxable amount must be a decimal")
+    .toFloat(),
+
+  body("purchaseItems.*.totalAmount")
+    .exists().withMessage("Total amount is required for each item")
+    .isDecimal()
+    .withMessage("Total amount must be a decimal")
+    .toFloat(),
 ];
 
+// --------------------
+// Exports
+// --------------------
 export {
   validatePurchase,
   validatePurchaseId,
-  validatePurchaseQuery,
-  validateBulkDelete,
 };
+
 export default {
   validatePurchase,
   validatePurchaseId,
-  validatePurchaseQuery,
-  validateBulkDelete,
 };

@@ -11,8 +11,6 @@ import purchaseController from "../controllers/purchaseControllers.js";
 import {
   validatePurchase,
   validatePurchaseId,
-  validatePurchaseQuery,
-  validateBulkDelete,
 } from "../validations/purchaseValidations.js";
 
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
@@ -22,8 +20,6 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 router.get(
   "/",
   authMiddleware,
-  validatePurchaseQuery,
-  validateRequest,
   purchaseController.listPurchases
 );
 
@@ -50,7 +46,6 @@ router.put(
   "/:id",
   authMiddleware,
   validatePurchaseId,
-  validatePurchase,
   validateRequest,
   purchaseController.updatePurchase
 );
@@ -64,14 +59,6 @@ router.delete(
   purchaseController.deletePurchase
 );
 
-// Bulk delete purchases
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  purchaseController.bulkDeletePurchases
-);
 
 export default router;
 export { router };
