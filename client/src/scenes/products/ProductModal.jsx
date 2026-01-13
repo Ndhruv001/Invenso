@@ -23,6 +23,18 @@ import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { TextField, TextAreaField, SelectField } from "@/components/common/FormFields";
 import { toast } from "react-toastify";
 
+// From all form values, keep only what the user actually changed.
+const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
+  const updatePayload = {};
+
+  Object.keys(fieldsUserModified).forEach(fieldName => {
+    updatePayload[fieldName] = currentFormValues[fieldName];
+  });
+
+  return updatePayload;
+};
+
+
 const ProductModal = ({
   onSubmit,
   onCancel,
@@ -55,11 +67,13 @@ const ProductModal = ({
 
   // React Hook Form setup (maintains controlled form state)
   const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting, isDirty }
-  } = useForm({
+  register,
+  handleSubmit,
+  reset,
+  getValues,
+  formState: { errors, isSubmitting, isDirty, dirtyFields }
+} = useForm({
+
     defaultValues,
     resolver: yupResolver(productSchema),
     mode: "onSubmit",
@@ -73,25 +87,45 @@ const ProductModal = ({
   const isDisabled = !isEditMode || isSubmitting || isLoading;
 
   const submitHandler = handleSubmit(
-    values => {
-      onSubmit(values);
-      console.log("🚀 ~ ProductModal ~ values:", values)
-      if (!initialData) {
-        reset(defaultValues);
-      }
-      if (initialData && isEditMode) {
-        onCancel();
-        setIsEditMode(false);
-      }
-    },
-    errors => {
-      if (Object.keys(errors).length > 0) {
-        toast.error("Please fix validation errors before submitting.");
-      } else {
-        toast.error("An unexpected error occurred. Please try again.");
+  currentFormValues => {
+    let updatePayload = currentFormValues;
+
+    // EDIT MODE → send only changed fields
+    if (initialData) {
+      updatePayload = extractModifiedFields(
+        currentFormValues,
+        dirtyFields
+      );
+
+      if (Object.keys(updatePayload).length === 0) {
+        toast.info("No changes detected");
+        return;
       }
     }
-  );
+
+    console.log("🚀 ~ ProductModal ~ updatePayload:", updatePayload)
+    onSubmit(updatePayload);
+
+    // CREATE MODE → reset form
+    if (!initialData) {
+      reset(defaultValues);
+    }
+
+    // EDIT MODE → close modal
+    if (initialData && isEditMode) {
+      onCancel();
+      setIsEditMode(false);
+    }
+  },
+  formErrors => {
+    if (Object.keys(formErrors).length > 0) {
+      toast.error("Please fix validation errors before submitting.");
+    } else {
+      toast.error("An unexpected error occurred. Please try again.");
+    }
+  }
+);
+
 
   const handleCancel = useCallback(() => {
     if (initialData && isEditMode && isDirty) {

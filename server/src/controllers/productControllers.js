@@ -88,27 +88,6 @@ const deleteProduct = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /products/bulk-delete
- * Bulk soft delete products by array of IDs.
- */
-const bulkDeleteProducts = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await productServices.bulkDeleteProducts(ids, userId);
-  return successResponse(res, "Products deleted successfully", deleted, 200);
-});
-
-/**
- * GET /products/search?q=
- * Global search products on all searchable fields.
- */
-const globalSearchProducts = asyncHandler(async (req, res) => {
-  const query = req.query?.q || "";
-  const results = await productServices.globalSearchProducts(query);
-  return successResponse(res, "Products search results", results, 200);
-});
-
-/**
  * GET /products/suggest?q=
  * Suggest product names for dropdown, max 10
  */
@@ -125,8 +104,6 @@ export default {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts,
-  globalSearchProducts,
   suggestProductNames,
 };
 export {
@@ -136,7 +113,5 @@ export {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts,
-  globalSearchProducts,
   suggestProductNames,
 };

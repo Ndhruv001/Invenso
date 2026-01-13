@@ -44,7 +44,6 @@ router.put(
   "/:id",
   authMiddleware,
   validateProductId,
-  validateProduct,
   validateRequest,
   productController.updateProduct
 );
@@ -56,15 +55,6 @@ router.delete(
   validateProductId,
   validateRequest,
   productController.deleteProduct
-);
-
-// Global search (with q param)
-router.get(
-  "/search",
-  authMiddleware,
-  validateSuggestOrSearch,
-  validateRequest,
-  productController.globalSearchProducts
 );
 
 // Product name suggestions for dropdown (with q param)

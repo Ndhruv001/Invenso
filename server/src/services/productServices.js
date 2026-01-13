@@ -1,6 +1,6 @@
 /**
  * productServices.js
- * Prisma-based services for Product resource.
+ * prisma-based services for Product resource.
  *
  * Supports:
  * - List with filters, search, pagination, sorting, stats
@@ -13,6 +13,7 @@
  * - Name suggestions for dropdowns
  */
 
+import { AcpSheetSize } from "@prisma/client";
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
@@ -22,8 +23,6 @@ import AppError from "../utils/appErrorUtils.js";
  * @returns {Object} { data, pagination, stats }
  *
  */
-
-const validSizes = new Set(["NONE", "S4x4", "S6x4", "S8x4", "S10x4", "S12x4", "OTHER"]);
 
 // List all distinct HSN Codes from Product table (only active products)
 async function listHsnCodes() {
@@ -45,16 +44,27 @@ async function listProducts({
   search = "",
   filters = {}
 }) {
-  const where = { isActive: true };
+  console.log("🚀 ~ listProducts ~ filters:", filters)
+  const where = {
+    isActive: true
+  };
 
-  // Apply filters
-  if (filters.categoryId) where.categoryId = Number(filters.categoryId);
-  if (filters.hsnCode) where.hsnCode = filters.hsnCode;
-  if (filters.size && validSizes.has(filters.size)) {
-    where.size = filters.size;
+  /* -------------------- Filters -------------------- */
+
+  if (filters.categoryId) {
+    where.categoryId = Number(filters.categoryId);
   }
 
-  if (filters.currentStock) {
+  if (filters.hsnCode) {
+    where.hsnCode = filters.hsnCode;
+  }
+
+  if (filters.size && AcpSheetSize[filters.size]) {
+  where.size = filters.size;
+}
+
+  // Stock status filter
+    if (filters.currentStock) {
     switch (filters.currentStock) {
       case "Low stock":
         where.currentStock = { lt: prisma.product.fields.threshold };
@@ -70,90 +80,94 @@ async function listProducts({
     }
   }
 
-  // Search across all relevant product fields
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
+  /* -------------------- Search -------------------- */
+
+  if (search.trim()) {
+    const q = search.trim();
+    const isNumeric = !isNaN(Number(q));
+
     where.OR = [
-      { name: { contains: trimmedSearch, mode: "insensitive" } },
-      { hsnCode: { contains: trimmedSearch, mode: "insensitive" } },
-      { unit: { contains: trimmedSearch, mode: "insensitive" } },
-      { description: { contains: trimmedSearch, mode: "insensitive" } },
-      // Numeric or decimal fields can only be filtered if search is numeric
-      ...(isNaN(Number(trimmedSearch))
-        ? []
-        : [
-            { openingStock: Number(trimmedSearch) },
-            { currentStock: Number(trimmedSearch) },
-            { avgCostPrice: Number(trimmedSearch) },
-            { avgSellPrice: Number(trimmedSearch) },
-            { threshold: parseInt(trimmedSearch, 10) }
-          ])
+      { name: { contains: q, mode: "insensitive" } },
+      { hsnCode: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
     ];
   }
 
+  /* -------------------- Pagination -------------------- */
+
   const skip = (page - 1) * limit;
-  const take = limit;
 
-  // Fetch total rows for pagination
-  const totalRows = await prisma.product.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
+  /* -------------------- DB Transaction -------------------- */
 
-  // Fetch product list with pagination and sorting
-  const data = await prisma.product.findMany({
-    where,
-    orderBy:
-      sortBy === "category"
-        ? { category: { name: sortOrder } } // ✅ relation sort
-        : { [sortBy]: sortOrder },
-    skip,
-    take,
-    include: { category: true }
-  });
-
-  // Calculate stats (filtered products, not all)
-  const [totalProducts, totalCategories, totalHSN, totalStockValue] = await Promise.all([
-    prisma.product.count({
-      where // ✅ use same filter
+  const [
+    products,
+    totalRows,
+    groupedCategories,
+    groupedHSN,
+    stockRows
+  ] = await prisma.$transaction([
+    prisma.product.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy:
+        sortBy === "category"
+          ? { category: { name: sortOrder } }
+          : { [sortBy]: sortOrder },
+      include: {
+        category: true
+      }
     }),
 
-    prisma.product
-      .groupBy({
-        by: ["categoryId"],
-        where // ✅ use same filter
-      })
-      .then(res => res.length),
+    prisma.product.count({ where }),
 
-    prisma.product
-      .groupBy({
-        by: ["hsnCode"],
-        where // ✅ use same filter
-      })
-      .then(res => res.length),
+    prisma.product.groupBy({
+      by: ["categoryId"],
+      where
+    }),
 
-    prisma.product
-      .findMany({
-        where, // ✅ use same filter
-        select: { currentStock: true, avgCostPrice: true }
-      })
-      .then(products =>
-        products.reduce(
-          (sum, p) => sum + (Number(p.currentStock) || 0) * (Number(p.avgCostPrice) || 0),
-          0
-        )
-      )
+    prisma.product.groupBy({
+      by: ["hsnCode"],
+      where
+    }),
+
+    prisma.product.findMany({
+      where,
+      select: {
+        currentStock: true,
+        avgCostPrice: true
+      }
+    })
   ]);
 
+  /* -------------------- Derived Stats -------------------- */
+
+  const totalStockValue = stockRows.reduce((sum, p) => {
+    return (
+      sum +
+      Number(p.currentStock || 0) * Number(p.avgCostPrice || 0)
+    );
+  }, 0);
+
+  /* -------------------- Response -------------------- */
+
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
+    data: products,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
     stats: {
-      totalProducts,
-      totalCategories,
-      totalHSN,
+      totalProducts: totalRows,
+      totalCategories: groupedCategories.length,
+      totalHSN: groupedHSN.length,
       totalStockValue
     }
   };
 }
+
 
 /**
  * Get product by ID with category relation
@@ -180,40 +194,70 @@ async function getProductById(id) {
  * @returns created product
  */
 async function createProduct(data, userId = null) {
-  const openingStock = Number(data.openingStock) || 0;
-  const avgCostPrice = Number(data.avgCostPrice) || 0;
-  const defaultCurrentStock = openingStock;
+  return prisma.$transaction(async (tx) => {
+    // Normalize numeric inputs (Decimal-safe)
+    const openingStock =
+      data.openingStock !== undefined ? Number(data.openingStock) : undefined;
 
-  return await prisma.$transaction(async tx => {
+    const avgCostPrice =
+      data.avgCostPrice !== undefined ? Number(data.avgCostPrice) : undefined;
+
+    const avgSellPrice =
+      data.avgSellPrice !== undefined ? Number(data.avgSellPrice) : undefined;
+
+    const threshold =
+      data.threshold !== undefined ? Number(data.threshold) : undefined;
+
+    // Build product data safely
+    const productData = {
+      name: data.name,
+
+      // Relations
+      category: {
+        connect: { id: data.categoryId }
+      },
+
+      // Optional nullable fields
+      ...(data.hsnCode !== undefined && { hsnCode: data.hsnCode }),
+      ...(data.description !== undefined && { description: data.description }),
+
+      // Optional enums (Prisma defaults apply if omitted)
+      ...(data.size !== undefined && { size: data.size }),
+      ...(data.unit !== undefined && { unit: data.unit }),
+
+      // Optional numeric fields (Prisma defaults apply if omitted)
+      ...(openingStock !== undefined && {
+        openingStock,
+        currentStock: openingStock
+      }),
+
+      ...(avgCostPrice !== undefined && { avgCostPrice }),
+      ...(avgSellPrice !== undefined && { avgSellPrice }),
+      ...(threshold !== undefined && { threshold })
+    };
+
     // Create product
     const product = await tx.product.create({
-      data: {
-        ...data,
-        openingStock,
-        currentStock: defaultCurrentStock,
-        avgCostPrice
-      }
+      data: productData
     });
 
-    // If openingStock > 0, insert inventory log and journal entry
-    if (openingStock > 0) {
+    // Inventory log only if openingStock provided & > 0
+    if (openingStock !== undefined && openingStock > 0) {
       await tx.inventoryLog.create({
         data: {
           productId: product.id,
           type: "ADD",
           quantity: openingStock,
           referenceType: "OPENING_STOCK",
-          remark: "Initial opening stock",
+          referenceId: String(product.id),
+          remark: "Opening stock at product creation",
           balanceBefore: 0,
           balanceAfter: openingStock
         }
       });
-
-      // JournalEntry creation could go here if you want financial tracking
-      // For now, omitted as per your mention - add if needed
     }
 
-    // Audit log create
+    // Audit log
     await tx.auditLog.create({
       data: {
         tableName: "products",
@@ -228,6 +272,7 @@ async function createProduct(data, userId = null) {
   });
 }
 
+
 /**
  * Update product with handling of openingStock change and inventory log
  * Wrap in transaction for atomicity and integrity
@@ -235,61 +280,111 @@ async function createProduct(data, userId = null) {
  * @param {Object} data fields to update
  * @returns updated product
  */
+
 async function updateProduct(id, data, userId = null) {
   if (!id) throw new AppError("Product ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
-    const existing = await tx.product.findUnique({ where: { id } });
-    if (!existing || !existing.isActive) throw new AppError("Product not found", 404);
+  return prisma.$transaction(async (tx) => {
+    // 1. Load existing product
+    const existing = await tx.product.findUnique({
+      where: { id }
+    });
 
-    // Prepare update
-    const openingStockPrev = Number(existing.openingStock) || 0;
-    const openingStockNew =
-      data.quantity !== undefined ? Number(data.quantity) : openingStockPrev;
+    if (!existing || !existing.isActive) {
+      throw new AppError("Product not found", 404);
+    }
 
-    const updateData = { ...data };
-    const { categoryId, quantity, ...rest } = updateData || {};
+    // 2. Prepare update container
+    const updateData = {};
+    let openingStockChanged = false;
 
-    // If openingStock changed, log inventory and update currentStock accordingly
-    if (openingStockNew !== openingStockPrev) {
-      const diff = Number(openingStockNew) - Number(openingStockPrev);
+    // 3. Name
+    if (data.name !== undefined && data.name !== existing.name) {
+      updateData.name = data.name;
+    }
 
+    // 4. Category
+    if (
+      data.categoryId !== undefined &&
+      data.categoryId !== existing.categoryId
+    ) {
+      updateData.category = {
+        connect: { id: data.categoryId }
+      };
+    }
+
+    // 5. HSN Code
+    if (data.hsnCode !== undefined && data.hsnCode !== existing.hsnCode) {
+      updateData.hsnCode = data.hsnCode;
+    }
+
+    // 6. Size
+    if (data.size !== undefined && data.size !== existing.size) {
+      updateData.size = data.size;
+    }
+
+    // 7. Unit
+    if (data.unit !== undefined && data.unit !== existing.unit) {
+      updateData.unit = data.unit;
+    }
+
+    // 8. Threshold
+    if (
+      data.threshold !== undefined &&
+      Number(data.threshold) !== Number(existing.threshold)
+    ) {
+      updateData.threshold = Number(data.threshold);
+    }
+
+    // 9. Description
+    if (
+      data.description !== undefined &&
+      data.description !== existing.description
+    ) {
+      updateData.description = data.description;
+    }
+
+    // 10. OPENING STOCK (IMPORTANT BUSINESS LOGIC)
+    if (
+      data.openingStock !== undefined &&
+      Number(data.openingStock) !== Number(existing.openingStock)
+    ) {
+      const oldOpeningStock = Number(existing.openingStock) || 0;
+      const newOpeningStock = Number(data.openingStock);
+      const diff = newOpeningStock - oldOpeningStock;
+
+      // Inventory log
       await tx.inventoryLog.create({
         data: {
           productId: id,
           type: diff > 0 ? "ADD" : "SUBTRACT",
           quantity: Math.abs(diff),
           referenceType: "ADJUSTMENT",
-          referenceId: id,
-          remark: `OpeningStock adjusted by ${diff}`,
+          referenceId: String(id),
+          remark: `Opening stock adjusted by ${diff}`,
           balanceBefore: Number(existing.currentStock) || 0,
           balanceAfter: (Number(existing.currentStock) || 0) + diff
         }
       });
 
-      updateData.currentStock = (Number(existing.currentStock) || 0) + diff;
-      updateData.openingStock = Number(openingStockNew) || 0;
-      console.log("🚀 ~ updateProduct ~ openingStock:", openingStock)
+      updateData.openingStock = newOpeningStock;
+      updateData.currentStock =
+        (Number(existing.currentStock) || 0) + diff;
+
+      openingStockChanged = true;
     }
 
-    // Update product
-    const updatedProduct = await tx.product.update({
-      where: { id },
-      data: {
-        ...rest,
-        // handle categoryId properly
-        ...(categoryId && {
-          category: {
-            connect: { id: categoryId }
-          },
-          ...(quantity && {
-            currentStock: quantity
-          })
-        })
-      }
-    });
+    // 11. Update product ONLY if something changed
+    let updatedProduct = existing;
 
-    // Audit log update
+    if (Object.keys(updateData).length > 0) {
+      updatedProduct = await tx.product.update({
+        where: { id },
+        data: updateData
+      });
+    }
+
+    // 12. Audit log
     await tx.auditLog.create({
       data: {
         tableName: "products",
@@ -337,80 +432,6 @@ async function deleteProduct(id, userId = null) {
 }
 
 /**
- * Bulk soft delete products by IDs, with audit log
- * @param {number[]} ids product IDs
- * @param {number|null} userId optional userId
- */
-async function bulkDeleteProducts(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of product IDs is required", 400);
-  }
-
-  return await prisma.$transaction(async tx => {
-    const existingProducts = await tx.product.findMany({
-      where: {
-        id: { in: ids },
-        isActive: true
-      }
-    });
-
-    if (existingProducts.length !== ids.length) throw new AppError("Some products not found", 404);
-
-    // Soft delete products
-    await tx.product.updateMany({
-      where: { id: { in: ids } },
-      data: { isActive: false }
-    });
-
-    // Create audit logs for each deleted product
-    await Promise.all(
-      existingProducts.map(prod =>
-        tx.auditLog.create({
-          data: {
-            tableName: "products",
-            recordId: String(prod.id),
-            action: "DELETE",
-            oldValue: JSON.stringify(prod),
-            userId
-          }
-        })
-      )
-    );
-
-    return true;
-  });
-}
-
-/**
- * Global search products across all searchable fields
- * @param {string} searchStr
- * @returns {Array} matching products
- */
-async function globalSearchProducts(searchStr) {
-  if (!searchStr || typeof searchStr !== "string") return [];
-
-  const trimmedSearch = searchStr.trim();
-
-  if (trimmedSearch === "") return [];
-
-  // All searchable fields for text search
-  const fields = ["name", "hsnCode", "description", "unit"];
-
-  // Numeric/enum fields must be carefully handled
-  // Searching only text fields for global search for safety here
-
-  const where = {
-    isActive: true,
-    OR: fields.map(field => ({
-      [field]: { contains: trimmedSearch, mode: "insensitive" }
-    }))
-  };
-
-  const products = await prisma.product.findMany({ where });
-  return products;
-}
-
-/**
  * Suggest product names matching query for dropdowns (limit 10)
  * @param {string} query
  * @returns [{id, name}]
@@ -438,8 +459,6 @@ export {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts,
-  globalSearchProducts,
   suggestProductNames
 };
 export default {
@@ -449,7 +468,5 @@ export default {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts,
-  globalSearchProducts,
   suggestProductNames
 };

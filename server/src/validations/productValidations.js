@@ -1,15 +1,13 @@
 /**
  * @file express-validator middlewares for product resource.
- * Validates request params, body, query, and batch actions.
  */
 
 import { body, param, query } from "express-validator";
-// & -- IGNORE --- this will a future addition
-// import createListValidation from "../middlewares/listValidation.js"; 
+import { AcpSheetSize, UnitType } from "@prisma/client";
 
-
-const ACP_SHEET_SIZES = ["NONE", "S4x4", "S6x4", "S8x4", "S10x4", "S12x4", "OTHER"];
-const UNIT_TYPES = ["PCS", "METER", "KG", "LITER", "BOX", "PACKET", "ROLL", "SHEET", "SQF", "SQM", "OTHER"];
+// Convert Prisma enums → arrays (IMPORTANT)
+const ACP_SHEET_SIZES = Object.values(AcpSheetSize);
+const UNIT_TYPES = Object.values(UnitType);
 
 // --------------------
 // Validate product ID param
@@ -27,18 +25,18 @@ const validateProductId = [
 const validateProduct = [
   body("name")
     .exists().withMessage("Name is required")
-    .isString().withMessage("Name must be a string")
+    .isString()
     .trim()
-    .notEmpty().withMessage("Name cannot be empty"),
+    .notEmpty(),
 
   body("categoryId")
     .exists().withMessage("CategoryId is required")
-    .isInt({ gt: 0 }).withMessage("CategoryId must be a positive integer")
+    .isInt({ gt: 0 })
     .toInt(),
 
   body("hsnCode")
     .optional()
-    .isString().withMessage("HSN Code must be a string")
+    .isString()
     .trim(),
 
   body("size")
@@ -51,59 +49,39 @@ const validateProduct = [
     .isIn(UNIT_TYPES)
     .withMessage(`Unit must be one of: ${UNIT_TYPES.join(", ")}`),
 
-  body("openingStock")
-    .optional()
-    .isDecimal().withMessage("Opening stock must be a decimal number")
-    .toFloat(),
-
-  body("currentStock")
-    .optional()
-    .isDecimal().withMessage("Current stock must be a decimal number")
-    .toFloat(),
-
-  body("avgCostPrice")
-    .optional()
-    .isDecimal().withMessage("Average cost price must be a decimal number")
-    .toFloat(),
-
-  body("avgSellPrice")
-    .optional()
-    .isDecimal().withMessage("Average sell price must be a decimal number")
-    .toFloat(),
-
-  body("threshold")
-    .optional()
-    .isDecimal().withMessage("Threshold must be a decimal number")
-    .toFloat(),
+  body("openingStock").optional().isDecimal().toFloat(),
+  body("currentStock").optional().isDecimal().toFloat(),
+  body("avgCostPrice").optional().isDecimal().toFloat(),
+  body("avgSellPrice").optional().isDecimal().toFloat(),
+  body("threshold").optional().isDecimal().toFloat(),
 
   body("description")
     .optional()
-    .isString().withMessage("Description must be a string")
+    .isString()
     .trim(),
 ];
 
-
 // --------------------
-// Validate query for suggest and search (q param)
+// Validate query for suggest/search
 // --------------------
 const validateSuggestOrSearch = [
   query("q")
-    .exists().withMessage("Query param 'q' is required")
-    .isString().withMessage("q must be a string")
+    .exists()
+    .isString()
     .trim()
-    .notEmpty().withMessage("'q' cannot be empty"),
+    .notEmpty(),
 ];
 
 // --------------------
 // Exports
 // --------------------
-export default {
+export {
   validateProduct,
   validateProductId,
   validateSuggestOrSearch,
 };
 
-export {
+export default {
   validateProduct,
   validateProductId,
   validateSuggestOrSearch,
