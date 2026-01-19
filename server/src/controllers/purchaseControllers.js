@@ -74,24 +74,12 @@ const deletePurchase = asyncHandler(async (req, res) => {
   return successResponse(res, "Purchase deleted successfully", deleted, 200);
 });
 
-/**
- * POST /purchases/bulk-delete
- * Bulk delete purchases by IDs
- */
-const bulkDeletePurchases = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await purchaseServices.bulkDeletePurchases(ids, userId);
-  return successResponse(res, "Purchases deleted successfully", deleted, 200);
-});
-
 export default {
   listPurchases,
   getPurchase,
   createPurchase,
   updatePurchase,
   deletePurchase,
-  bulkDeletePurchases,
 };
 export {
   listPurchases,
@@ -99,5 +87,4 @@ export {
   createPurchase,
   updatePurchase,
   deletePurchase,
-  bulkDeletePurchases,
 };

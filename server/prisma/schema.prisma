@@ -207,7 +207,7 @@ model Purchase {
   id                 Int               @id @default(autoincrement())
   date               DateTime          @default(now())
   partyId            Int
-  invoiceNumber      Int               @unique @default(autoincrement())
+  invoiceNumber      Int               
   totalAmount        Decimal           @db.Decimal(15, 2)
   totalGstAmount     Decimal           @db.Decimal(15, 2)
   totalTaxableAmount Decimal           @db.Decimal(15, 2)
@@ -398,7 +398,7 @@ model Payment {
   updatedAt        DateTime             @updatedAt
 
   party           Party?             @relation(fields: [partyId], references: [id])
-  purchase        Purchase?          @relation("PurchasePayments", fields: [referenceId], references: [invoiceNumber], map: "payment_purchase_fkey")
+  purchase        Purchase?          @relation("PurchasePayments", fields: [referenceId], references: [id], map: "payment_purchase_fkey")
   sale            Sale?              @relation("SalePayments", fields: [referenceId], references: [invoiceNumber], map: "payment_sale_fkey")
   purchaseReturn  PurchaseReturn?    @relation("PurchaseReturnPayments", fields: [referenceId], references: [id], map: "payment_purchase_return_fkey")
   saleReturn      SaleReturn?        @relation("SaleReturnPayments", fields: [referenceId], references: [id], map: "payment_sale_return_fkey")
@@ -460,7 +460,7 @@ model InventoryLog {
   updatedAt       DateTime          @updatedAt
 
   product         Product           @relation(fields: [productId], references: [id])
-  purchase        Purchase?         @relation("PurchaseInventoryLogs", fields: [referenceId], references: [invoiceNumber], map: "inventory_purchase_fkey")
+  purchase        Purchase?         @relation("PurchaseInventoryLogs", fields: [referenceId], references: [id], map: "inventory_purchase_fkey")
   sale            Sale?             @relation("SaleInventoryLogs", fields: [referenceId], references: [invoiceNumber], map: "inventory_sale_fkey")
   purchaseReturn  PurchaseReturn?   @relation("PurchaseReturnInventoryLogs", fields: [referenceId], references: [id], map: "inventory_purchase_return_fkey")
   saleReturn      SaleReturn?       @relation("SaleReturnInventoryLogs", fields: [referenceId], references: [id], map: "inventory_sale_return_fkey")

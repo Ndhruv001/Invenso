@@ -98,112 +98,129 @@ async function listPurchases({
   search = "",
   filters = {}
 }) {
+  /* -------------------- Base Where -------------------- */
+
   const where = {};
 
-  if (filters.partyId) where.partyId = Number(filters.partyId);
+  /* -------------------- Filters -------------------- */
+
+  if (filters.partyId) {
+    where.partyId = Number(filters.partyId);
+  }
 
   if (filters.invoiceNumber) {
-    where.invoiceNumber = { contains: filters.invoiceNumber, mode: "insensitive" };
+    where.invoiceNumber = Number(filters.invoiceNumber);
   }
 
-  const from = filters.dateFrom;
-  const to = filters.dateTo;
-
-  if (from || to) {
-    const dateFilter = buildDateFilter({ from, to });
-    if (dateFilter) where.date = dateFilter;
+  if (filters.dateFrom || filters.dateTo) {
+    const dateFilter = buildDateFilter({
+      from: filters.dateFrom,
+      to: filters.dateTo
+    });
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
   }
 
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
+  if (filters.paymentMode) {
+    where.paymentMode = filters.paymentMode;
+  }
 
-    // Find matching parties by name
-    const matchingParties = await prisma.party.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true }
-    });
-    const partyIds = matchingParties.map(p => p.id);
+  /* -------------------- Search -------------------- */
 
-    // Find matching products by name (within purchaseItems)
-    const matchingProducts = await prisma.product.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true }
-    });
-    const productIds = matchingProducts.map(p => p.id);
+  if (search.trim()) {
+    const q = search.trim();
+    const isNumeric = !isNaN(Number(q));
 
-    where.OR = [
-      { invoiceNumber: Number.isNaN(Number(search)) ? undefined : Number(search) },
-      { remarks: { contains: trimmedSearch, mode: "insensitive" } },
-      { partyId: { in: partyIds.length ? partyIds : [0] } },
+    const orConditions = [
+      { remarks: { contains: q, mode: "insensitive" } },
+
       {
-        purchaseItems: {
-          some: {
-            productId: { in: productIds.length ? productIds : [0] }
-          }
+        party: {
+          name: { contains: q, mode: "insensitive" }
         }
-      }
+      },
+
+      ...(isNumeric ? [{ invoiceNumber: Number(q) }] : [])
     ];
+
+    where.OR = orConditions;
   }
 
-  // ✅ 3. Pagination logic
+  /* -------------------- Pagination -------------------- */
+
   const skip = (page - 1) * limit;
   const take = limit;
 
-  // ✅ 4. Fetch total count and data (like product)
-  const totalRows = await prisma.purchase.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
+  /* -------------------- Safe Sorting -------------------- */
 
-  const data = await prisma.purchase.findMany({
-    where,
-    orderBy: sortBy === "party" ? { party: { name: sortOrder } } : { [sortBy]: sortOrder },
-    skip,
-    take,
-    include: {
-      party: true,
-      purchaseItems: {
-        include: {
-          product: {
-            include: { category: true }
+  const allowedSortFields = ["date", "invoiceNumber", "totalAmount", "createdAt"];
+
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
+
+  const orderBy =
+    safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
+
+  /* -------------------- DB Transaction -------------------- */
+
+  const [purchases, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+    prisma.purchase.findMany({
+      where,
+      skip,
+      take,
+      orderBy,
+      include: {
+        party: true,
+        purchaseItems: {
+          include: {
+            product: {
+              include: { category: true }
+            }
           }
         }
       }
-    }
-  });
+    }),
 
-  // ✅ 5. Aggregate stats (filtered)
-  const [totalParties, sumAmounts] = await Promise.all([
-    prisma.purchase
-      .groupBy({
-        by: ["partyId"],
-        where
-      })
-      .then(res => res.length),
+    prisma.purchase.count({ where }),
 
-    prisma.purchase
-      .aggregate({
-        where,
-        _sum: {
-          totalAmount: true,
-          totalGstAmount: true,
-          paidAmount: true
-        }
-      })
-      .then(res => ({
-        totalAmount: Number(res._sum.totalAmount) || 0,
-        totalGstAmount: Number(res._sum.totalGstAmount) || 0,
-        totalPaid: Number(res._sum.paidAmount) || 0
-      }))
+    prisma.purchase.groupBy({
+      by: ["partyId"],
+      where
+    }),
+
+    prisma.purchase.aggregate({
+      where,
+      _sum: {
+        totalAmount: true,
+        totalGstAmount: true,
+        totalTaxableAmount: true,
+        paidAmount: true
+      }
+    })
   ]);
 
+  /* -------------------- Stats -------------------- */
+
+  const stats = {
+    totalPurchases: totalRows,
+    totalParties: groupedParties.length,
+    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
+    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
+    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
+    sumTotalPaid: Number(aggregates._sum.paidAmount) || 0
+  };
+
+  /* -------------------- Response -------------------- */
+
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
-    stats: {
-      totalParties,
-      sumTotalAmount: sumAmounts.totalAmount,
-      sumTotalGst: sumAmounts.totalGstAmount,
-      sumTotalPaid: sumAmounts.totalPaid
-    }
+    data: purchases,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
+    stats
   };
 }
 
@@ -240,57 +257,62 @@ async function createPurchase(data, userId = null) {
     purchaseItems
   } = data;
 
-  if (!purchaseItems || !Array.isArray(purchaseItems) || purchaseItems.length === 0) {
+  if (!Array.isArray(purchaseItems) || purchaseItems.length === 0) {
     throw new AppError("Purchase items are required", 400);
   }
 
-  return await prisma.$transaction(async tx => {
-    // Calculate totals for purchase items
+  return prisma.$transaction(async tx => {
+    /* -------------------- Normalize & Prepare -------------------- */
     let totalAmount = 0;
     let totalTaxableAmount = 0;
     let totalGstAmount = 0;
 
-    const purchaseItemsData = [];
-
-    for (const item of purchaseItems) {
-      const itemTotalTaxable = Number(item.taxableAmount);
-      const itemGstAmount = Number(item.gstAmount);
+    const purchaseItemsData = purchaseItems.map(item => {
+      const quantity = Number(item.quantity);
+      const pricePerUnit = Number(item.pricePerUnit);
+      const gstRate = Number(item.gstRate);
+      const taxableAmount = Number(item.taxableAmount);
+      const gstAmount = Number(item.gstAmount);
       const itemTotalAmount = Number(item.totalAmount);
 
-      totalTaxableAmount += itemTotalTaxable;
-      totalGstAmount += itemGstAmount;
+      totalTaxableAmount += taxableAmount;
+      totalGstAmount += gstAmount;
       totalAmount += itemTotalAmount;
 
-      purchaseItemsData.push({
+      return {
         productId: item.productId,
         size: item.size || "NONE",
-        quantity: item.quantity,
-        pricePerUnit: item.pricePerUnit,
-        gstRate: item.gstRate,
-        gstAmount: itemGstAmount,
-        taxableAmount: itemTotalTaxable,
+        quantity,
+        pricePerUnit,
+        gstRate,
+        taxableAmount,
+        gstAmount,
         totalAmount: itemTotalAmount
-      });
-    }
-
-    // Create purchase
-    const purchase = await tx.purchase.create({
-      data: {
-        date,
-        partyId,
-        invoiceNumber,
-        paidAmount,
-        paymentMode,
-        paymentReference,
-        remarks,
-        totalAmount,
-        totalGstAmount,
-        totalTaxableAmount
-      }
+      };
     });
 
-    // Create purchase items & update stock + inventory log
+    /* -------------------- Build Purchase Data -------------------- */
+    const purchaseData = {
+      ...(date && { date }),
+      partyId,
+      ...(invoiceNumber && { invoiceNumber }),
+      totalAmount,
+      totalGstAmount,
+      totalTaxableAmount,
+      paidAmount: Number(paidAmount),
+      ...(paymentMode && { paymentMode }),
+      ...(paymentReference && { paymentReference }),
+      ...(remarks && { remarks })
+    };
+
+    /* -------------------- Create Purchase -------------------- */
+    const purchase = await tx.purchase.create({
+      data: purchaseData
+    });
+
+    /* -------------------- Create Items + Inline Inventory -------------------- */
     for (const item of purchaseItemsData) {
+      // 1. Create the item record
       await tx.purchaseItem.create({
         data: {
           purchaseId: purchase.id,
@@ -298,40 +320,55 @@ async function createPurchase(data, userId = null) {
         }
       });
 
-      // Create inventory log and update product stock (ADD type because purchasing increases stock)
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
+      // 2. Inline Inventory Logic (Replacing the function call)
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found`, 404);
+      }
+
+      const balanceBefore = Number(product.currentStock);
+      const balanceAfter = balanceBefore + item.quantity;
+
+      // Log the movement
+      await tx.inventoryLog.create({
+        data: {
           productId: item.productId,
           quantity: item.quantity,
           type: "ADD",
-          remark: `Purchase #${purchase.id} item addition`
-        },
-        "PURCHASE",
-        purchase.id
-      );
+          referenceType: "PURCHASE",
+          referenceId: purchase.id, // Linked to the new purchase ID
+          remark: `Purchase #${purchase.id}`,
+          balanceBefore,
+          balanceAfter
+        }
+      });
+
+      // Update actual stock
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { currentStock: balanceAfter }
+      });
     }
 
-    // Update party current balance based on paidAmount
-    if (partyId) {
-      // Calculate difference party owes (totalAmount - paidAmount)
-      const partyBalanceDiff = totalAmount - paidAmount;
-      if (partyBalanceDiff > 0) {
-        // Party owes: increase payable balance by partyBalanceDiff
-        await tx.party.update({
-          where: { id: partyId },
-          data: { currentBalance: { increment: partyBalanceDiff } }
-        });
-      }
+    /* -------------------- Party Balance Update -------------------- */
+    const payableAmount = totalAmount - Number(paidAmount);
+    if (partyId && payableAmount > 0) {
+      await tx.party.update({
+        where: { id: partyId },
+        data: { currentBalance: { increment: payableAmount } }
+      });
     }
 
-    // Create payment entry if paid amount > 0
-    if (paidAmount > 0 && partyId) {
+    /* -------------------- Payment Entry -------------------- */
+    if (partyId && Number(paidAmount) > 0) {
       await tx.payment.create({
         data: {
           partyId,
           type: "PAID",
-          amount: paidAmount,
+          amount: Number(paidAmount),
           referenceType: "PURCHASE",
           referenceId: purchase.id,
           paymentMode,
@@ -341,7 +378,7 @@ async function createPurchase(data, userId = null) {
       });
     }
 
-    // Create audit log
+    /* -------------------- Audit Log -------------------- */
     await tx.auditLog.create({
       data: {
         tableName: "purchases",
@@ -362,150 +399,317 @@ async function createPurchase(data, userId = null) {
  * @param {Object} data update data incl. purchaseItems array
  * @param {number|null} userId
  */
-async function updatePurchase(id, data, userId = null) {
-  if (!id) throw new AppError("Purchase ID is required", 400);
-  if (!data) throw new AppError("Update data is required", 400);
+async function updatePurchase(purchaseId, data, userId = null) {
+  if (!purchaseId) {
+    throw new AppError("Purchase ID is required", 400);
+  }
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
     const existingPurchase = await tx.purchase.findUnique({
-      where: { id },
+      where: { id: purchaseId },
       include: { purchaseItems: true }
     });
-    if (!existingPurchase) throw new AppError("Purchase not found", 404);
 
-    const {
-      purchaseItems = [],
-      paidAmount = existingPurchase.paidAmount,
-      paymentMode,
-      paymentReference,
-      partyId = existingPurchase.partyId,
-      remarks
-    } = data;
-
-    // Update purchase items stocks: first revert old stock and inventory log
-    for (const oldItem of existingPurchase.purchaseItems) {
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
-          productId: oldItem.productId,
-          quantity: oldItem.quantity,
-          type: "SUBTRACT",
-          remark: `Revert purchase #${id} item before update`
-        },
-        "PURCHASE",
-        id
-      );
-
-      // Delete old purchase item after revert
-      await tx.purchaseItem.delete({ where: { id: oldItem.id } });
+    if (!existingPurchase) {
+      throw new AppError("Purchase not found", 404);
     }
 
-    // Then add new purchase items stock and inventory log, calculate new totals
-    let totalAmount = 0;
-    let totalTaxableAmount = 0;
-    let totalGstAmount = 0;
+    const purchaseUpdateData = {};
+    let itemsWereModified = false;
+    let purchaseWasUpdated = false;
 
-    for (const item of purchaseItems) {
-      const itemTotalTaxable = Number(item.taxableAmount);
-      const itemGstAmount = Number(item.gstAmount);
-      const itemTotalAmount = Number(item.totalAmount);
+    /* ------------------------------
+       Purchase fields (partial updates)
+    ------------------------------ */
+    if (data.partyId !== undefined) {
+      purchaseUpdateData.partyId = data.partyId;
+    }
 
-      totalTaxableAmount += itemTotalTaxable;
-      totalGstAmount += itemGstAmount;
-      totalAmount += itemTotalAmount;
+    if (data.invoiceNumber !== undefined) {
+      purchaseUpdateData.invoiceNumber = Number(data.invoiceNumber);
+    }
 
-      await tx.purchaseItem.create({
-        data: {
-          purchaseId: id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: itemGstAmount,
-          taxableAmount: itemTotalTaxable,
-          totalAmount: itemTotalAmount
+    if (data.paidAmount !== undefined) {
+      purchaseUpdateData.paidAmount = Number(data.paidAmount);
+    }
+
+    if (data.paymentMode !== undefined) {
+      purchaseUpdateData.paymentMode = data.paymentMode;
+    }
+
+    if (data.paymentReference !== undefined) {
+      purchaseUpdateData.paymentReference = data.paymentReference;
+    }
+
+    if (data.remarks !== undefined) {
+      purchaseUpdateData.remarks = data.remarks;
+    }
+
+    /* ------------------------------
+       Purchase items (ONLY if sent)
+    ------------------------------ */
+    if (Array.isArray(data.purchaseItems)) {
+      itemsWereModified = true;
+
+      const incomingIds = data.purchaseItems
+        .filter(item => item.id)
+        .map(item => item.id);
+
+      const itemsToDelete = existingPurchase.purchaseItems.filter(
+        item => !incomingIds.includes(item.id)
+      );
+
+      /* ---- STEP 1: DELETE removed items ---- */
+      for (const itemToDelete of itemsToDelete) {
+        const product = await tx.product.findUnique({
+          where: { id: itemToDelete.productId }
+        });
+
+        if (product) {
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore - Number(itemToDelete.quantity);
+
+          if (stockAfter < 0) {
+            throw new AppError(
+              `Cannot delete item: would result in negative stock for product ${product.name}`,
+              400
+            );
+          }
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "SUBTRACT",
+              quantity: itemToDelete.quantity,
+              referenceType: "PURCHASE",
+              referenceId: String(purchaseId),
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter,
+              remark: "Item removed from purchase"
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
         }
+
+        await tx.purchaseItem.delete({
+          where: { id: itemToDelete.id }
+        });
+      }
+
+      /* ---- STEP 2 & 3: UPDATE existing + ADD new items ---- */
+      for (const incomingItem of data.purchaseItems) {
+        /* ---- UPDATE existing item ---- */
+        if (incomingItem.id) {
+          const existingItem = existingPurchase.purchaseItems.find(
+            item => item.id === incomingItem.id
+          );
+
+          if (!existingItem) {
+            throw new AppError("Purchase item not found", 404);
+          }
+
+          const product = await tx.product.findUnique({
+            where: { id: existingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const oldQty = Number(existingItem.quantity);
+          const newQty = incomingItem.quantity !== undefined 
+            ? Number(incomingItem.quantity) 
+            : oldQty;
+
+          const qtyDiff = newQty - oldQty;
+
+          if (qtyDiff !== 0) {
+            const stockBefore = Number(product.currentStock);
+            const stockAfter = stockBefore + qtyDiff;
+
+            if (stockAfter < 0) {
+              throw new AppError(
+                `Insufficient stock for product ${product.name}`,
+                400
+              );
+            }
+
+            await tx.inventoryLog.create({
+              data: {
+                productId: product.id,
+                type: qtyDiff > 0 ? "ADD" : "SUBTRACT",
+                quantity: Math.abs(qtyDiff),
+                referenceType: "PURCHASE",
+                referenceId: String(purchaseId),
+                balanceBefore: stockBefore,
+                balanceAfter: stockAfter
+              }
+            });
+
+            await tx.product.update({
+              where: { id: product.id },
+              data: { currentStock: stockAfter }
+            });
+          }
+
+          await tx.purchaseItem.update({
+            where: { id: existingItem.id },
+            data: {
+              quantity: newQty,
+              pricePerUnit: incomingItem.pricePerUnit ?? existingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate ?? existingItem.gstRate,
+              gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
+              totalAmount: incomingItem.totalAmount ?? existingItem.totalAmount,
+              size: incomingItem.size ?? existingItem.size
+            }
+          });
+        }
+
+        /* ---- ADD new item ---- */
+        else {
+          const product = await tx.product.findUnique({
+            where: { id: incomingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore + Number(incomingItem.quantity);
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "ADD",
+              quantity: incomingItem.quantity,
+              referenceType: "PURCHASE",
+              referenceId: String(purchaseId),
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
+
+          await tx.purchaseItem.create({
+            data: {
+              purchaseId,
+              productId: incomingItem.productId,
+              size: incomingItem.size || "NONE",
+              quantity: incomingItem.quantity,
+              pricePerUnit: incomingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate,
+              gstAmount: incomingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount,
+              totalAmount: incomingItem.totalAmount
+            }
+          });
+        }
+      }
+
+      /* ---- Recalculate totals after items changed ---- */
+      const allItems = await tx.purchaseItem.findMany({
+        where: { purchaseId }
       });
 
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "ADD",
-          remark: `Purchase #${id} item addition`
-        },
-        "PURCHASE",
-        id
+      purchaseUpdateData.totalAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.totalAmount),
+        0
+      );
+
+      purchaseUpdateData.totalTaxableAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.taxableAmount),
+        0
+      );
+
+      purchaseUpdateData.totalGstAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.gstAmount),
+        0
       );
     }
 
-    // Calculate party balance diff and update
-    if (partyId) {
-      const oldPaidAmount = existingPurchase.paidAmount || 0;
-      const newPaidAmount = paidAmount || 0;
-      await updatePartyBalanceForPaymentDiff(tx, partyId, oldPaidAmount, newPaidAmount);
+    /* ------------------------------
+       Update purchase record
+    ------------------------------ */
+    const updatedPurchase =
+      Object.keys(purchaseUpdateData).length > 0
+        ? await tx.purchase.update({
+            where: { id: purchaseId },
+            data: purchaseUpdateData
+          })
+        : existingPurchase;
+
+    if (Object.keys(purchaseUpdateData).length > 0) {
+      purchaseWasUpdated = true;
     }
 
-    // Update purchase
-    const updatedPurchase = await tx.purchase.update({
-      where: { id },
-      data: {
-        partyId,
-        paidAmount,
-        paymentMode,
-        paymentReference,
-        totalAmount,
-        totalTaxableAmount,
-        totalGstAmount,
-        remarks
-      }
-    });
+    if (itemsWereModified) {
+      purchaseWasUpdated = true;
+    }
 
-    // Update or create payment
-    const existingPayment = await tx.payment.findFirst({
-      where: { referenceType: "PURCHASE", referenceId: id }
-    });
-    if (updatedPurchase.paidAmount > 0 && partyId) {
-      if (existingPayment) {
-        await tx.payment.update({
-          where: { id: existingPayment.id },
-          data: {
-            partyId,
-            amount: updatedPurchase.paidAmount,
-            paymentMode: updatedPurchase.paymentMode,
-            paymentReference: updatedPurchase.paymentReference,
-            remark: updatedPurchase.remarks
-          }
-        });
-      } else {
-        await tx.payment.create({
-          data: {
-            partyId,
-            type: "PAID",
-            amount: updatedPurchase.paidAmount,
-            referenceType: "PURCHASE",
-            referenceId: updatedPurchase.id,
-            paymentMode: updatedPurchase.paymentMode,
-            paymentReference: updatedPurchase.paymentReference,
-            remark: updatedPurchase.remarks
-          }
+    /* ------------------------------
+       Party balance adjustment (UNIFIED LOGIC)
+       This runs AFTER all updates are complete
+    ------------------------------ */
+    const oldPartyId = existingPurchase.partyId;
+    const oldTotal = Number(existingPurchase.totalAmount);
+    const oldPaid = Number(existingPurchase.paidAmount || 0);
+    const oldPayable = oldTotal - oldPaid;
+
+    const newPartyId = updatedPurchase.partyId;
+    const newTotal = Number(updatedPurchase.totalAmount);
+    const newPaid = Number(updatedPurchase.paidAmount || 0);
+    const newPayable = newTotal - newPaid;
+
+    const partyChanged = oldPartyId !== newPartyId;
+
+    if (partyChanged) {
+      // Party changed: reverse old payable, apply new payable
+      await tx.party.update({
+        where: { id: oldPartyId },
+        data: { currentBalance: { increment: -oldPayable } }
+      });
+
+      await tx.party.update({
+        where: { id: newPartyId },
+        data: { currentBalance: { increment: newPayable } }
+      });
+    } else {
+      // Same party: apply payable diff
+      const payableDiff = newPayable - oldPayable;
+
+      if (payableDiff !== 0) {
+        await tx.party.update({
+          where: { id: oldPartyId },
+          data: { currentBalance: { increment: payableDiff } }
         });
       }
     }
 
-    // Audit log
-    await tx.auditLog.create({
-      data: {
-        tableName: "purchases",
-        recordId: String(id),
-        action: "UPDATE",
-        oldValue: JSON.stringify(existingPurchase),
-        newValue: JSON.stringify(updatedPurchase),
-        userId
-      }
-    });
+    /* ------------------------------
+       Audit log (only if something changed)
+    ------------------------------ */
+    if (purchaseWasUpdated) {
+      await tx.auditLog.create({
+        data: {
+          tableName: "purchases",
+          recordId: String(purchaseId),
+          action: "UPDATE",
+          oldValue: JSON.stringify(existingPurchase),
+          newValue: JSON.stringify(updatedPurchase),
+          userId
+        }
+      });
+    }
 
     return updatedPurchase;
   });
@@ -519,64 +723,123 @@ async function updatePurchase(id, data, userId = null) {
  * - Delete purchase items and purchase
  * - Audit log
  */
-async function deletePurchase(id, userId = null) {
-  if (!id) throw new AppError("Purchase ID is required", 400);
+async function deletePurchase(purchaseId, userId = null) {
+  if (!purchaseId) {
+    throw new AppError("Purchase ID is required", 400);
+  }
 
-  return await prisma.$transaction(async tx => {
-    const purchase = await tx.purchase.findUnique({
-      where: { id },
+  return prisma.$transaction(async (tx) => {
+    /* ----------------------------------------
+       1. Load purchase with items
+    ---------------------------------------- */
+    const existingPurchase = await tx.purchase.findUnique({
+      where: { id: purchaseId },
       include: { purchaseItems: true }
     });
-    if (!purchase) throw new AppError("Purchase not found", 404);
 
-    // Undo product stock and inventory logs for each item
-    for (const item of purchase.purchaseItems) {
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "SUBTRACT",
-          remark: `Undo purchase #${id} item deletion`
-        },
-        "PURCHASE",
-        id
-      );
+    if (!existingPurchase) {
+      throw new AppError("Purchase not found", 404);
     }
 
-    // Undo party currentBalance by totalAmount (payable)
-    if (purchase.partyId) {
-      await tx.party.update({
-        where: { id: purchase.partyId },
+    /* ----------------------------------------
+       2. REVERSE INVENTORY (undo stock addition)
+    ---------------------------------------- */
+    for (const item of existingPurchase.purchaseItems) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(
+          `Product ${item.productId} not found or inactive`,
+          404
+        );
+      }
+
+      const stockBefore = Number(product.currentStock);
+      const stockAfter = stockBefore - Number(item.quantity);
+
+      if (stockAfter < 0) {
+        throw new AppError(
+          "Stock underflow while deleting purchase",
+          400
+        );
+      }
+
+      // Inventory reversal log
+      await tx.inventoryLog.create({
         data: {
-          currentBalance: {
-            increment: -Number(purchase.totalAmount - purchase.paidAmount)
-          }
+          productId: product.id,
+          type: "SUBTRACT",
+          quantity: item.quantity,
+          referenceType: "PURCHASE",
+          referenceId: String(purchaseId),
+          remark: `Purchase #${purchaseId} deleted`,
+          balanceBefore: stockBefore,
+          balanceAfter: stockAfter
         }
+      });
+
+      // Update product stock
+      await tx.product.update({
+        where: { id: product.id },
+        data: { currentStock: stockAfter }
       });
     }
 
-    // Delete payment if exists
-    const payment = await tx.payment.findFirst({
-      where: { referenceType: "PURCHASE", referenceId: id }
-    });
-    if (payment) {
-      await tx.payment.delete({ where: { id: payment.id } });
+    /* ----------------------------------------
+       3. REVERSE PARTY BALANCE (payable undo)
+    ---------------------------------------- */
+    if (existingPurchase.partyId) {
+      const payableAmount =
+        Number(existingPurchase.totalAmount) -
+        Number(existingPurchase.paidAmount || 0);
+
+      if (payableAmount !== 0) {
+        await tx.party.update({
+          where: { id: existingPurchase.partyId },
+          data: {
+            currentBalance: {
+              increment: -payableAmount
+            }
+          }
+        });
+      }
     }
 
-    // Delete purchase items (cascade might already handle, but explicit)
-    await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
+    /* ----------------------------------------
+       4. DELETE ALL PAYMENTS LINKED TO PURCHASE
+    ---------------------------------------- */
+    await tx.payment.deleteMany({
+      where: {
+        referenceType: "PURCHASE",
+        referenceId: String(purchaseId)
+      }
+    });
 
-    // Delete purchase record
-    await tx.purchase.delete({ where: { id } });
+    /* ----------------------------------------
+       5. DELETE PURCHASE ITEMS (cascade safe)
+    ---------------------------------------- */
+    await tx.purchaseItem.deleteMany({
+      where: { purchaseId }
+    });
 
-    // Audit log
+    /* ----------------------------------------
+       6. DELETE PURCHASE
+    ---------------------------------------- */
+    await tx.purchase.delete({
+      where: { id: purchaseId }
+    });
+
+    /* ----------------------------------------
+       7. AUDIT LOG (MANDATORY)
+    ---------------------------------------- */
     await tx.auditLog.create({
       data: {
         tableName: "purchases",
-        recordId: String(id),
+        recordId: String(purchaseId),
         action: "DELETE",
-        oldValue: JSON.stringify(purchase),
+        oldValue: JSON.stringify(existingPurchase),
         userId
       }
     });
@@ -585,96 +848,12 @@ async function deletePurchase(id, userId = null) {
   });
 }
 
-/**
- * Bulk delete purchases by IDs with all related cleanup
- * Undo stock and inventory logs, undo party balance, delete payments, purchase items, purchases, audit logs.
- * @param {number[]} ids array of purchase IDs
- * @param {number|null} userId for audit logging
- */
-async function bulkDeletePurchases(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of purchase IDs is required", 400);
-  }
 
-  return await prisma.$transaction(async tx => {
-    const existingPurchases = await tx.purchase.findMany({
-      where: { id: { in: ids } },
-      include: { purchaseItems: true }
-    });
-
-    if (existingPurchases.length !== ids.length) {
-      throw new AppError("Some purchases not found", 404);
-    }
-
-    for (const purchase of existingPurchases) {
-      // Undo stock and inventory logs for all purchase items
-      for (const item of purchase.purchaseItems) {
-        await createInventoryLogAndUpdateStock(
-          tx,
-          {
-            productId: item.productId,
-            quantity: item.quantity,
-            type: "SUBTRACT",
-            remark: `Undo bulk delete purchase #${purchase.id} item`
-          },
-          "PURCHASE",
-          purchase.id
-        );
-      }
-
-      // Undo party balance by totalAmount
-      if (purchase.partyId) {
-        await tx.party.update({
-          where: { id: purchase.partyId },
-          data: {
-            currentBalance: { increment: -Number(purchase.totalAmount - purchase.paidAmount) }
-          }
-        });
-      }
-
-      // Delete payment if exists
-      const payment = await tx.payment.findFirst({
-        where: { referenceType: "PURCHASE", referenceId: purchase.id }
-      });
-      if (payment) {
-        await tx.payment.delete({ where: { id: payment.id } });
-      }
-
-      // Delete purchase items
-      await tx.purchaseItem.deleteMany({ where: { purchaseId: purchase.id } });
-
-      // Delete purchase record
-      await tx.purchase.delete({ where: { id: purchase.id } });
-
-      // Audit log
-      await tx.auditLog.create({
-        data: {
-          tableName: "purchases",
-          recordId: String(purchase.id),
-          action: "DELETE",
-          oldValue: JSON.stringify(purchase),
-          userId
-        }
-      });
-    }
-
-    return true;
-  });
-}
-
-export {
-  listPurchases,
-  getPurchaseById,
-  createPurchase,
-  updatePurchase,
-  deletePurchase,
-  bulkDeletePurchases
-};
+export { listPurchases, getPurchaseById, createPurchase, updatePurchase, deletePurchase };
 export default {
   listPurchases,
   getPurchaseById,
   createPurchase,
   updatePurchase,
-  deletePurchase,
-  bulkDeletePurchases
+  deletePurchase
 };

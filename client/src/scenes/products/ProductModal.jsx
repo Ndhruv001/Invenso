@@ -12,7 +12,7 @@ import {
   Ruler
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
-import productSchema from "@/validations/product.schema";
+import productSchema from "@/validations/productSchema";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
