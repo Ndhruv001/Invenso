@@ -26,70 +26,6 @@ function buildDateFilter({ from, to }) {
   return Object.keys(cond).length ? cond : undefined;
 }
 
-/**
- * Helper: Update party current balance based on difference in payment
- * @param {Transaction} tx Prisma transaction client
- * @param {number} partyId
- * @param {number} oldPaidAmount
- * @param {number} newPaidAmount
- */
-async function updatePartyBalanceForPaymentDiff(tx, partyId, oldPaidAmount, newPaidAmount) {
-  const diff = newPaidAmount - oldPaidAmount;
-  if (diff === 0) return;
-  // Positive diff means party owes more -> increase payable balance
-  // Negative diff means party paid more -> decrease payable balance
-  await tx.party.update({
-    where: { id: partyId },
-    data: {
-      currentBalance: { increment: -diff }
-    }
-  });
-}
-
-/**
- * Helper: Create inventory log & update product stock
- * @param {Transaction} tx Prisma transaction client
- * @param {Object} item { productId, quantity, type(ADD/SUBTRACT), referenceType, referenceId, remark }
- */
-async function createInventoryLogAndUpdateStock(tx, item, referenceType, referenceId) {
-  const product = await tx.product.findUnique({ where: { id: item.productId } });
-  if (!product || !product.isActive)
-    throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-
-  // Determine balance before/after
-  const balanceBefore = Number(product.currentStock);
-  let balanceAfter;
-
-  if (item.type === "ADD") {
-    balanceAfter = balanceBefore + Number(item.quantity);
-  } else if (item.type === "SUBTRACT") {
-    if (balanceBefore < item.quantity) throw new AppError("Insufficient stock to subtract", 400);
-    balanceAfter = balanceBefore - Number(item.quantity);
-  } else {
-    throw new AppError("Inventory log type must be ADD or SUBTRACT", 400);
-  }
-
-  // Create Inventory Log
-  await tx.inventoryLog.create({
-    data: {
-      productId: item.productId,
-      quantity: item.quantity,
-      type: item.type,
-      referenceType,
-      referenceId: String(referenceId),
-      remark: item.remark || null,
-      balanceBefore,
-      balanceAfter
-    }
-  });
-
-  // Update product stock
-  await tx.product.update({
-    where: { id: item.productId },
-    data: { currentStock: balanceAfter }
-  });
-}
-
 async function listPurchases({
   page = 1,
   limit = 10,
@@ -154,7 +90,7 @@ async function listPurchases({
 
   /* -------------------- Safe Sorting -------------------- */
 
-  const allowedSortFields = ["date", "invoiceNumber", "totalAmount", "createdAt"];
+  const allowedSortFields = ["date", "invoiceNumber", "totalAmount", "createdAt", "party"];
 
   const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
 
@@ -451,9 +387,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
     if (Array.isArray(data.purchaseItems)) {
       itemsWereModified = true;
 
-      const incomingIds = data.purchaseItems
-        .filter(item => item.id)
-        .map(item => item.id);
+      const incomingIds = data.purchaseItems.filter(item => item.id).map(item => item.id);
 
       const itemsToDelete = existingPurchase.purchaseItems.filter(
         item => !incomingIds.includes(item.id)
@@ -521,9 +455,8 @@ async function updatePurchase(purchaseId, data, userId = null) {
           }
 
           const oldQty = Number(existingItem.quantity);
-          const newQty = incomingItem.quantity !== undefined 
-            ? Number(incomingItem.quantity) 
-            : oldQty;
+          const newQty =
+            incomingItem.quantity !== undefined ? Number(incomingItem.quantity) : oldQty;
 
           const qtyDiff = newQty - oldQty;
 
@@ -532,10 +465,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
             const stockAfter = stockBefore + qtyDiff;
 
             if (stockAfter < 0) {
-              throw new AppError(
-                `Insufficient stock for product ${product.name}`,
-                400
-              );
+              throw new AppError(`Insufficient stock for product ${product.name}`, 400);
             }
 
             await tx.inventoryLog.create({
@@ -568,10 +498,9 @@ async function updatePurchase(purchaseId, data, userId = null) {
               size: incomingItem.size ?? existingItem.size
             }
           });
-        }
+        } else {
 
         /* ---- ADD new item ---- */
-        else {
           const product = await tx.product.findUnique({
             where: { id: incomingItem.productId }
           });
@@ -621,20 +550,14 @@ async function updatePurchase(purchaseId, data, userId = null) {
         where: { purchaseId }
       });
 
-      purchaseUpdateData.totalAmount = allItems.reduce(
-        (sum, i) => sum + Number(i.totalAmount),
-        0
-      );
+      purchaseUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.totalAmount), 0);
 
       purchaseUpdateData.totalTaxableAmount = allItems.reduce(
         (sum, i) => sum + Number(i.taxableAmount),
         0
       );
 
-      purchaseUpdateData.totalGstAmount = allItems.reduce(
-        (sum, i) => sum + Number(i.gstAmount),
-        0
-      );
+      purchaseUpdateData.totalGstAmount = allItems.reduce((sum, i) => sum + Number(i.gstAmount), 0);
     }
 
     /* ------------------------------
@@ -728,7 +651,7 @@ async function deletePurchase(purchaseId, userId = null) {
     throw new AppError("Purchase ID is required", 400);
   }
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async tx => {
     /* ----------------------------------------
        1. Load purchase with items
     ---------------------------------------- */
@@ -750,20 +673,14 @@ async function deletePurchase(purchaseId, userId = null) {
       });
 
       if (!product || !product.isActive) {
-        throw new AppError(
-          `Product ${item.productId} not found or inactive`,
-          404
-        );
+        throw new AppError(`Product ${item.productId} not found or inactive`, 404);
       }
 
       const stockBefore = Number(product.currentStock);
       const stockAfter = stockBefore - Number(item.quantity);
 
       if (stockAfter < 0) {
-        throw new AppError(
-          "Stock underflow while deleting purchase",
-          400
-        );
+        throw new AppError("Stock underflow while deleting purchase", 400);
       }
 
       // Inventory reversal log
@@ -792,8 +709,7 @@ async function deletePurchase(purchaseId, userId = null) {
     ---------------------------------------- */
     if (existingPurchase.partyId) {
       const payableAmount =
-        Number(existingPurchase.totalAmount) -
-        Number(existingPurchase.paidAmount || 0);
+        Number(existingPurchase.totalAmount) - Number(existingPurchase.paidAmount || 0);
 
       if (payableAmount !== 0) {
         await tx.party.update({
@@ -847,7 +763,6 @@ async function deletePurchase(purchaseId, userId = null) {
     return true;
   });
 }
-
 
 export { listPurchases, getPurchaseById, createPurchase, updatePurchase, deletePurchase };
 export default {

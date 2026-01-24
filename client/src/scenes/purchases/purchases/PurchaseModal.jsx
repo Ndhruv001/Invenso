@@ -60,18 +60,29 @@ const PurchaseModal = ({
   // Memoize default values
   const defaultValues = useMemo(() => {
     return {
-      partyName: initialData?.party?.name || "",
-      phone: initialData?.party?.phone || "",
-      billingAddress: initialData?.billingAddress || "",
-      shippingAddress: initialData?.shippingAddress || "",
-      invoiceNumber: initialData?.invoiceNumber || "",
-      invoiceDate: formatDate(initialData?.date) || "",
-      purchaseItems: initialData?.purchaseItems || [],
-      paymentMode: initialData?.paymentMode || "",
-      paymentReference: initialData?.paymentReference || "",
-      remarks: initialData?.remarks || "",
-      totalAmount: initialData?.totalAmount ?? 0,
-      paidAmount: initialData?.paidAmount ?? 0
+      // Party info
+      partyName: initialData?.party?.name ?? "",
+      phone: initialData?.party?.phone ?? "",
+      billingAddress: initialData?.party?.address ?? "",
+      shippingAddress: initialData?.party?.address ?? "",
+
+      // Invoice info
+      invoiceNumber: initialData?.invoiceNumber ?? "",
+      invoiceDate: initialData?.date ? formatDate(initialData.date) : "",
+
+      // Items
+      purchaseItems: Array.isArray(initialData?.purchaseItems) ? initialData.purchaseItems : [],
+
+      // Payment
+      paymentMode: initialData?.paymentMode ?? "",
+      paymentReference: initialData?.paymentReference ?? "",
+
+      // Misc
+      remarks: initialData?.remarks ?? "",
+
+      // Amounts (convert to numbers)
+      totalAmount: Number(initialData?.totalAmount ?? 0),
+      paidAmount: Number(initialData?.paidAmount ?? 0)
     };
   }, [initialData]);
 
