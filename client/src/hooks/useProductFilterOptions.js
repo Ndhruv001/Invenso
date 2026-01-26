@@ -2,7 +2,6 @@
 import { useMemo } from "react";
 import { useCategories } from "@/hooks/useCategories";
 import { useHsnCodes } from "@/hooks/useProducts";
-import { ACP_SHEET_SIZE_OPTIONS } from "@/constants/ACP_SHEET_SIZES";
 import STOCK_STATUSES from "@/constants/STOCK_STATUSES";
 
 function useProductFilterOptions() {
@@ -57,13 +56,6 @@ const hsnCodeOptions = useMemo(
       placeholder: "All Statuses",
       options: stockOptions
     },
-    {
-      key: "size",
-      type: "select",
-      label: "Size",
-      placeholder: "All Sizes",
-      options: ACP_SHEET_SIZE_OPTIONS
-    }
   ];
 }
 

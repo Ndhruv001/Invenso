@@ -6,7 +6,8 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts
+  bulkDeleteProducts,
+  suggestProducts
 } from "@/services/productServices";
 
 /**
@@ -112,6 +113,15 @@ export const useBulkDeleteProducts = () => {
   });
 };
 
+export const useProductSuggestions = query => {
+  return useQuery({
+    queryKey: ["product-suggestions", query],
+    queryFn: () => suggestProducts(query),
+    enabled: !!query && query.length >= 2, // ⬅ important
+    staleTime: 60 * 1000,
+  });
+};
+
 // --------------------------------------------------
 // DEFAULT EXPORT
 // --------------------------------------------------
@@ -122,5 +132,6 @@ export default {
   useUpdateProduct,
   useDeleteProduct,
   useBulkDeleteProducts,
+  useProductSuggestions,
   PRODUCT_KEYS
 };

@@ -156,6 +156,19 @@ export const bulkDeleteProducts = async ids => {
   }
 };
 
+export const suggestProducts = async query => {
+  if (!query) return [];
+
+  try {
+    const { data } = await axiosInstance.get(`/products/suggest`, {
+      params: { q: query },
+    });
+    return data;
+  } catch (error) {
+    handleAxiosError(error, "Failed to fetch party suggestions");
+  }
+};
+
 // Named export group
 export const productsApi = {
   getHsnCodes,

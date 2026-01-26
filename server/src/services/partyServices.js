@@ -48,7 +48,6 @@ async function listParties({
       { identifier: { contains: trimmedSearch, mode: "insensitive" } },
       { phone: { contains: trimmedSearch, mode: "insensitive" } },
       { gstNumber: { contains: trimmedSearch, mode: "insensitive" } },
-      { address: { contains: trimmedSearch, mode: "insensitive" } },
       { remark: { contains: trimmedSearch, mode: "insensitive" } }
     ];
 
@@ -88,14 +87,14 @@ async function listParties({
 
     prisma.party
       .aggregate({
-        where: { ...where, balanceType: "RECEIVABLE" },
+        where: { ...where},
         _sum: { currentBalance: true }
       })
       .then(res => Number(res._sum.currentBalance) || 0),
 
     prisma.party
       .aggregate({
-        where: { ...where, balanceType: "PAYABLE" },
+        where: { ...where },
         _sum: { currentBalance: true }
       })
       .then(res => Number(res._sum.currentBalance) || 0),
@@ -330,8 +329,8 @@ async function suggestPartyNames(query) {
       isActive: true,
       name: { contains: query.trim(), mode: "insensitive" }
     },
-    select: { id: true, name: true },
-    take: 10
+    take: 5,
+    orderBy: { name: "asc" },
   });
 }
 

@@ -1,45 +1,58 @@
-import React, { useMemo, useEffect, useState, useCallback } from "react";
+import React, { useMemo, useEffect, useState, useCallback, use } from "react";
 import { Save, X, FileText, Plus, Trash2, Edit3, AlertCircle } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import purchaseSchema from "@/validations/purchaseSchema";
+import { purchaseCreateSchema, purchaseUpdateSchema } from "@/validations/purchaseSchema";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
-import { formatDate } from "@/lib/helpers/formatters";
+import { PAYMENT_MODE_OPTIONS } from "@/constants/PAYMENT_MODES";
+import { GST_RATE_OPTIONS } from "@/constants/GST_RATES";
 import { toast } from "react-toastify";
+import { debounce } from "@/lib/helpers/debounce";
+import { usePartySuggestions } from "@/hooks/useParties";
+import { useProductSuggestions } from "@/hooks/useProducts";
 
-const PARTIES = [
-  { id: "1", name: "Party A", phone: "1234567890" },
-  { id: "2", name: "Party B", phone: "0987654321" }
-];
-const CATEGORIES = [
-  { id: "1", name: "Category 1" },
-  { id: "2", name: "Category 2" }
-];
-const SIZES = [
-  { id: "1", name: "Small" },
-  { id: "2", name: "Medium" },
-  { id: "3", name: "Large" }
-];
-const UNITS = [
-  { id: "1", name: "Pcs" },
-  { id: "2", name: "Kg" },
-  { id: "3", name: "Meter" }
-];
-const GST_RATES = [
-  { id: "0", name: "0%" },
-  { id: "5", name: "5%" },
-  { id: "12", name: "12%" },
-  { id: "18", name: "18%" },
-  { id: "28", name: "28%" }
-];
-const PAYMENT_TYPES = [
-  { id: "cash", name: "Cash" },
-  { id: "card", name: "Card" },
-  { id: "upi", name: "UPI" },
-  { id: "bank", name: "Bank Transfer" }
-];
+function calculatePurchaseTotals(items = [], paidAmount = 0) {
+  let totalTaxableAmount = 0;
+  let totalGstAmount = 0;
+
+  items.forEach(item => {
+    const quantity = Number(item.quantity || 0);
+    const pricePerUnit = Number(item.pricePerUnit || 0);
+    const gstRate = Number(item.gstRate || 0);
+
+    const taxableAmount = quantity * pricePerUnit;
+    const gstAmount = (taxableAmount * gstRate) / 100;
+
+    totalTaxableAmount += taxableAmount;
+    totalGstAmount += gstAmount;
+  });
+
+  const totalAmount = totalTaxableAmount + totalGstAmount;
+  const balanceAmount = totalAmount - Number(paidAmount || 0);
+
+  return {
+    totalTaxableAmount: Math.round(totalTaxableAmount),
+    totalGstAmount: Math.round(totalGstAmount),
+    totalAmount: Math.round(totalAmount),
+    balanceAmount: Math.round(balanceAmount)
+  };
+}
+
+// From all form values, keep only what the user actually changed.
+const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
+  const updatePayload = {};
+
+  Object.keys(fieldsUserModified).forEach(fieldName => {
+    if (fieldsUserModified[fieldName]) {
+      updatePayload[fieldName] = currentFormValues[fieldName];
+    }
+  });
+  return updatePayload;
+};
+
+/* ----------------------------- COMPONENT ----------------------------- */
 
 const PurchaseModal = ({
   onSubmit,
@@ -48,45 +61,87 @@ const PurchaseModal = ({
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-  console.log("🚀 ~ PurchaseModal ~ initialData:", initialData);
   const { theme } = useTheme();
 
-  // Edit mode state
+  /* ----------------------- PARTY INPUT ------------------------ */
+  const [partyInputValue, setPartyInputValue] = useState(initialData?.party?.name || "");
+  const [partySearchQuery, setPartySearchQuery] = useState("");
+  const [partySuggestions, setPartySuggestions] = useState([]);
+  const [showPartySuggestions, setShowPartySuggestions] = useState(false);
+  const [selectedParty, setSelectedParty] = useState(initialData?.party || null);
+
+  /* -------------------------------- PRODUCT INPUT ---------------------- -----*/
+
+  const [productSearchQuery, setProductSearchQuery] = useState({
+    query: "",
+    rowIndex: null
+  });
+  const [productSuggestions, setProductSuggestions] = useState([]);
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const [activeProductRowIndex, setActiveProductRowIndex] = useState(null);
+  const [productSearchText, setProductSearchText] = useState({});
+
+  /* -------------------------- EDIT MODE -------------------------- */
+
   const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
-  // Confirmation dialog hook
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
 
-  // Memoize default values
-  const defaultValues = useMemo(() => {
-    return {
-      // Party info
+  /* ---------------------- DEFAULT VALUES ------------------------- */
+
+  const defaultValues = useMemo(
+    () => ({
       partyName: initialData?.party?.name ?? "",
       phone: initialData?.party?.phone ?? "",
-      billingAddress: initialData?.party?.address ?? "",
-      shippingAddress: initialData?.party?.address ?? "",
-
-      // Invoice info
       invoiceNumber: initialData?.invoiceNumber ?? "",
-      invoiceDate: initialData?.date ? formatDate(initialData.date) : "",
+      invoiceDate: initialData?.date
+        ? initialData.date.split("T")[0]
+        : new Date(Date.now()).toISOString().split("T")[0],
 
-      // Items
-      purchaseItems: Array.isArray(initialData?.purchaseItems) ? initialData.purchaseItems : [],
-
-      // Payment
-      paymentMode: initialData?.paymentMode ?? "",
+      paymentMode: initialData?.paymentMode ?? "NONE",
       paymentReference: initialData?.paymentReference ?? "",
-
-      // Misc
+      paidAmount: Number(initialData?.paidAmount ?? 0),
       remarks: initialData?.remarks ?? "",
-
-      // Amounts (convert to numbers)
       totalAmount: Number(initialData?.totalAmount ?? 0),
-      paidAmount: Number(initialData?.paidAmount ?? 0)
-    };
-  }, [initialData]);
+      totalTaxableAmount: Number(initialData?.totalTaxableAmount ?? 0),
+      totalGstAmount: Number(initialData?.totalGstAmount ?? 0),
 
-  // React Hook Form setup with useFieldArray for dynamic purchaseItems
+      items: initialData?.purchaseItems?.map(item => ({
+        // --- identity / relations ---
+        id: item.id,
+        purchaseId: item.purchaseId,
+        productId: Number(item.productId),
+
+        // --- rich product object (used for display only) ---
+        product: item.product ?? null,
+
+        // --- editable fields ---
+        quantity: Number(item.quantity),
+        pricePerUnit: Number(item.pricePerUnit),
+        gstRate: Number(item.gstRate),
+        gstAmount: Number(item.gstAmount),
+        taxableAmount: Number(item.taxableAmount),
+        amount: Number(item.amount)
+      })) ?? [
+        {
+          id: null,
+          purchaseId: null,
+          productId: "",
+          product: null,
+          quantity: 1,
+          pricePerUnit: 0,
+          gstRate: 0,
+          gstAmount: 0,
+          taxableAmount: 0,
+          amount: 0
+        }
+      ]
+    }),
+    [initialData]
+  );
+
+  /* -------------------------- FORM -------------------------- */
+
   const {
     register,
     handleSubmit,
@@ -94,163 +149,188 @@ const PurchaseModal = ({
     watch,
     setValue,
     control,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isDirty, isSubmitting, dirtyFields }
   } = useForm({
     defaultValues,
-    resolver: yupResolver(purchaseSchema),
-    mode: "onSubmit",
-    reValidateMode: "onBlur"
+    resolver: yupResolver(initialData ? purchaseUpdateSchema : purchaseCreateSchema),
+    mode: "onSubmit"
   });
 
-  // Field array for purchaseItems management
-  const { fields, append, remove } = useFieldArray({
+  /* --------------------- PARTY SUGGESTIONS ---------------------- */
+  const { data: partySuggestionsData } = usePartySuggestions(partySearchQuery);
+
+  const debouncedPartySearch = useMemo(
+    () =>
+      debounce(value => {
+        if (!value) {
+          setPartySuggestions([]);
+          setShowPartySuggestions(false);
+          return;
+        }
+
+        setPartySearchQuery(value);
+        setShowPartySuggestions(true);
+      }, 800),
+    []
+  );
+
+  useEffect(() => {
+    if (partySuggestionsData) {
+      setPartySuggestions(partySuggestionsData);
+    }
+  }, [partySuggestionsData]);
+
+  /* --------------------- PRODUCT SUGGESTIONS ---------------------- */
+  const { data: productSuggestionsData } = useProductSuggestions(productSearchQuery.query);
+
+  const debouncedProductSearch = useMemo(
+    () =>
+      debounce((value, rowIndex) => {
+        if (!value) {
+          setProductSuggestions([]);
+          setShowProductSuggestions(false);
+          setActiveProductRowIndex(null);
+          return;
+        }
+
+        setActiveProductRowIndex(rowIndex);
+        setProductSearchQuery({ query: value, rowIndex });
+        setShowProductSuggestions(true);
+      }, 800),
+    []
+  );
+
+  useEffect(() => {
+    if (productSuggestionsData) {
+      setProductSuggestions(productSuggestionsData);
+    }
+  }, [productSuggestionsData]);
+
+  const selectProduct = (product, index) => {
+    setValue(`items.${index}.product`, product);
+    setValue(`items.${index}.productId`, product.id);
+
+    // clear search text
+    setProductSearchText(prev => ({
+      ...prev,
+      [index]: ""
+    }));
+
+    setShowProductSuggestions(false);
+    setActiveProductRowIndex(null);
+  };
+
+  /* ---------------------- FIELD ARRAY ------------------------- */
+
+  const {
+    fields: purchaseItemFields,
+    append: appendPurchaseItem,
+    remove: removePurchaseItemByIndex
+  } = useFieldArray({
     control,
-    name: "purchaseItems"
+    name: "items"
   });
 
-  // Reset form when defaultValues change
+  /* ------------------------ RESET ----------------------------- */
+
   useEffect(() => {
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  // Watch all form values for calculations
-  const watchedpurchaseItems = watch("purchaseItems");
-  const watchedRoundOff = watch("roundOff");
-  const watchedPaymentAmount = watch("paymentAmount");
+  /* --------------------- WATCHERS ----------------------------- */
 
-  // Disabled state
-  const isDisabled = !isEditMode || isSubmitting || isLoading;
+  const watchedItems = useWatch({
+    control,
+    name: "items"
+  });
 
-  // Calculate totals (memoized for performance)
-  const calculations = useMemo(() => {
-    let subtotal = 0;
-    let totalGst = 0;
-    let totalQty = 0;
+  const watchedPaidAmount = watch("paidAmount");
 
-    watchedpurchaseItems?.forEach(item => {
-      const qty = parseFloat(item?.qty || 0);
-      const price = parseFloat(item?.pricePerUnit || 0);
-      const gstRate = parseFloat(item?.gstPercentage || 0);
+  /* -------------------- CALCULATIONS -------------------------- */
 
-      const itemTotal = qty * price;
-      const gstAmount = (itemTotal * gstRate) / 100;
+  const totals = useMemo(() => {
+    return calculatePurchaseTotals(watchedItems, watchedPaidAmount);
+  }, [watchedItems, watchedPaidAmount]);
 
-      subtotal += itemTotal;
-      totalGst += gstAmount;
-      totalQty += qty;
+  const calculatedItems = useMemo(() => {
+    return watchedItems.map(item => {
+      const taxableAmount = item.quantity * item.pricePerUnit;
+      const gstAmount = taxableAmount * (item.gstRate / 100);
+      const amount = taxableAmount + gstAmount;
+
+      return {
+        ...item,
+        taxableAmount: Math.round(taxableAmount),
+        gstAmount: Math.round(gstAmount),
+        amount: Math.round(amount)
+      };
     });
+  }, [watchedItems]);
 
-    const grandTotal = subtotal + totalGst;
-    const roundOff = parseFloat(watchedRoundOff || 0);
-    const finalTotal = grandTotal + roundOff;
-    const paymentAmount = parseFloat(watchedPaymentAmount || 0);
-    const balance = finalTotal - paymentAmount;
+  /* -------------------- ITEMS ------------------------------- */
 
-    return {
-      subtotal,
-      totalGst,
-      totalQty,
-      grandTotal,
-      roundOff,
-      finalTotal,
-      paymentAmount,
-      balance
-    };
-  }, [watchedpurchaseItems, watchedRoundOff, watchedPaymentAmount]);
-
-  // Handle party selection
-  const handlePartyChange = useCallback(
-    partyId => {
-      const party = PARTIES.find(p => p.id === partyId);
-      setValue("partyName", partyId);
-      setValue("phoneNo", party ? party.phone : "");
-    },
-    [setValue]
-  );
-
-  // Add new item
-  const addNewItem = useCallback(() => {
-    append({
-      item: "",
-      hsn: "",
-      category: "",
-      size: "",
-      qty: 1,
-      unit: "",
+  const handleAddItem = useCallback(() => {
+    appendPurchaseItem({
+      productId: "",
+      quantity: 1,
       pricePerUnit: 0,
-      gstPercentage: "18"
+      gstRate: 0
     });
-  }, [append]);
+  }, [appendPurchaseItem]);
 
-  // Remove item
-  const removeItem = useCallback(
+  const handleRemoveItem = useCallback(
     index => {
-      if (fields.length > 1) {
-        remove(index);
+      if (purchaseItemFields.length > 1) {
+        removePurchaseItemByIndex(index);
       }
     },
-    [fields.length, remove]
+    [purchaseItemFields.length, removePurchaseItemByIndex]
   );
 
-  // Submit handler
+  /* -------------------- SUBMIT ------------------------------- */
+
   const submitHandler = handleSubmit(
     values => {
-      const formattedData = {
-        ...values,
-        purchaseItems: values.purchaseItems.map((item, index) => {
-          const qty = parseFloat(item.qty || 0);
-          const price = parseFloat(item.pricePerUnit || 0);
-          const gstRate = parseFloat(item.gstPercentage || 0);
-          const itemTotal = qty * price;
-          const gstAmount = (itemTotal * gstRate) / 100;
-
-          return {
-            ...item,
-            sn: index + 1,
-            qty,
-            pricePerUnit: price,
-            gstAmount,
-            amount: itemTotal + gstAmount
-          };
-        }),
-        ...calculations
+      let payload = extractModifiedFields(values, dirtyFields);
+      payload = {
+        ...payload,
+        items: calculatedItems,
+        totalTaxableAmount: totals.totalTaxableAmount,
+        totalGstAmount: totals.totalGstAmount,
+        totalAmount: totals.totalAmount
       };
-
-      onSubmit(formattedData);
+      onSubmit(payload);
 
       if (!initialData) {
         reset(defaultValues);
       }
+
       if (initialData && isEditMode) {
         onCancel();
         setIsEditMode(false);
       }
     },
-    errors => {
-      if (Object.keys(errors).length > 0) {
-        toast.error("Please fix validation errors before submitting.");
-      } else {
-        toast.error("An unexpected error occurred. Please try again.");
-      }
+    error => {
+      console.log("Validation Errors:", error);
+      toast.error("Please fix validation errors before submitting.");
     }
   );
 
-  // Handle cancel with confirmation if dirty
+  /* -------------------- CANCEL ------------------------------- */
+
   const handleCancel = useCallback(() => {
     if (initialData && isEditMode && isDirty) {
       openDialog({
-        title: "Discard Changes?",
-        message: "Are you sure you want to discard your changes? All unsaved changes will be lost.",
-        onConfirm: async () => {
+        title: "Discard changes?",
+        message: "All unsaved changes will be lost.",
+        onConfirm: () => {
           reset(defaultValues);
           onCancel();
           setIsEditMode(false);
         }
       });
     } else {
-      if (!initialData) {
-        reset(defaultValues);
-      }
+      reset(defaultValues);
       onCancel();
     }
   }, [initialData, isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
@@ -270,6 +350,9 @@ const PurchaseModal = ({
       setIsEditMode(prev => !prev);
     }
   }, [isEditMode, isDirty, reset, defaultValues, openDialog]);
+
+  // Disabled state
+  const isDisabled = !isEditMode || isSubmitting || isLoading;
 
   return (
     <>
@@ -326,119 +409,109 @@ const PurchaseModal = ({
             <div className="overflow-y-auto flex-1 p-4">
               <div className="space-y-4">
                 {/* Top Section - Party Details and Invoice Info */}
-                <div className="flex justify-between gap-6">
-                  {/* Left Side - Party Details */}
-                  <div className="flex-1 max-w-lg space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                          Party Name <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          {...register("partyName")}
-                          onChange={e => handlePartyChange(e.target.value)}
-                          disabled={isDisabled}
-                          className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                        >
-                          <option value="">Select Party</option>
-                          {PARTIES.map(party => (
-                            <option key={party.id} value={party.id}>
-                              {party.name}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.partyName && (
-                          <p className="mt-1 text-xs text-red-600 flex purchaseItems-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {errors.partyName.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                          Phone No.
-                        </label>
-                        <input
-                          type="tel"
-                          {...register("phoneNo")}
-                          disabled={isDisabled}
-                          className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                          placeholder="Phone number"
-                        />
-                      </div>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Party Name */}
+                  <div className="relative">
+                    <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
+                      Party Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={partyInputValue}
+                      disabled={isDisabled}
+                      onChange={e => {
+                        const value = e.target.value;
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                          Billing Address <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          {...register("billingAddress")}
-                          disabled={isDisabled}
-                          rows={3}
-                          className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none resize-none ${theme.bg}`}
-                          placeholder="Billing address"
-                        />
-                        {errors.billingAddress && (
-                          <p className="mt-1 text-xs text-red-600 flex purchaseItems-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {errors.billingAddress.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                          Shipping Address
-                        </label>
-                        <textarea
-                          {...register("shippingAddress")}
-                          disabled={isDisabled}
-                          rows={3}
-                          className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none resize-none ${theme.bg}`}
-                          placeholder="Shipping address"
-                        />
-                      </div>
-                    </div>
+                        if (selectedParty) {
+                          setSelectedParty(null);
+                          setValue("partyId", null);
+                          setValue("party", null);
+                        }
+
+                        setPartyInputValue(value);
+                        debouncedPartySearch(value);
+                      }}
+                      className={`w-full px-3 py-2  text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
+                    />
+
+                    {errors.partyName && (
+                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.partyName.message}
+                      </p>
+                    )}
+                    {showPartySuggestions && partySuggestions.length > 0 && (
+                      <ul className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow">
+                        {partySuggestions.map(party => (
+                          <li
+                            key={party.id}
+                            className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100"
+                            onClick={() => {
+                              setSelectedParty(party);
+                              setPartyInputValue(party.name);
+                              setValue("party", party);
+                              setValue("partyId", party.id);
+                              setShowPartySuggestions(false);
+                            }}
+                          >
+                            {party.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
-                  {/* Right Side - Invoice Details */}
-                  <div className="w-60 space-y-3">
-                    <div>
-                      <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Invoice Number <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        {...register("invoiceNumber")}
-                        disabled={isDisabled}
-                        className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                        placeholder="INV-001"
-                      />
-                      {errors.invoiceNumber && (
-                        <p className="mt-1 text-xs text-red-600 flex purchaseItems-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {errors.invoiceNumber.message}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Invoice Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        {...register("invoiceDate")}
-                        disabled={isDisabled}
-                        className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                      />
-                      {errors.invoiceDate && (
-                        <p className="mt-1 text-xs text-red-600 flex purchaseItems-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {errors.invoiceDate.message}
-                        </p>
-                      )}
-                    </div>
+                  {/* Phone */}
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
+                      Phone No.
+                    </label>
+                    <input
+                      type="tel"
+                      value={selectedParty?.phone || ""}
+                      disabled={true}
+                      className={`w-full px-3 py-2 cursor-not-allowed text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
+                      placeholder="Phone number"
+                    />
+                  </div>
+
+                  {/* Invoice Number */}
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
+                      Invoice Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      {...register("invoiceNumber")}
+                      disabled={isDisabled}
+                      className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
+                      placeholder="INV-001"
+                    />
+                    {errors.invoiceNumber && (
+                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.invoiceNumber.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Invoice Date */}
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
+                      Invoice Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      {...register("invoiceDate")}
+                      disabled={isDisabled}
+                      className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
+                    />
+                    {errors.invoiceDate && (
+                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.invoiceDate.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -450,86 +523,26 @@ const PurchaseModal = ({
                     <table className="w-full min-w-max table-fixed" style={{ minWidth: "1200px" }}>
                       <thead>
                         <tr className={theme.tableHeader}>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "70px" }}
-                          >
-                            SN.
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-3 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "300px" }}
-                          >
-                            Item
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "100px" }}
-                          >
-                            HSN
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "135px" }}
-                          >
-                            Category
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "110px" }}
-                          >
-                            Size
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "80px" }}
-                          >
-                            Qty
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "100px" }}
-                          >
-                            Unit
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "120px" }}
-                          >
-                            Price/Unit
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "150px" }}
-                          >
-                            <div>GST</div>
-                            <div className="grid grid-cols-2 gap-1 mt-1">
-                              <div className="text-xs">%</div>
-                              <div className="text-xs">Amount</div>
-                            </div>
-                          </th>
-                          <th
-                            className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                            style={{ width: "130px" }}
-                          >
-                            Amount
-                          </th>
+                          <th className="px-2 py-2 w-12">SN</th>
+                          <th className="px-3 py-2">Item</th>
+                          <th className="px-2 py-2 w-20">Qty</th>
+                          <th className="px-2 py-2 w-24">Unit</th>
+                          <th className="px-2 py-2 w-28">Price</th>
+                          <th className="px-2 py-2 w-32">GST</th>
+                          <th className="px-2 py-2 w-32 text-right">Amount</th>
                           {(isEditMode || !initialData) && (
-                            <th
-                              className={`border ${theme.border} px-2 py-2 text-sm font-medium ${theme.text.secondary}`}
-                              style={{ width: "70px" }}
-                            >
-                              Action
-                            </th>
+                            <th className="px-2 py-2 w-16">Action</th>
                           )}
                         </tr>
                       </thead>
                       <tbody>
-                        {fields.map((field, index) => {
-                          const item = watchedpurchaseItems[index] || {};
-                          const qty = parseFloat(item?.qty || 0);
-                          const price = parseFloat(item?.pricePerUnit || 0);
-                          const gstRate = parseFloat(item?.gstPercentage || 0);
+                        {purchaseItemFields.map((field, index) => {
+                          const item = watchedItems[index] || {};
+
+                          const qty = Number(item.quantity || 0);
+                          const price = Number(item.pricePerUnit || 0);
+                          const gstRate = Number(item.gstRate || 0);
+
                           const itemTotal = qty * price;
                           const gstAmount = (itemTotal * gstRate) / 100;
                           const totalAmount = itemTotal + gstAmount;
@@ -541,120 +554,122 @@ const PurchaseModal = ({
                               >
                                 {index + 1}
                               </td>
-                              <td className={`border ${theme.border} px-2 py-2`}>
+
+                              {/* Item Name (read from product) */}
+                              <td className={`border ${theme.border} px-2 py-2 relative`}>
                                 <input
-                                  {...register(`purchaseItems.${index}.item`)}
+                                  type="text"
                                   disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                  placeholder="Item name"
+                                  value={
+                                    item.product
+                                      ? item.product.name
+                                      : productSearchText[index] || ""
+                                  }
+                                  onChange={e => {
+                                    const value = e.target.value;
+
+                                    console.log("Typing:", value, "Row:", index);
+
+                                    // update typing text
+                                    setProductSearchText(prev => ({
+                                      ...prev,
+                                      [index]: value
+                                    }));
+
+                                    // clear selected product
+                                    setValue(`items.${index}.product`, null);
+                                    setValue(`items.${index}.productId`, "");
+
+                                    debouncedProductSearch(value, index);
+                                  }}
+                                  className="w-full px-2 py-1 text-sm border-0 outline-none bg-transparent"
                                 />
-                                {errors?.purchaseItems?.[index]?.item && (
-                                  <p className="text-xs text-red-600 mt-1">Required</p>
-                                )}
+                                {showProductSuggestions &&
+                                  activeProductRowIndex === index &&
+                                  productSuggestions.length > 0 && (
+                                    <ul className="absolute z-10 mt-1 w-full bg-white border rounded shadow">
+                                      {productSuggestions.map(product => (
+                                        <li
+                                          key={product.id}
+                                          onClick={() => selectProduct(product, index)}
+                                          className="px-2 py-1 text-sm cursor-pointer hover:bg-gray-100"
+                                        >
+                                          {product.name}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
                               </td>
-                              <td className={`border ${theme.border} px-2 py-2`}>
-                                <input
-                                  {...register(`purchaseItems.${index}.hsn`)}
-                                  disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                  placeholder="HSN"
-                                />
-                              </td>
-                              <td className={`border ${theme.border} px-2 py-2`}>
-                                <select
-                                  {...register(`purchaseItems.${index}.category`)}
-                                  disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                >
-                                  <option value="">None</option>
-                                  {CATEGORIES.map(cat => (
-                                    <option key={cat.id} value={cat.id}>
-                                      {cat.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className={`border ${theme.border} px-2 py-2`}>
-                                <select
-                                  {...register(`purchaseItems.${index}.size`)}
-                                  disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                >
-                                  <option value="">None</option>
-                                  {SIZES.map(size => (
-                                    <option key={size.id} value={size.id}>
-                                      {size.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
+
+                              {/* Quantity */}
                               <td className={`border ${theme.border} px-2 py-2`}>
                                 <input
                                   type="number"
-                                  {...register(`purchaseItems.${index}.qty`)}
+                                  {...register(`items.${index}.quantity`)}
                                   disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
                                   min="1"
-                                  step="1"
+                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
                                 />
                               </td>
+
+                              {/* Unit (from product, read-only) */}
                               <td className={`border ${theme.border} px-2 py-2`}>
-                                <select
-                                  {...register(`purchaseItems.${index}.unit`)}
-                                  disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                >
-                                  <option value="">None</option>
-                                  {UNITS.map(unit => (
-                                    <option key={unit.id} value={unit.name}>
-                                      {unit.name}
-                                    </option>
-                                  ))}
-                                </select>
+                                <input
+                                  value={item.product?.unit || ""}
+                                  disabled
+                                  className={`w-full px-2 py-1 cursor-not-allowed text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
+                                />
                               </td>
+
+                              {/* Price per unit */}
                               <td className={`border ${theme.border} px-2 py-2`}>
                                 <input
                                   type="number"
-                                  {...register(`purchaseItems.${index}.pricePerUnit`)}
+                                  {...register(`items.${index}.pricePerUnit`)}
                                   disabled={isDisabled}
-                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                  min="0"
                                   step="0.01"
+                                  className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
                                 />
                               </td>
+
+                              {/* GST */}
                               <td className={`border ${theme.border} px-1 py-2`}>
-                                <div className="grid grid-cols-2 gap-1">
+                                <div className="grid grid-cols-2 gap-1 items-center">
                                   <select
-                                    {...register(`purchaseItems.${index}.gstPercentage`)}
+                                    {...register(`items.${index}.gstRate`)}
                                     disabled={isDisabled}
                                     className={`w-full px-1 py-1 text-xs border-0 outline-none bg-transparent ${theme.text.primary}`}
                                   >
-                                    {GST_RATES.map(rate => (
-                                      <option key={rate.id} value={rate.id}>
-                                        {rate.name}
+                                    {GST_RATE_OPTIONS.map(rate => (
+                                      <option key={rate.value} value={rate.value}>
+                                        {rate.label}
                                       </option>
                                     ))}
                                   </select>
+
                                   <div
-                                    className={`px-1 py-1 text-xs text-right ${theme.text.primary}`}
+                                    className={`px-1 py-1 text-xs text-right font-medium ${theme.text.primary}`}
                                   >
-                                    ₹{gstAmount.toFixed(2)}
+                                    ₹{Math.round(gstAmount).toFixed(2)}
                                   </div>
                                 </div>
                               </td>
+
+                              {/* Total */}
                               <td
-                                className={`border ${theme.border} px-2 py-2 text-right text-sm font-medium ${theme.text.primary}`}
+                                className={`border cursor-not-allowed ${theme.border} px-2 py-2 text-right text-sm font-medium ${theme.text.primary}`}
                               >
-                                ₹{totalAmount.toFixed(2)}
+                                ₹{Math.round(totalAmount).toFixed(2)}
                               </td>
+
+                              {/* Action */}
                               {(isEditMode || !initialData) && (
                                 <td className={`border ${theme.border} px-2 py-2 text-center`}>
-                                  {fields.length > 1 && (
+                                  {purchaseItemFields.length > 1 && (
                                     <button
                                       type="button"
-                                      onClick={() => removeItem(index)}
+                                      onClick={() => handleRemoveItem(index)}
                                       className="p-1 text-red-500 hover:text-red-700 transition-colors cursor-pointer"
-                                      title="Remove item"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
@@ -664,51 +679,46 @@ const PurchaseModal = ({
                             </tr>
                           );
                         })}
+                        {/* 👇 ADD-ITEM ROW */}
+                        {(isEditMode || !initialData) && (
+                          <tr className={theme.tableRow}>
+                            {/* SN */}
+                            <td className={`border ${theme.border} px-2 py-2 text-center text-sm`}>
+                              +
+                            </td>
 
-                        {/* Summary Row */}
-                        <tr className={`${theme.tableHeader} font-medium`}>
-                          <td className={`border ${theme.border} px-2 py-2 text-center text-sm`}>
-                            {(isEditMode || !initialData) && (
+                            {/* Item column → Add button */}
+                            <td className={`border ${theme.border} px-2 py-2`}>
                               <button
                                 type="button"
-                                onClick={addNewItem}
-                                className="flex purchaseItems-center cursor-pointer gap-1 px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
-                                title="Add new item"
+                                onClick={handleAddItem}
+                                className={`inline-flex items-center border font-bold text-sm gap-1 px-3 py-1 cursor-pointer rounded-md ${theme.text.muted} hover:${theme.text.primary} transition`}
                               >
-                                <Plus className="w-3 h-3" />
-                                Add
+                                + Add Item
                               </button>
+                            </td>
+
+                            {/* Quantity */}
+                            <td className={`border ${theme.border} px-2 py-2`} />
+
+                            {/* Unit */}
+                            <td className={`border ${theme.border} px-2 py-2`} />
+
+                            {/* Price */}
+                            <td className={`border ${theme.border} px-2 py-2`} />
+
+                            {/* GST */}
+                            <td className={`border ${theme.border} px-2 py-2`} />
+
+                            {/* Total */}
+                            <td className={`border ${theme.border} px-2 py-2`} />
+
+                            {/* Action */}
+                            {(isEditMode || !initialData) && (
+                              <td className={`border ${theme.border} px-2 py-2`} />
                             )}
-                          </td>
-                          <td
-                            className={`border ${theme.border} px-2 py-2 text-sm ${theme.text.primary}`}
-                          >
-                            Total
-                          </td>
-                          <td className={`border ${theme.border}`}></td>
-                          <td className={`border ${theme.border}`}></td>
-                          <td className={`border ${theme.border}`}></td>
-                          <td
-                            className={`border ${theme.border} px-2 py-2 text-center text-sm ${theme.text.primary}`}
-                          >
-                            {calculations.totalQty}
-                          </td>
-                          <td className={`border ${theme.border}`}></td>
-                          <td className={`border ${theme.border}`}></td>
-                          <td
-                            className={`border ${theme.border} px-2 py-2 text-right text-sm ${theme.text.primary}`}
-                          >
-                            ₹{calculations.totalGst.toFixed(2)}
-                          </td>
-                          <td
-                            className={`border ${theme.border} px-2 py-2 text-right text-sm ${theme.text.primary}`}
-                          >
-                            ₹{calculations.grandTotal.toFixed(2)}
-                          </td>
-                          {(isEditMode || !initialData) && (
-                            <td className={`border ${theme.border}`}></td>
-                          )}
-                        </tr>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -720,31 +730,30 @@ const PurchaseModal = ({
                   <div className="flex-1 max-w-md space-y-3">
                     <div>
                       <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Payment Type
+                        Payment Mode
                       </label>
                       <select
-                        {...register("paymentType")}
+                        {...register("paymentMode")}
                         disabled={isDisabled}
                         className={`w-48 px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
                       >
-                        <option value="">None</option>
-                        {PAYMENT_TYPES.map(type => (
-                          <option key={type.id} value={type.id}>
-                            {type.name}
+                        {PAYMENT_MODE_OPTIONS.map(type => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Reference
+                        Payment Reference
                       </label>
                       <input
                         type="text"
-                        {...register("reference")}
+                        {...register("paymentReference")}
                         disabled={isDisabled}
                         className={`w-48 px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                        placeholder="Reference number"
+                        placeholder="Payment reference"
                       />
                     </div>
                     <div>
@@ -762,36 +771,29 @@ const PurchaseModal = ({
                   </div>
 
                   {/* Right Side - Totals */}
-                  <div className="w-64 space-y-2">
-                    <div className="flex justify-between py-1 purchaseItems-center">
-                      <span className={`text-sm ${theme.text.secondary}`}>Round Off:</span>
-                      <input
-                        type="number"
-                        {...register("roundOff")}
-                        disabled={isDisabled}
-                        className={`w-24 px-2 py-1 text-sm border ${theme.border} rounded text-right focus:border-blue-500 outline-none ${theme.bg}`}
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div className={`flex justify-between py-2 border-t ${theme.border}`}>
-                      <span className={`text-base font-semibold ${theme.text.primary}`}>
-                        Total Amount:
-                      </span>
-                      <span className={`text-base font-bold ${theme.text.primary}`}>
-                        ₹{calculations.finalTotal.toFixed(2)}
+                  <div className="w-full max-w-sm ml-auto space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Amount</span>
+                      <span className="font-semibold cursor-not-allowed">
+                        ₹{totals.totalAmount.toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between py-1 purchaseItems-center">
-                      <span className={`text-sm ${theme.text.secondary}`}>Payment:</span>
+
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Paid</span>
                       <input
                         type="number"
-                        {...register("paymentAmount")}
+                        {...register("paidAmount")}
                         disabled={isDisabled}
-                        className={`w-24 px-2 py-1 text-sm border ${theme.border} rounded text-right focus:border-blue-500 outline-none ${theme.bg}`}
-                        step="0.01"
-                        placeholder="0.00"
+                        className="w-24 px-2 py-1 text-lg font-bold text-right"
                       />
+                    </div>
+
+                    <div className="flex justify-between border-t pt-2 font-semibold cursor-not-allowed">
+                      <span>Balance</span>
+                      <span>
+                        ₹{(totals.totalAmount - Number(watch("paidAmount") || 0)).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>

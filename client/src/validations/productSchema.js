@@ -1,6 +1,5 @@
 // src/validations/product.schema.js
 import * as Yup from "yup";
-import { ACP_SHEET_SIZES } from "@/constants/ACP_SHEET_SIZES";
 import { UNIT_TYPES } from "@/constants/UNIT_TYPES"; 
 // UNIT_TYPES = ["PCS","METER","KG","LITER","BOX","PACKET","ROLL","SHEET","SQF"]
 
@@ -22,10 +21,6 @@ const productSchema = Yup.object({
     .nullable()
     .max(20, "HSN code must be less than 20 characters")
     .notRequired(),
-
-  size: Yup.string()
-    .required("Size is required")
-    .oneOf(ACP_SHEET_SIZES, "Invalid size option"),
 
   unit: Yup.string()
     .required("Unit is required")

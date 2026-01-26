@@ -138,6 +138,21 @@ export const bulkDeleteParties = async ids => {
   }
 };
 
+export const suggestParties = async query => {
+  if (!query) return [];
+
+  try {
+    const { data } = await axiosInstance.get(`/parties/suggest`, {
+      params: { q: query },
+    });
+    return data;
+  } catch (error) {
+    handleAxiosError(error, "Failed to fetch party suggestions");
+  }
+};
+
+
+
 // Named export group
 export const partiesApi = {
   getParties,

@@ -77,7 +77,8 @@ async function listPurchases({
         }
       },
 
-      ...(isNumeric ? [{ invoiceNumber: Number(q) }] : [])
+      ...(isNumeric ? [{ invoiceNumber: Number(q) }] : []),
+      ...(isNumeric ? [{ totalAmount: Number(q) }] : [])
     ];
 
     where.OR = orConditions;
@@ -190,10 +191,10 @@ async function createPurchase(data, userId = null) {
     paymentMode,
     paymentReference,
     remarks,
-    purchaseItems
+    items
   } = data;
 
-  if (!Array.isArray(purchaseItems) || purchaseItems.length === 0) {
+  if (!Array.isArray(items) || items.length === 0) {
     throw new AppError("Purchase items are required", 400);
   }
 
@@ -203,27 +204,25 @@ async function createPurchase(data, userId = null) {
     let totalTaxableAmount = 0;
     let totalGstAmount = 0;
 
-    const purchaseItemsData = purchaseItems.map(item => {
+    const itemsData = items.map(item => {
       const quantity = Number(item.quantity);
       const pricePerUnit = Number(item.pricePerUnit);
       const gstRate = Number(item.gstRate);
       const taxableAmount = Number(item.taxableAmount);
       const gstAmount = Number(item.gstAmount);
-      const itemTotalAmount = Number(item.totalAmount);
+      const itemAmount = Number(item.amount);
 
       totalTaxableAmount += taxableAmount;
       totalGstAmount += gstAmount;
-      totalAmount += itemTotalAmount;
-
+      totalAmount += itemAmount;
       return {
         productId: item.productId,
-        size: item.size || "NONE",
         quantity,
         pricePerUnit,
         gstRate,
         taxableAmount,
         gstAmount,
-        totalAmount: itemTotalAmount
+        amount: itemAmount
       };
     });
 
@@ -247,7 +246,7 @@ async function createPurchase(data, userId = null) {
     });
 
     /* -------------------- Create Items + Inline Inventory -------------------- */
-    for (const item of purchaseItemsData) {
+    for (const item of itemsData) {
       // 1. Create the item record
       await tx.purchaseItem.create({
         data: {
@@ -275,7 +274,7 @@ async function createPurchase(data, userId = null) {
           quantity: item.quantity,
           type: "ADD",
           referenceType: "PURCHASE",
-          referenceId: purchase.id, // Linked to the new purchase ID
+          purchaseId: purchase.id, // Linked to the new purchase ID
           remark: `Purchase #${purchase.id}`,
           balanceBefore,
           balanceAfter
@@ -306,7 +305,7 @@ async function createPurchase(data, userId = null) {
           type: "PAID",
           amount: Number(paidAmount),
           referenceType: "PURCHASE",
-          referenceId: purchase.id,
+          purchaseId: purchase.id,
           paymentMode,
           paymentReference,
           remark: remarks
@@ -384,10 +383,10 @@ async function updatePurchase(purchaseId, data, userId = null) {
     /* ------------------------------
        Purchase items (ONLY if sent)
     ------------------------------ */
-    if (Array.isArray(data.purchaseItems)) {
+    if (Array.isArray(data.items)) {
       itemsWereModified = true;
 
-      const incomingIds = data.purchaseItems.filter(item => item.id).map(item => item.id);
+      const incomingIds = data.items.filter(item => item.id).map(item => item.id);
 
       const itemsToDelete = existingPurchase.purchaseItems.filter(
         item => !incomingIds.includes(item.id)
@@ -416,7 +415,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
               type: "SUBTRACT",
               quantity: itemToDelete.quantity,
               referenceType: "PURCHASE",
-              referenceId: String(purchaseId),
+              purchaseId: Number(purchaseId),
               balanceBefore: stockBefore,
               balanceAfter: stockAfter,
               remark: "Item removed from purchase"
@@ -435,7 +434,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
       }
 
       /* ---- STEP 2 & 3: UPDATE existing + ADD new items ---- */
-      for (const incomingItem of data.purchaseItems) {
+      for (const incomingItem of data.items) {
         /* ---- UPDATE existing item ---- */
         if (incomingItem.id) {
           const existingItem = existingPurchase.purchaseItems.find(
@@ -474,7 +473,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
                 type: qtyDiff > 0 ? "ADD" : "SUBTRACT",
                 quantity: Math.abs(qtyDiff),
                 referenceType: "PURCHASE",
-                referenceId: String(purchaseId),
+                purchaseId: Number(purchaseId),
                 balanceBefore: stockBefore,
                 balanceAfter: stockAfter
               }
@@ -494,8 +493,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
               gstRate: incomingItem.gstRate ?? existingItem.gstRate,
               gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
               taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
-              totalAmount: incomingItem.totalAmount ?? existingItem.totalAmount,
-              size: incomingItem.size ?? existingItem.size
+              amount: incomingItem.amount ?? existingItem.amount,
             }
           });
         } else {
@@ -518,7 +516,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
               type: "ADD",
               quantity: incomingItem.quantity,
               referenceType: "PURCHASE",
-              referenceId: String(purchaseId),
+              purchaseId: Number(purchaseId),
               balanceBefore: stockBefore,
               balanceAfter: stockAfter
             }
@@ -533,13 +531,12 @@ async function updatePurchase(purchaseId, data, userId = null) {
             data: {
               purchaseId,
               productId: incomingItem.productId,
-              size: incomingItem.size || "NONE",
               quantity: incomingItem.quantity,
               pricePerUnit: incomingItem.pricePerUnit,
               gstRate: incomingItem.gstRate,
               gstAmount: incomingItem.gstAmount,
               taxableAmount: incomingItem.taxableAmount,
-              totalAmount: incomingItem.totalAmount
+              amount: incomingItem.amount
             }
           });
         }
@@ -550,7 +547,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
         where: { purchaseId }
       });
 
-      purchaseUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.totalAmount), 0);
+      purchaseUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.amount), 0);
 
       purchaseUpdateData.totalTaxableAmount = allItems.reduce(
         (sum, i) => sum + Number(i.taxableAmount),
@@ -690,7 +687,7 @@ async function deletePurchase(purchaseId, userId = null) {
           type: "SUBTRACT",
           quantity: item.quantity,
           referenceType: "PURCHASE",
-          referenceId: String(purchaseId),
+          purchaseId: Number(purchaseId),
           remark: `Purchase #${purchaseId} deleted`,
           balanceBefore: stockBefore,
           balanceAfter: stockAfter
@@ -729,7 +726,7 @@ async function deletePurchase(purchaseId, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "PURCHASE",
-        referenceId: String(purchaseId)
+        purchaseId: Number(purchaseId)
       }
     });
 

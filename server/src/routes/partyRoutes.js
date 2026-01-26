@@ -13,10 +13,16 @@ import {
   validatePartyId,
   validatePartyQuery,
   validateBulkDelete,
-  validateSuggestOrSearch
 } from "../validations/partyValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
+
+// Party name suggestions for dropdown (with q param)
+router.get(
+  "/suggest",
+  authMiddleware,
+  partyController.suggestPartyNames
+);
 
 // List parties with filters, pagination, sorting
 router.get("/", authMiddleware, validatePartyQuery, validateRequest, partyController.listParties);
@@ -59,19 +65,12 @@ router.post(
 router.get(
   "/search",
   authMiddleware,
-  validateSuggestOrSearch,
   validateRequest,
   partyController.globalSearchParties
 );
 
-// Party name suggestions for dropdown (with q param)
-router.get(
-  "/suggest",
-  authMiddleware,
-  validateSuggestOrSearch,
-  validateRequest,
-  partyController.suggestPartyNames
-);
+
+
 
 export default router;
 export { router };

@@ -5,7 +5,8 @@ import {
   createParty,
   updateParty,
   deleteParty,
-  bulkDeleteParties
+  bulkDeleteParties,
+  suggestParties
 } from "@/services/partyServices";
 
 /**
@@ -102,6 +103,15 @@ export const useBulkDeleteParties = () => {
   });
 };
 
+export const usePartySuggestions = query => {
+  return useQuery({
+    queryKey: ["party-suggestions", query],
+    queryFn: () => suggestParties(query),
+    enabled: !!query && query.length >= 2, // ⬅ important
+    staleTime: 60 * 1000,
+  });
+};
+
 // --------------------------------------------------
 // DEFAULT EXPORT
 // --------------------------------------------------
@@ -112,5 +122,6 @@ export default {
   useUpdateParty,
   useDeleteParty,
   useBulkDeleteParties,
+  usePartySuggestions,
   PARTY_KEYS
 };

@@ -120,22 +120,15 @@ const validateBulkDelete = [
     .withMessage("Each party ID must be a positive integer"),
 ];
 
-// Validate search and suggest query param "q"
-const validateSuggestOrSearch = [
-  query("q").notEmpty().withMessage("Query parameter q is required"),
-];
-
 export {
   validateParty,
   validatePartyId,
   validatePartyQuery,
   validateBulkDelete,
-  validateSuggestOrSearch,
 };
 export default {
   validateParty,
   validatePartyId,
   validatePartyQuery,
   validateBulkDelete,
-  validateSuggestOrSearch,
 };

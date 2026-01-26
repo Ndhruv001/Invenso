@@ -8,7 +8,7 @@ const validateRequest = asyncHandler(async (req, res, next) => {
     const errorMsg = errors
       .array()
       .map(e => `${e.param}: ${e.msg}`)
-      .join("; ");
+      .join("--------> ");
     return next(
       new AppError("Invalid request data", 400, `Validation error: ${errorMsg}`, {
         requestId: req.requestId,

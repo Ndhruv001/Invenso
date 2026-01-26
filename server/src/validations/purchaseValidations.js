@@ -3,11 +3,10 @@
  */
 
 import { body, param, query } from "express-validator";
-import { PaymentMode, AcpSheetSize } from "@prisma/client";
+import { PaymentMode } from "@prisma/client";
 
 // Convert Prisma enums → arrays
 const PAYMENT_MODES = Object.values(PaymentMode);
-const ACP_SHEET_SIZES = Object.values(AcpSheetSize);
 
 // --------------------
 // Validate purchase ID param
@@ -89,11 +88,6 @@ const validatePurchase = [
     .isInt({ gt: 0 })
     .toInt(),
 
-  body("purchaseItems.*.size")
-    .optional()
-    .isIn(ACP_SHEET_SIZES)
-    .withMessage(`Size must be one of: ${ACP_SHEET_SIZES.join(", ")}`),
-
   body("purchaseItems.*.quantity")
     .exists().withMessage("Quantity is required for each item")
     .isDecimal()
@@ -124,7 +118,7 @@ const validatePurchase = [
     .withMessage("Taxable amount must be a decimal")
     .toFloat(),
 
-  body("purchaseItems.*.totalAmount")
+  body("purchaseItems.*.amount")
     .exists().withMessage("Total amount is required for each item")
     .isDecimal()
     .withMessage("Total amount must be a decimal")

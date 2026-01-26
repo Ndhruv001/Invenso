@@ -1,91 +1,57 @@
 import * as Yup from "yup";
-import { ACP_SHEET_SIZES } from "@/constants/ACP_SHEET_SIZES";
 import { PAYMENT_MODES } from "@/constants/PAYMENT_MODES";
-// PAYMENT_MODES = ["CASH","UPI","BANK","CHEQUE","NONE"]
 
 /**
  * -------------------------
  * Purchase Item Schema
+ * (Used in BOTH create & update)
  * -------------------------
  */
 const purchaseItemSchema = Yup.object({
   productId: Yup.number()
     .typeError("Product is required")
-    .required("Product is required")
     .integer("Product must be a valid ID")
-    .positive("Product must be valid"),
-
-  size: Yup.string()
-    .required("Size is required")
-    .oneOf(ACP_SHEET_SIZES, "Invalid size option"),
+    .positive("Product must be valid")
+    .required("Product is required"),
 
   quantity: Yup.number()
     .typeError("Quantity must be a number")
-    .required("Quantity is required")
-    .moreThan(0, "Quantity must be greater than 0"),
+    .moreThan(0, "Quantity must be greater than 0")
+    .required("Quantity is required"),
 
   pricePerUnit: Yup.number()
     .typeError("Price per unit must be a number")
-    .required("Price per unit is required")
-    .min(0, "Price per unit cannot be negative"),
+    .min(0, "Price per unit cannot be negative")
+    .required("Price per unit is required"),
 
   gstRate: Yup.number()
     .typeError("GST rate must be a number")
-    .required("GST rate is required")
-    .min(0, "GST rate cannot be negative"),
-
-  gstAmount: Yup.number()
-    .typeError("GST amount must be a number")
-    .required("GST amount is required")
-    .min(0, "GST amount cannot be negative"),
-
-  taxableAmount: Yup.number()
-    .typeError("Taxable amount must be a number")
-    .required("Taxable amount is required")
-    .min(0, "Taxable amount cannot be negative"),
-
-  totalAmount: Yup.number()
-    .typeError("Total amount must be a number")
-    .required("Total amount is required")
-    .min(0, "Total amount cannot be negative"),
+    .min(0, "GST rate cannot be negative")
+    .required("GST rate is required"),
 });
 
 /**
  * -------------------------
- * Purchase Schema
+ * Purchase CREATE Schema
+ * (Strict – everything required)
  * -------------------------
  */
-const purchaseSchema = Yup.object({
+const purchaseCreateSchema = Yup.object({
   date: Yup.date()
     .typeError("Invalid date")
     .required("Date is required"),
 
   partyId: Yup.number()
     .typeError("Party is required")
-    .required("Party is required")
     .integer("Party must be a valid ID")
-    .positive("Party must be valid"),
+    .positive("Party must be valid")
+    .required("Party is required"),
 
   invoiceNumber: Yup.number()
     .typeError("Invoice number is required")
-    .required("Invoice number is required")
     .integer("Invoice number must be valid")
-    .positive("Invoice number must be valid"),
-
-  totalAmount: Yup.number()
-    .typeError("Total amount must be a number")
-    .required("Total amount is required")
-    .min(0, "Total amount cannot be negative"),
-
-  totalGstAmount: Yup.number()
-    .typeError("Total GST must be a number")
-    .required("Total GST is required")
-    .min(0, "Total GST cannot be negative"),
-
-  totalTaxableAmount: Yup.number()
-    .typeError("Total taxable amount must be a number")
-    .required("Total taxable amount is required")
-    .min(0, "Total taxable amount cannot be negative"),
+    .positive("Invoice number must be valid")
+    .required("Invoice number is required"),
 
   paidAmount: Yup.number()
     .transform((value, originalValue) =>
@@ -96,8 +62,58 @@ const purchaseSchema = Yup.object({
     .nullable(),
 
   paymentMode: Yup.string()
-    .required("Payment mode is required")
-    .oneOf(PAYMENT_MODES, "Invalid payment mode"),
+    .oneOf(PAYMENT_MODES, "Invalid payment mode")
+    .required("Payment mode is required"),
+
+  paymentReference: Yup.string()
+    .trim()
+    .nullable()
+    .max(100, "Payment reference must be less than 100 characters"),
+
+  remarks: Yup.string()
+    .trim()
+    .nullable()
+    .max(300, "Remarks must be less than 300 characters"),
+
+  items: Yup.array()
+    .of(purchaseItemSchema)
+    .min(1, "At least one item is required")
+    .required("Items are required"),
+});
+
+/**
+ * -------------------------
+ * Purchase UPDATE Schema
+ * (Flexible – partial updates)
+ * -------------------------
+ */
+const purchaseUpdateSchema = Yup.object({
+  date: Yup.date().typeError("Invalid date").notRequired(),
+
+  partyId: Yup.number()
+    .typeError("Party must be a number")
+    .integer("Party must be a valid ID")
+    .positive("Party must be valid")
+    .notRequired(),
+
+  invoiceNumber: Yup.number()
+    .typeError("Invoice number must be a number")
+    .integer("Invoice number must be valid")
+    .positive("Invoice number must be valid")
+    .notRequired(),
+
+  paidAmount: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === "" || originalValue === null ? 0 : value
+    )
+    .typeError("Paid amount must be a number")
+    .min(0, "Paid amount cannot be negative")
+    .nullable()
+    .notRequired(),
+
+  paymentMode: Yup.string()
+    .oneOf(PAYMENT_MODES, "Invalid payment mode")
+    .notRequired(),
 
   paymentReference: Yup.string()
     .trim()
@@ -111,14 +127,19 @@ const purchaseSchema = Yup.object({
     .max(300, "Remarks must be less than 300 characters")
     .notRequired(),
 
+  /**
+   * You said:
+   * "I want to send backend all items list always"
+   * So items stays REQUIRED
+   */
   items: Yup.array()
     .of(purchaseItemSchema)
     .min(1, "At least one item is required")
     .required("Items are required"),
 });
 
-export default purchaseSchema;
 export {
-  purchaseSchema,
   purchaseItemSchema,
+  purchaseCreateSchema,
+  purchaseUpdateSchema,
 };

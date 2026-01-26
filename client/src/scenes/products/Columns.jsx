@@ -30,23 +30,6 @@ const StockBadge = ({ stock, threshold }) => {
   );
 };
 
-/**
- * Badge to display size, replacing "NONE" with "N/A".
- * Uses theme primary text color for consistency.
- */
-const SizeBadge = ({ size }) => {
-  const { theme } = useTheme();
-
-  return (
-    <span
-      className="text-sm font-medium tracking-wide"
-      style={{ color: theme.text.primary }}
-      aria-label={`Size: ${size === "NONE" ? "N/A" : size}`}
-    >
-      {size === "NONE" ? "N/A" : size.replace("S", "")}
-    </span>
-  );
-};
 
 /**
  * Badge to display category name and type.
@@ -145,12 +128,6 @@ const Columns = ( showSelection = false ) => {
       header: "Category",
       cell: ({ getValue }) => <CategoryBadge category={getValue()} />,
       size: 140
-    },
-    {
-      accessorKey: "size",
-      header: "Size",
-      cell: ({ getValue }) => <SizeBadge size={getValue()} />,
-      size: 100
     },
     {
       accessorKey: "unit",

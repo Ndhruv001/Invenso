@@ -3,10 +3,9 @@
  */
 
 import { body, param, query } from "express-validator";
-import { AcpSheetSize, UnitType } from "@prisma/client";
+import {  UnitType } from "@prisma/client";
 
 // Convert Prisma enums → arrays (IMPORTANT)
-const ACP_SHEET_SIZES = Object.values(AcpSheetSize);
 const UNIT_TYPES = Object.values(UnitType);
 
 // --------------------
@@ -38,11 +37,6 @@ const validateProduct = [
     .optional()
     .isString()
     .trim(),
-
-  body("size")
-    .optional()
-    .isIn(ACP_SHEET_SIZES)
-    .withMessage(`Size must be one of: ${ACP_SHEET_SIZES.join(", ")}`),
 
   body("unit")
     .exists().withMessage("Unit is required")

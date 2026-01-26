@@ -13,7 +13,6 @@
  * - Name suggestions for dropdowns
  */
 
-import { AcpSheetSize } from "@prisma/client";
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
@@ -44,7 +43,6 @@ async function listProducts({
   search = "",
   filters = {}
 }) {
-  console.log("🚀 ~ listProducts ~ filters:", filters)
   const where = {
     isActive: true
   };
@@ -58,10 +56,6 @@ async function listProducts({
   if (filters.hsnCode) {
     where.hsnCode = filters.hsnCode;
   }
-
-  if (filters.size && AcpSheetSize[filters.size]) {
-  where.size = filters.size;
-}
 
   // Stock status filter
     if (filters.currentStock) {
@@ -84,7 +78,6 @@ async function listProducts({
 
   if (search.trim()) {
     const q = search.trim();
-    const isNumeric = !isNaN(Number(q));
 
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
@@ -222,7 +215,6 @@ async function createProduct(data, userId = null) {
       ...(data.description !== undefined && { description: data.description }),
 
       // Optional enums (Prisma defaults apply if omitted)
-      ...(data.size !== undefined && { size: data.size }),
       ...(data.unit !== undefined && { unit: data.unit }),
 
       // Optional numeric fields (Prisma defaults apply if omitted)
@@ -249,7 +241,6 @@ async function createProduct(data, userId = null) {
           type: "ADD",
           quantity: openingStock,
           referenceType: "OPENING_STOCK",
-          referenceId: String(product.id),
           remark: "Opening stock at product creation",
           balanceBefore: 0,
           balanceAfter: openingStock
@@ -284,6 +275,7 @@ async function createProduct(data, userId = null) {
 async function updateProduct(id, data, userId = null) {
   if (!id) throw new AppError("Product ID is required", 400);
 
+      
   return prisma.$transaction(async (tx) => {
     // 1. Load existing product
     const existing = await tx.product.findUnique({
@@ -318,11 +310,6 @@ async function updateProduct(id, data, userId = null) {
       updateData.hsnCode = data.hsnCode;
     }
 
-    // 6. Size
-    if (data.size !== undefined && data.size !== existing.size) {
-      updateData.size = data.size;
-    }
-
     // 7. Unit
     if (data.unit !== undefined && data.unit !== existing.unit) {
       updateData.unit = data.unit;
@@ -352,7 +339,7 @@ async function updateProduct(id, data, userId = null) {
       const oldOpeningStock = Number(existing.openingStock) || 0;
       const newOpeningStock = Number(data.openingStock);
       const diff = newOpeningStock - oldOpeningStock;
-
+      
       // Inventory log
       await tx.inventoryLog.create({
         data: {
@@ -360,17 +347,16 @@ async function updateProduct(id, data, userId = null) {
           type: diff > 0 ? "ADD" : "SUBTRACT",
           quantity: Math.abs(diff),
           referenceType: "ADJUSTMENT",
-          referenceId: String(id),
           remark: `Opening stock adjusted by ${diff}`,
           balanceBefore: Number(existing.currentStock) || 0,
           balanceAfter: (Number(existing.currentStock) || 0) + diff
         }
       });
-
+      
       updateData.openingStock = newOpeningStock;
       updateData.currentStock =
-        (Number(existing.currentStock) || 0) + diff;
-
+      (Number(existing.currentStock) || 0) + diff;
+      
       openingStockChanged = true;
     }
 
@@ -447,8 +433,7 @@ async function suggestProductNames(query) {
         mode: "insensitive"
       }
     },
-    select: { id: true, name: true },
-    take: 10
+    take: 5
   });
 }
 

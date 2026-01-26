@@ -16,7 +16,6 @@ import productSchema from "@/validations/productSchema";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
-import ACP_SHEET_SIZES from "@/constants/ACP_SHEET_SIZES";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useCategories } from "@/hooks/useCategories";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -28,7 +27,10 @@ const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
   const updatePayload = {};
 
   Object.keys(fieldsUserModified).forEach(fieldName => {
-    updatePayload[fieldName] = currentFormValues[fieldName];
+    if(fieldsUserModified[fieldName]){
+
+      updatePayload[fieldName] = currentFormValues[fieldName];
+    }
   });
 
   return updatePayload;
@@ -60,7 +62,7 @@ const ProductModal = ({
       threshold: initialData?.threshold ?? "",
       description: initialData?.description || "",
       size: initialData?.size || "",
-      quantity: initialData?.openingStock ?? ""
+      openingStock: initialData?.openingStock ?? ""
     }),
     [initialData]
   );
@@ -103,8 +105,8 @@ const ProductModal = ({
       }
     }
 
-    console.log("🚀 ~ ProductModal ~ updatePayload:", updatePayload)
     onSubmit(updatePayload);
+    console.log("🚀 ~ ProductModal ~ updatePayload:", updatePayload)
 
     // CREATE MODE → reset form
     if (!initialData) {
@@ -308,21 +310,9 @@ const ProductModal = ({
                   <div className="flex-1 h-px bg-gray-300"></div>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <SelectField
-                    name="size"
-                    label="Size"
-                    icon={Ruler}
-                    options={ACP_SHEET_SIZES}
-                    errors={errors}
-                    register={register}
-                    isEditMode={isEditMode}
-                    isDisabled={isDisabled}
-                    initialData={initialData}
-                    theme={theme}
-                  />
                   <TextField
-                    name="quantity"
-                    label="Quantity"
+                    name="openingStock"
+                    label="Opening Stock Quantity"
                     placeholder="0"
                     type="number"
                     errors={errors}
