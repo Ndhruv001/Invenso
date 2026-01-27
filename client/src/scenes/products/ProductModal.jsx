@@ -44,6 +44,7 @@ const ProductModal = ({
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
+  initialData = null;
   const { theme } = useTheme();
   const { data: productCategories } = useCategories("PRODUCT");
 

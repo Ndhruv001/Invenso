@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback, use } from "react";
+import React, { useMemo, useEffect, useState, useCallback } from "react";
 import { Save, X, FileText, Plus, Trash2, Edit3, AlertCircle } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
@@ -91,10 +91,10 @@ const PurchaseModal = ({
 
   const defaultValues = useMemo(
     () => ({
-      partyName: initialData?.party?.name ?? "",
+      partyId: initialData?.partyId ?? "",
       phone: initialData?.party?.phone ?? "",
       invoiceNumber: initialData?.invoiceNumber ?? "",
-      invoiceDate: initialData?.date
+      date: initialData?.date
         ? initialData.date.split("T")[0]
         : new Date(Date.now()).toISOString().split("T")[0],
 
@@ -291,7 +291,10 @@ const PurchaseModal = ({
 
   const submitHandler = handleSubmit(
     values => {
-      let payload = extractModifiedFields(values, dirtyFields);
+      let payload = values;
+      if( initialData && !isEditMode ) {
+        payload = extractModifiedFields(values, dirtyFields);
+      }
       payload = {
         ...payload,
         items: calculatedItems,
@@ -300,6 +303,7 @@ const PurchaseModal = ({
         totalAmount: totals.totalAmount
       };
       onSubmit(payload);
+      console.log("🚀 ~ PurchaseModal ~ payload:", payload)
 
       if (!initialData) {
         reset(defaultValues);
@@ -502,14 +506,14 @@ const PurchaseModal = ({
                     </label>
                     <input
                       type="date"
-                      {...register("invoiceDate")}
+                      {...register("date")}
                       disabled={isDisabled}
                       className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
                     />
-                    {errors.invoiceDate && (
+                    {errors.date && (
                       <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
-                        {errors.invoiceDate.message}
+                        {errors.date.message}
                       </p>
                     )}
                   </div>
@@ -567,8 +571,6 @@ const PurchaseModal = ({
                                   }
                                   onChange={e => {
                                     const value = e.target.value;
-
-                                    console.log("Typing:", value, "Row:", index);
 
                                     // update typing text
                                     setProductSearchText(prev => ({
