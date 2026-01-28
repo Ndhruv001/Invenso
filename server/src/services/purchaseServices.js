@@ -210,11 +210,11 @@ async function createPurchase(data, userId = null) {
       const gstRate = Number(item.gstRate);
       const taxableAmount = Number(item.taxableAmount);
       const gstAmount = Number(item.gstAmount);
-      const itemAmount = Number(item.amount);
+      const amount = Number(item.amount);
 
       totalTaxableAmount += taxableAmount;
       totalGstAmount += gstAmount;
-      totalAmount += itemAmount;
+      totalAmount += amount;
       return {
         productId: item.productId,
         quantity,
@@ -222,7 +222,7 @@ async function createPurchase(data, userId = null) {
         gstRate,
         taxableAmount,
         gstAmount,
-        amount: itemAmount
+        amount
       };
     });
 
@@ -386,7 +386,9 @@ async function updatePurchase(purchaseId, data, userId = null) {
     if (Array.isArray(data.items)) {
       itemsWereModified = true;
 
-      const incomingIds = data.items.filter(item => item.id).map(item => item.id);
+      const incomingIds = data.items
+        .filter(item => typeof item.id === "number")
+        .map(item => item.id);
 
       const itemsToDelete = existingPurchase.purchaseItems.filter(
         item => !incomingIds.includes(item.id)
@@ -493,12 +495,11 @@ async function updatePurchase(purchaseId, data, userId = null) {
               gstRate: incomingItem.gstRate ?? existingItem.gstRate,
               gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
               taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
-              amount: incomingItem.amount ?? existingItem.amount,
+              amount: incomingItem.amount ?? existingItem.amount
             }
           });
         } else {
-
-        /* ---- ADD new item ---- */
+          /* ---- ADD new item ---- */
           const product = await tx.product.findUnique({
             where: { id: incomingItem.productId }
           });

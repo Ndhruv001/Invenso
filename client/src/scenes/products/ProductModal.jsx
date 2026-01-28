@@ -9,10 +9,9 @@ import {
   Edit3,
   Target,
   FileText,
-  Ruler
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
-import productSchema from "@/validations/productSchema";
+import {productCreateSchema, productUpdateSchema} from "@/validations/productSchema";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
@@ -44,7 +43,8 @@ const ProductModal = ({
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-  initialData = null;
+
+
   const { theme } = useTheme();
   const { data: productCategories } = useCategories("PRODUCT");
 
@@ -62,7 +62,6 @@ const ProductModal = ({
       unit: initialData?.unit || "",
       threshold: initialData?.threshold ?? "",
       description: initialData?.description || "",
-      size: initialData?.size || "",
       openingStock: initialData?.openingStock ?? ""
     }),
     [initialData]
@@ -73,12 +72,11 @@ const ProductModal = ({
   register,
   handleSubmit,
   reset,
-  getValues,
   formState: { errors, isSubmitting, isDirty, dirtyFields }
 } = useForm({
 
     defaultValues,
-    resolver: yupResolver(productSchema),
+    resolver: initialData ? yupResolver(productUpdateSchema) : yupResolver(productCreateSchema),
     mode: "onSubmit",
     reValidateMode: "onBlur"
   });
@@ -107,7 +105,6 @@ const ProductModal = ({
     }
 
     onSubmit(updatePayload);
-    console.log("🚀 ~ ProductModal ~ updatePayload:", updatePayload)
 
     // CREATE MODE → reset form
     if (!initialData) {

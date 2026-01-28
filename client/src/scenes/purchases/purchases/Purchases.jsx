@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import {
   usePurchases,
   useUpdatePurchase,
-  useDeletePurchase
+  useDeletePurchase,
 } from "@/hooks/usePurchases";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";

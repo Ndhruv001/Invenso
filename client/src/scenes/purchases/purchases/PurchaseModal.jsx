@@ -303,7 +303,6 @@ const PurchaseModal = ({
         totalAmount: totals.totalAmount
       };
       onSubmit(payload);
-      console.log("🚀 ~ PurchaseModal ~ payload:", payload)
 
       if (!initialData) {
         reset(defaultValues);

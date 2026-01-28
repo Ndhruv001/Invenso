@@ -78,47 +78,47 @@ const validatePurchase = [
     .toFloat(),
 
   // ---- Purchase items ----
-  body("purchaseItems")
+  body("items")
     .exists().withMessage("Purchase items are required")
     .isArray({ min: 1 })
     .withMessage("Purchase items must be an array with at least one item"),
 
-  body("purchaseItems.*.productId")
+  body("items.*.productId")
     .exists().withMessage("Product ID is required for each item")
     .isInt({ gt: 0 })
     .toInt(),
 
-  body("purchaseItems.*.quantity")
+  body("items.*.quantity")
     .exists().withMessage("Quantity is required for each item")
     .isDecimal()
     .withMessage("Quantity must be a decimal")
     .toFloat(),
 
-  body("purchaseItems.*.pricePerUnit")
+  body("items.*.pricePerUnit")
     .exists().withMessage("Price per unit is required for each item")
     .isDecimal()
     .withMessage("Price per unit must be a decimal")
     .toFloat(),
 
-  body("purchaseItems.*.gstRate")
+  body("items.*.gstRate")
     .exists().withMessage("GST rate is required for each item")
     .isDecimal()
     .withMessage("GST rate must be a decimal")
     .toFloat(),
 
-  body("purchaseItems.*.gstAmount")
+  body("items.*.gstAmount")
     .exists().withMessage("GST amount is required for each item")
     .isDecimal()
     .withMessage("GST amount must be a decimal")
     .toFloat(),
 
-  body("purchaseItems.*.taxableAmount")
+  body("items.*.taxableAmount")
     .exists().withMessage("Taxable amount is required for each item")
     .isDecimal()
     .withMessage("Taxable amount must be a decimal")
     .toFloat(),
 
-  body("purchaseItems.*.amount")
+  body("items.*.amount")
     .exists().withMessage("Total amount is required for each item")
     .isDecimal()
     .withMessage("Total amount must be a decimal")
