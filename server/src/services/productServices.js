@@ -30,8 +30,8 @@ async function listHsnCodes() {
     distinct: ["hsnCode"],
     orderBy: { hsnCode: "asc" },
     select: {
-      hsnCode: true,
-    },
+      hsnCode: true
+    }
   });
 }
 
@@ -58,7 +58,7 @@ async function listProducts({
   }
 
   // Stock status filter
-    if (filters.currentStock) {
+  if (filters.currentStock) {
     switch (filters.currentStock) {
       case "Low stock":
         where.currentStock = { lt: prisma.product.fields.threshold };
@@ -82,7 +82,7 @@ async function listProducts({
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
       { hsnCode: { contains: q, mode: "insensitive" } },
-      { description: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } }
     ];
   }
 
@@ -92,54 +92,45 @@ async function listProducts({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [
-    products,
-    totalRows,
-    groupedCategories,
-    groupedHSN,
-    stockRows
-  ] = await prisma.$transaction([
-    prisma.product.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy:
-        sortBy === "category"
-          ? { category: { name: sortOrder } }
-          : { [sortBy]: sortOrder },
-      include: {
-        category: true
-      }
-    }),
+  const [products, totalRows, groupedCategories, groupedHSN, stockRows] = await prisma.$transaction(
+    [
+      prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy:
+          sortBy === "category" ? { category: { name: sortOrder } } : { [sortBy]: sortOrder },
+        include: {
+          category: true
+        }
+      }),
 
-    prisma.product.count({ where }),
+      prisma.product.count({ where }),
 
-    prisma.product.groupBy({
-      by: ["categoryId"],
-      where
-    }),
+      prisma.product.groupBy({
+        by: ["categoryId"],
+        where
+      }),
 
-    prisma.product.groupBy({
-      by: ["hsnCode"],
-      where
-    }),
+      prisma.product.groupBy({
+        by: ["hsnCode"],
+        where
+      }),
 
-    prisma.product.findMany({
-      where,
-      select: {
-        currentStock: true,
-        avgCostPrice: true
-      }
-    })
-  ]);
+      prisma.product.findMany({
+        where,
+        select: {
+          currentStock: true,
+          avgCostPrice: true
+        }
+      })
+    ]
+  );
 
   /* -------------------- Derived Stats -------------------- */
 
   const totalStockValue = stockRows.reduce((sum, p) => {
-    return (
-      sum +
-      Number(p.currentStock || 0) * Number(p.avgCostPrice || 0)
-    );
+    return sum + Number(p.currentStock || 0) * Number(p.avgCostPrice || 0);
   }, 0);
 
   /* -------------------- Response -------------------- */
@@ -160,7 +151,6 @@ async function listProducts({
     }
   };
 }
-
 
 /**
  * Get product by ID with category relation
@@ -187,19 +177,13 @@ async function getProductById(id) {
  * @returns created product
  */
 async function createProduct(data, userId = null) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async tx => {
+
     // Normalize numeric inputs (Decimal-safe)
-    const openingStock =
-      data.openingStock !== undefined ? Number(data.openingStock) : undefined;
-
-    const avgCostPrice =
-      data.avgCostPrice !== undefined ? Number(data.avgCostPrice) : undefined;
-
-    const avgSellPrice =
-      data.avgSellPrice !== undefined ? Number(data.avgSellPrice) : undefined;
-
-    const threshold =
-      data.threshold !== undefined ? Number(data.threshold) : undefined;
+    const openingStock = data.openingStock !== undefined ? Number(data.openingStock) : undefined;
+    const threshold = data.threshold !== undefined ? Number(data.threshold) : undefined;
+    const avgCostPrice = undefined;
+    const avgSellPrice = undefined;
 
     // Build product data safely
     const productData = {
@@ -223,8 +207,6 @@ async function createProduct(data, userId = null) {
         currentStock: openingStock
       }),
 
-      ...(avgCostPrice !== undefined && { avgCostPrice }),
-      ...(avgSellPrice !== undefined && { avgSellPrice }),
       ...(threshold !== undefined && { threshold })
     };
 
@@ -263,7 +245,6 @@ async function createProduct(data, userId = null) {
   });
 }
 
-
 /**
  * Update product with handling of openingStock change and inventory log
  * Wrap in transaction for atomicity and integrity
@@ -275,8 +256,7 @@ async function createProduct(data, userId = null) {
 async function updateProduct(id, data, userId = null) {
   if (!id) throw new AppError("Product ID is required", 400);
 
-      
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async tx => {
     // 1. Load existing product
     const existing = await tx.product.findUnique({
       where: { id }
@@ -288,7 +268,6 @@ async function updateProduct(id, data, userId = null) {
 
     // 2. Prepare update container
     const updateData = {};
-    let openingStockChanged = false;
 
     // 3. Name
     if (data.name !== undefined && data.name !== existing.name) {
@@ -296,10 +275,7 @@ async function updateProduct(id, data, userId = null) {
     }
 
     // 4. Category
-    if (
-      data.categoryId !== undefined &&
-      data.categoryId !== existing.categoryId
-    ) {
+    if (data.categoryId !== undefined && data.categoryId !== existing.categoryId) {
       updateData.category = {
         connect: { id: data.categoryId }
       };
@@ -310,25 +286,19 @@ async function updateProduct(id, data, userId = null) {
       updateData.hsnCode = data.hsnCode;
     }
 
-    // 7. Unit
-    if (data.unit !== undefined && data.unit !== existing.unit) {
-      updateData.unit = data.unit;
-    }
-
     // 8. Threshold
-    if (
-      data.threshold !== undefined &&
-      Number(data.threshold) !== Number(existing.threshold)
-    ) {
+    if (data.threshold !== undefined && Number(data.threshold) !== Number(existing.threshold)) {
       updateData.threshold = Number(data.threshold);
     }
 
     // 9. Description
-    if (
-      data.description !== undefined &&
-      data.description !== existing.description
-    ) {
+    if (data.description !== undefined && data.description !== existing.description) {
       updateData.description = data.description;
+    }
+    
+    // 9. Date
+    if (data.date !== undefined && data.date !== existing.date) {
+      updateData.date = data.date;
     }
 
     // 10. OPENING STOCK (IMPORTANT BUSINESS LOGIC)
@@ -339,7 +309,7 @@ async function updateProduct(id, data, userId = null) {
       const oldOpeningStock = Number(existing.openingStock) || 0;
       const newOpeningStock = Number(data.openingStock);
       const diff = newOpeningStock - oldOpeningStock;
-      
+
       // Inventory log
       await tx.inventoryLog.create({
         data: {
@@ -352,12 +322,9 @@ async function updateProduct(id, data, userId = null) {
           balanceAfter: (Number(existing.currentStock) || 0) + diff
         }
       });
-      
+
       updateData.openingStock = newOpeningStock;
-      updateData.currentStock =
-      (Number(existing.currentStock) || 0) + diff;
-      
-      openingStockChanged = true;
+      updateData.currentStock = (Number(existing.currentStock) || 0) + diff;
     }
 
     // 11. Update product ONLY if something changed
@@ -431,7 +398,8 @@ async function suggestProductNames(query) {
       name: {
         contains: query.trim(),
         mode: "insensitive"
-      }
+      },
+
     },
     take: 5
   });

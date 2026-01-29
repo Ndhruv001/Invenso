@@ -26,6 +26,7 @@ function buildDateFilter({ from, to }) {
   return Object.keys(cond).length ? cond : undefined;
 }
 
+
 async function listPurchases({
   page = 1,
   limit = 10,
@@ -301,6 +302,7 @@ async function createPurchase(data, userId = null) {
     if (partyId && Number(paidAmount) > 0) {
       await tx.payment.create({
         data: {
+          date,
           partyId,
           type: "PAID",
           amount: Number(paidAmount),
@@ -378,6 +380,9 @@ async function updatePurchase(purchaseId, data, userId = null) {
 
     if (data.remarks !== undefined) {
       purchaseUpdateData.remarks = data.remarks;
+    }
+    if (data.date !== undefined) {
+      purchaseUpdateData.date = data.date;
     }
 
     /* ------------------------------

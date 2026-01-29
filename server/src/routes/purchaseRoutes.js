@@ -9,7 +9,8 @@ const router = express.Router();
 
 import purchaseController from "../controllers/purchaseControllers.js";
 import {
-  validatePurchase,
+  validateCreatePurchase,
+  validateUpdatePurchase,
   validatePurchaseId,
 } from "../validations/purchaseValidations.js";
 
@@ -36,7 +37,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
-  validatePurchase,
+  validateCreatePurchase,
   validateRequest,
   purchaseController.createPurchase
 );
@@ -46,6 +47,7 @@ router.put(
   "/:id",
   authMiddleware,
   validatePurchaseId,
+  validateUpdatePurchase,
   validateRequest,
   purchaseController.updatePurchase
 );

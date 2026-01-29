@@ -5,9 +5,10 @@ const router = express.Router();
 
 import authMiddleware from "../middlewares/authMiddleware.js";
 import {
-  validateProduct,
+  validateCreateProduct,
+  validateUpdateProduct,
   validateProductId,
-  validateSuggestOrSearch
+  validateSuggest
 } from "../validations/productValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import productController from "../controllers/productControllers.js";
@@ -25,7 +26,7 @@ router.get("/hsn-codes", authMiddleware, productController.listHsnCodes);
 router.get(
   "/suggest",
   authMiddleware,
-  validateSuggestOrSearch,
+  validateSuggest,
   validateRequest,
   productController.suggestProductNames
 );
@@ -40,7 +41,7 @@ router.get(
 router.get("/", authMiddleware, productController.listProducts);
 
 // Create new product
-router.post("/", authMiddleware, validateProduct, validateRequest, productController.createProduct);
+router.post("/", authMiddleware, validateCreateProduct, validateRequest, productController.createProduct);
 
 /**
  * ---------------------------
@@ -62,6 +63,7 @@ router.put(
   "/:id",
   authMiddleware,
   validateProductId,
+  validateUpdateProduct,
   validateRequest,
   productController.updateProduct
 );

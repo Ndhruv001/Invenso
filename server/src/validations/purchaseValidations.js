@@ -13,37 +13,70 @@ const PAYMENT_MODES = Object.values(PaymentMode);
 // --------------------
 const validatePurchaseId = [
   param("id")
-    .exists().withMessage("Purchase ID param is required")
-    .isInt({ gt: 0 }).withMessage("Purchase ID must be a positive integer")
-    .toInt(),
+    .exists()
+    .withMessage("Purchase ID param is required")
+    .isInt({ gt: 0 })
+    .withMessage("Purchase ID must be a positive integer")
+    .toInt()
 ];
 
 // --------------------
 // Validate purchase create/update body
 // --------------------
-const validatePurchase = [
-  // ---- Core purchase fields ----
-  body("partyId")
-    .exists().withMessage("Party ID is required")
-    .isInt({ gt: 0 })
-    .withMessage("Party ID must be a positive integer")
-    .toInt(),
+const validateCreatePurchase = [
+  // ---- Core fields ----
+  body("partyId").exists().withMessage("Party ID is required").isInt({ gt: 0 }).toInt(),
 
-  body("date")
-    .optional()
-    .isISO8601()
-    .withMessage("Date must be in ISO8601 format"),
-
-  // invoiceNumber is auto-generated → do NOT require
-  body("invoiceNumber")
-    .optional()
-    .isInt({ gt: 0 })
-    .toInt(),
+  body("date").optional().isISO8601().withMessage("Date must be ISO8601"),
 
   body("paymentMode")
     .optional()
     .isIn(PAYMENT_MODES)
     .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
+
+  body("paymentReference").optional().isString().trim(),
+
+  body("remarks").optional().isString().trim(),
+
+  body("paidAmount").optional().isDecimal().toFloat(),
+
+  body("totalAmount").exists().withMessage("Total amount is required").isDecimal().toFloat(),
+
+  body("totalTaxableAmount").exists().isDecimal().toFloat(),
+
+  body("totalGstAmount").exists().isDecimal().toFloat(),
+
+  // ---- Items ----
+  body("items").exists().isArray({ min: 1 }).withMessage("At least one purchase item is required"),
+
+  body("items.*.productId").exists().isInt({ gt: 0 }).toInt(),
+
+  body("items.*.quantity").exists().isDecimal().toFloat(),
+
+  body("items.*.pricePerUnit").exists().isDecimal().toFloat(),
+
+  body("items.*.gstRate").exists().isDecimal().toFloat(),
+
+  body("items.*.gstAmount").exists().isDecimal().toFloat(),
+
+  body("items.*.taxableAmount").exists().isDecimal().toFloat(),
+
+  body("items.*.amount").exists().isDecimal().toFloat()
+];
+
+const validateUpdatePurchase = [
+  body("partyId")
+    .optional()
+    .isInt({ gt: 0 })
+    .toInt(),
+
+  body("date")
+    .optional()
+    .isISO8601(),
+
+  body("paymentMode")
+    .optional()
+    .isIn(PAYMENT_MODES),
 
   body("paymentReference")
     .optional()
@@ -58,82 +91,71 @@ const validatePurchase = [
   body("paidAmount")
     .optional()
     .isDecimal()
-    .withMessage("Paid amount must be a decimal")
     .toFloat(),
 
   body("totalAmount")
-    .exists().withMessage("Total amount is required")
+    .optional()
     .isDecimal()
-    .withMessage("Total amount must be a decimal")
     .toFloat(),
 
   body("totalTaxableAmount")
-    .exists().withMessage("Total taxable amount is required")
+    .optional()
     .isDecimal()
     .toFloat(),
 
   body("totalGstAmount")
-    .exists().withMessage("Total GST amount is required")
+    .optional()
     .isDecimal()
     .toFloat(),
 
-  // ---- Purchase items ----
   body("items")
-    .exists().withMessage("Purchase items are required")
-    .isArray({ min: 1 })
-    .withMessage("Purchase items must be an array with at least one item"),
+    .optional()
+    .isArray({ min: 1 }),
 
   body("items.*.productId")
-    .exists().withMessage("Product ID is required for each item")
+    .optional()
     .isInt({ gt: 0 })
     .toInt(),
 
   body("items.*.quantity")
-    .exists().withMessage("Quantity is required for each item")
+    .optional()
     .isDecimal()
-    .withMessage("Quantity must be a decimal")
     .toFloat(),
 
   body("items.*.pricePerUnit")
-    .exists().withMessage("Price per unit is required for each item")
+    .optional()
     .isDecimal()
-    .withMessage("Price per unit must be a decimal")
     .toFloat(),
 
   body("items.*.gstRate")
-    .exists().withMessage("GST rate is required for each item")
+    .optional()
     .isDecimal()
-    .withMessage("GST rate must be a decimal")
     .toFloat(),
 
   body("items.*.gstAmount")
-    .exists().withMessage("GST amount is required for each item")
+    .optional()
     .isDecimal()
-    .withMessage("GST amount must be a decimal")
     .toFloat(),
 
   body("items.*.taxableAmount")
-    .exists().withMessage("Taxable amount is required for each item")
+    .optional()
     .isDecimal()
-    .withMessage("Taxable amount must be a decimal")
     .toFloat(),
 
   body("items.*.amount")
-    .exists().withMessage("Total amount is required for each item")
+    .optional()
     .isDecimal()
-    .withMessage("Total amount must be a decimal")
     .toFloat(),
 ];
+
 
 // --------------------
 // Exports
 // --------------------
-export {
-  validatePurchase,
-  validatePurchaseId,
-};
+export { validateCreatePurchase, validateUpdatePurchase, validatePurchaseId };
 
 export default {
-  validatePurchase,
-  validatePurchaseId,
+  validateCreatePurchase,
+  validateUpdatePurchase,
+  validatePurchaseId
 };
