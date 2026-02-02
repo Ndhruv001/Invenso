@@ -767,11 +767,37 @@ async function deletePurchase(purchaseId, userId = null) {
   });
 }
 
-export { listPurchases, getPurchaseById, createPurchase, updatePurchase, deletePurchase };
+// services/purchaseServices.js
+
+async function getPurchaseSuggestionsByPartyId(partyId) {
+  if (!partyId) {
+    throw new AppError("Party ID is required", 400);
+  }
+
+  const purchases = await prisma.purchase.findMany({
+    where: {
+      partyId: Number(partyId),
+    },
+    orderBy: {
+      date: "desc"
+    },
+    take: 50, // suggestions only, not full list
+    include: {
+      party: true,
+      purchaseItems: {include : { product: { include: { category: true } } } },
+    }
+  });
+
+  return purchases;
+}
+
+
+export { listPurchases, getPurchaseById, createPurchase, updatePurchase, deletePurchase, getPurchaseSuggestionsByPartyId };
 export default {
   listPurchases,
   getPurchaseById,
   createPurchase,
   updatePurchase,
-  deletePurchase
+  deletePurchase,
+  getPurchaseSuggestionsByPartyId
 };

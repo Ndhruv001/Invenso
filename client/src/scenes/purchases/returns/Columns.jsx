@@ -22,8 +22,8 @@ const PartyBadge = ({ party }) => {
 };
 
 /**
- * Purchase table column definitions including all cell rendering logic and actions.
- * Pass `onView`, `onEdit`, `onDelete` callbacks and `showSelection`.
+ * Purchase Return table column definitions.
+ * Mirrors Purchase columns with minimal semantic differences.
  */
 const Columns = (showSelection = false) => {
   const { theme } = useTheme();
@@ -40,16 +40,6 @@ const Columns = (showSelection = false) => {
       size: 80
     },
     {
-      accessorKey: "invoiceNumber",
-      header: "Invoice Number",
-      cell: ({ getValue }) => (
-        <span className="font-semibold text-sm" style={{ color: theme.text.primary }}>
-          {getValue() || "N/A"}
-        </span>
-      ),
-      minSize: 180
-    },
-    {
       accessorKey: "party",
       header: "Party",
       cell: ({ getValue }) => <PartyBadge party={getValue()} />,
@@ -58,13 +48,11 @@ const Columns = (showSelection = false) => {
     {
       accessorKey: "date",
       header: "Date",
-      cell: ({ getValue }) => {
-        return (
-          <span className="text-sm" style={{ color: theme.text.primary }}>
-            {formatDate(getValue())}
-          </span>
-        );
-      },
+      cell: ({ getValue }) => (
+        <span className="text-sm" style={{ color: theme.text.primary }}>
+          {formatDate(getValue())}
+        </span>
+      ),
       size: 120
     },
     {
@@ -79,14 +67,14 @@ const Columns = (showSelection = false) => {
       meta: { align: "right" }
     },
     {
-      accessorKey: "paidAmount",
-      header: "Paid Amount",
+      accessorKey: "receivedAmount",
+      header: "Received Amount",
       cell: ({ getValue }) => (
         <span className="font-semibold text-right block" style={{ color: theme.text.primary }}>
           {formatCurrency(getValue())}
         </span>
       ),
-      size: 140,
+      size: 160,
       meta: { align: "right" }
     },
     {
@@ -101,8 +89,8 @@ const Columns = (showSelection = false) => {
       meta: { align: "right" }
     },
     {
-      accessorKey: "remarks",
-      header: "Remarks",
+      accessorKey: "reason",
+      header: "Reason",
       cell: ({ getValue }) => (
         <span
           className="text-sm truncate block max-w-[200px]"

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from "react";
+import React, { useMemo, useEffect, useState, useCallback, use } from "react";
 import {
   Save,
   X,
@@ -11,7 +11,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
-import {productCreateSchema, productUpdateSchema} from "@/validations/productSchema";
+import {productCreateSchema, productUpdateSchema} from "@/validations/productValidations";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
@@ -267,7 +267,7 @@ const ProductModal = ({
                     errors={errors}
                     register={register}
                     isEditMode={isEditMode}
-                    isDisabled={isDisabled}
+                    isDisabled={initialData ? true : isDisabled}
                     initialData={initialData}
                     theme={theme}
                   />

@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { useParties } from "@/hooks/useParties";
 
 /**
- * React hook to provide filter option definitions and choices for Purchase resource filters.
+ * React hook to provide filter option definitions and choices for Purchase return resource filters.
  */
-function usePurchaseFilterOptions() {
+function usePurchaseReturnFilterOptions() {
   const { data: partyData } = useParties();
   
 
@@ -42,5 +42,5 @@ function usePurchaseFilterOptions() {
   ];
 }
 
-export default usePurchaseFilterOptions;
-export { usePurchaseFilterOptions };
+export default usePurchaseReturnFilterOptions;
+export { usePurchaseReturnFilterOptions };

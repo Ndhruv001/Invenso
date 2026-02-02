@@ -24,6 +24,13 @@ router.get(
   purchaseController.listPurchases
 );
 
+// Get purchase by Party ID
+router.get(
+  "/party-id/:partyId",
+  authMiddleware,
+  purchaseController.getPurchaseByPartyId
+);
+
 // Get purchase by ID
 router.get(
   "/:id",

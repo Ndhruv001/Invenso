@@ -137,25 +137,6 @@ export const deleteProduct = async id => {
   }
 };
 
-/**
- * Soft deletes multiple products by IDs.
- * @param {number[]} ids - Array of product IDs
- * @returns {Promise<Object>}
- */
-export const bulkDeleteProducts = async ids => {
-  if (!Array.isArray(ids) || ids.length === 0)
-    throw new Error("IDs array is required for bulk delete");
-
-  try {
-    const { data } = await axiosInstance.delete(`/products/bulk-delete`, {
-      data: { ids }
-    });
-    return data;
-  } catch (error) {
-    handleAxiosError(error, "Failed to bulk delete products");
-  }
-};
-
 export const suggestProducts = async query => {
   if (!query) return [];
 
@@ -177,7 +158,6 @@ export const productsApi = {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts
 };
 
 export default productsApi;

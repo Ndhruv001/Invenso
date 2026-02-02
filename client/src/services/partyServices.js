@@ -20,7 +20,6 @@ const handleAxiosError = (error, defaultMsg) => {
  * @returns {Promise<Object>} Paginated { data, pagination, stats }
  */
 export const getParties = async (filters = {}) => {
-  console.log("🚀 ~ getParties ~ filters:", filters)
   try {
     const params = new URLSearchParams();
 

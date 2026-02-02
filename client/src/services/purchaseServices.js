@@ -14,15 +14,6 @@ const handleAxiosError = (error, defaultMsg) => {
   throw new Error(message);
 };
 
-export const getParties = async () => {
-  try {
-    const { data } = await axiosInstance.get("/parties");
-    return data;
-  } catch (error) {
-    handleAxiosError(error, "Failed to fetch parties");
-  }
-};
-
 // Fetch paginated purchase list with filters, sort, search etc.
 export const getPurchases = async (filters = {}) => {
   try {
@@ -48,7 +39,7 @@ export const getPurchases = async (filters = {}) => {
 };
 
 // Fetch purchase by ID
-export const getPurchase = async (id) => {
+export const getPurchase = async id => {
   if (!id) throw new Error("Purchase ID is required");
   try {
     const { data } = await axiosInstance.get(`/purchases/${id}`);
@@ -60,7 +51,7 @@ export const getPurchase = async (id) => {
 };
 
 // Create new purchase with data object
-export const createPurchase = async (purchaseData) => {
+export const createPurchase = async purchaseData => {
   try {
     const { data } = await axiosInstance.post("/purchases", purchaseData);
     return data;
@@ -89,7 +80,7 @@ export const updatePurchase = async (id, updateData) => {
 };
 
 // Soft delete purchase by ID
-export const deletePurchase = async (id) => {
+export const deletePurchase = async id => {
   if (!id) throw new Error("Purchase ID is required");
   try {
     const { data } = await axiosInstance.delete(`/purchases/${id}`);
@@ -102,19 +93,19 @@ export const deletePurchase = async (id) => {
   }
 };
 
-// Bulk delete purchases by array of IDs
-export const bulkDeletePurchases = async (ids) => {
-  if (!Array.isArray(ids) || ids.length === 0)
-    throw new Error("IDs array is required for bulk delete");
+// Fetch purchase suggestions by partyId (for dropdown / selection)
+export const getPurchaseSuggestionsByPartyId = async (partyId) => {
+  if (!partyId) return [];
+
   try {
-    const { data } = await axiosInstance.delete(`/purchases/bulk-delete`, {
-      data: { ids },
-    });
-    return data;
+    const { data } = await axiosInstance.get(`/purchases/party-id/${partyId}`);
+
+    return data ?? [];
   } catch (error) {
-    handleAxiosError(error, "Failed to bulk delete purchases");
+    handleAxiosError(error, "Failed to fetch purchase suggestions");
   }
 };
+
 
 export const purchasesApi = {
   getPurchases,
@@ -122,7 +113,7 @@ export const purchasesApi = {
   createPurchase,
   updatePurchase,
   deletePurchase,
-  bulkDeletePurchases,
+  getPurchaseSuggestionsByPartyId
 };
 
 export default purchasesApi;

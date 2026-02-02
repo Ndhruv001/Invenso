@@ -1,267 +1,344 @@
-/**
- * saleServices.js
- * Revised sale services with consistent party balance and payment handling,
- * detailed inventory log with correct balances,
- * profit calculation, and DRY bulk delete using single delete function.
- */
-
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
 /**
  * Helper: Build date filter for Prisma
+ * @param {Object} dateFilter {from, to}
  */
-function buildDateFilter(dateFilter) {
-  if (!dateFilter) return undefined;
+function buildDateFilter({ from, to }) {
   const cond = {};
-  if (dateFilter.from) cond.gte = new Date(dateFilter.from);
-  if (dateFilter.to) cond.lte = new Date(dateFilter.to);
+
+  if (from) cond.gte = new Date(from);
+  if (to) cond.lte = new Date(to);
+
   return Object.keys(cond).length ? cond : undefined;
 }
 
 /**
- * Helper: Adjust party balance based on old and new owed amount
- * owed = totalAmount - receivedAmount
+ * listSales
+ * List sales with filters, pagination, search, stats
  */
-async function adjustPartyBalanceOnSale(
-  tx, partyId,
-  oldTotal, oldReceived,
-  newTotal, newReceived
-) {
-  const oldOwed = oldTotal - oldReceived;
-  const newOwed = newTotal - newReceived;
-  const diff = newOwed - oldOwed;
+async function listSales({
+  page = 1,
+  limit = 10,
+  sortBy = "date",
+  sortOrder = "desc",
+  search = "",
+  filters = {}
+}) {
+  /* -------------------- Base Where -------------------- */
 
-  if (diff !== 0) {
-    await tx.party.update({
-      where: { id: partyId },
-      data: { currentBalance: { increment: diff } },
-    });
-  }
-}
-
-/**
- * Helper: Create inventory log & update product stock with correct balances
- */
-async function createInventoryLogAndUpdateStock(tx, item, referenceType, referenceId) {
-  const product = await tx.product.findUnique({ where: { id: item.productId } });
-  if (!product || !product.isActive) throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-
-  const balanceBefore = Number(product.currentStock);
-  const balanceAfter = balanceBefore - Number(item.quantity);
-  if (balanceAfter < 0) throw new AppError("Insufficient stock to subtract", 400);
-
-  const avgCostPrice = Number(product.avgCostPrice || 0);
-
-  const profit = (Number(item.pricePerUnit) - avgCostPrice) * Number(item.quantity);
-
-  // Create Inventory Log with balances
-  await tx.inventoryLog.create({
-    data: {
-      productId: item.productId,
-      quantity: item.quantity,
-      type: "SUBTRACT",
-      referenceType,
-      referenceId: String(referenceId),
-      remark: item.remark || null,
-      balanceBefore,
-      balanceAfter,
-    },
-  });
-
-  // Update product stock
-  await tx.product.update({
-    where: { id: item.productId },
-    data: { currentStock: balanceAfter },
-  });
-
-  return profit;
-}
-
-/**
- * List sales with global search and stats including totalProfit
- */
-async function listSales({ page = 1, limit = 10, sortBy = "date", sortOrder = "desc", search = "", filters = {} }) {
   const where = {};
 
-  if (filters.date) {
-    const dateFilter = buildDateFilter(filters.date);
-    if (dateFilter) where.date = dateFilter;
+  /* -------------------- Filters -------------------- */
+
+  if (filters.partyId) {
+    where.partyId = Number(filters.partyId);
   }
 
-  // Global search
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
-
-    const matchingParties = await prisma.party.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true },
-    });
-    const partyIds = matchingParties.map(p => p.id);
-
-    const matchingProducts = await prisma.product.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true },
-    });
-    const productIds = matchingProducts.map(p => p.id);
-
-    where.AND = where.AND || [];
-    where.AND.push({
-      OR: [
-        { partyId: { in: partyIds.length ? partyIds : [0] } },
-        { invoiceNumber: { contains: trimmedSearch, mode: "insensitive" } },
-        { remarks: { contains: trimmedSearch, mode: "insensitive" } },
-        {
-          saleItems: {
-            some: {
-              productId: { in: productIds.length ? productIds : [0] },
-            },
-          },
-        },
-      ],
-    });
+  if (filters.invoiceNumber) {
+    where.invoiceNumber = Number(filters.invoiceNumber);
   }
+
+  if (filters.dateFrom || filters.dateTo) {
+    const dateFilter = buildDateFilter({
+      from: filters.dateFrom,
+      to: filters.dateTo
+    });
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
+  }
+
+  if (filters.paymentMode) {
+    where.paymentMode = filters.paymentMode;
+  }
+
+  /* -------------------- Search -------------------- */
+
+  if (search.trim()) {
+    const q = search.trim();
+    const isNumeric = !isNaN(Number(q));
+
+    const orConditions = [
+      { remarks: { contains: q, mode: "insensitive" } },
+
+      {
+        party: {
+          name: { contains: q, mode: "insensitive" }
+        }
+      },
+
+      ...(isNumeric ? [{ invoiceNumber: Number(q) }] : []),
+      ...(isNumeric ? [{ totalAmount: Number(q) }] : [])
+    ];
+
+    where.OR = orConditions;
+  }
+
+  /* -------------------- Pagination -------------------- */
 
   const skip = (page - 1) * limit;
   const take = limit;
 
-  const data = await prisma.sale.findMany({
-    where,
-    orderBy: { [sortBy]: sortOrder },
-    skip,
-    take,
-    include: { party: true, saleItems: true },
-  });
+  /* -------------------- Safe Sorting -------------------- */
 
-  const totalRows = await prisma.sale.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
+  const allowedSortFields = ["date", "invoiceNumber", "totalAmount", "createdAt", "party"];
 
-  const [totalSales, sumTotalAmount, sumTotalGst, sumReceivedAmount, sumTotalProfit] = await Promise.all([
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
+
+  const orderBy =
+    safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
+
+  /* -------------------- DB Transaction -------------------- */
+
+  const [sales, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+    prisma.sale.findMany({
+      where,
+      skip,
+      take,
+      orderBy,
+      include: {
+        party: true,
+        saleItems: {
+          include: {
+            product: {
+              include: { category: true }
+            }
+          }
+        }
+      }
+    }),
+
     prisma.sale.count({ where }),
-    prisma.sale.aggregate({ where, _sum: { totalAmount: true } }).then(r => Number(r._sum.totalAmount) || 0),
-    prisma.sale.aggregate({ where, _sum: { totalGstAmount: true } }).then(r => Number(r._sum.totalGstAmount) || 0),
-    prisma.sale.aggregate({ where, _sum: { receivedAmount: true } }).then(r => Number(r._sum.receivedAmount) || 0),
-    prisma.sale.aggregate({ where, _sum: { totalProfit: true } }).then(r => Number(r._sum.totalProfit) || 0),
+
+    prisma.sale.groupBy({
+      by: ["partyId"],
+      where
+    }),
+
+    prisma.sale.aggregate({
+      where,
+      _sum: {
+        totalAmount: true,
+        totalGstAmount: true,
+        totalTaxableAmount: true,
+        receivedAmount: true,
+        totalProfit: true
+      }
+    })
   ]);
 
+  /* -------------------- Stats -------------------- */
+
+  const stats = {
+    totalSales: totalRows,
+    totalParties: groupedParties.length,
+    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
+    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
+    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
+    sumTotalReceived: Number(aggregates._sum.receivedAmount) || 0,
+    sumTotalProfit: Number(aggregates._sum.totalProfit) || 0
+  };
+
+  /* -------------------- Response -------------------- */
+
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
-    stats: {
-      totalSales,
-      sumTotalAmount,
-      sumTotalGst,
-      sumReceivedAmount,
-      sumTotalProfit,
+    data: sales,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
     },
+    stats
   };
 }
 
 /**
- * Get sale by ID with relations
+ * Get sale by ID including items and party
  */
 async function getSaleById(id) {
   if (!id) throw new AppError("Sale ID is required", 400);
 
   const sale = await prisma.sale.findUnique({
     where: { id },
-    include: { saleItems: true, party: true },
+    include: {
+      saleItems: true,
+      party: true
+    }
   });
 
   if (!sale) throw new AppError("Sale not found", 404);
+
   return sale;
 }
 
 /**
- * Create sale with correct and consistent balance management
+ * Create sale with items, inventory logs, stock, payment, party balance, audit log
+ * @param {Object} data sale data with items array
+ * @param {number|null} userId
  */
 async function createSale(data, userId = null) {
-  const { date, partyId, invoiceNumber, paymentMode, paymentReference, remarks, saleItems, receivedAmount = 0 } = data;
+  const {
+    date,
+    partyId,
+    invoiceNumber,
+    receivedAmount = 0,
+    paymentMode,
+    paymentReference,
+    remarks,
+    items
+  } = data;
 
-  if (!saleItems || !Array.isArray(saleItems) || saleItems.length === 0) {
+  if (!Array.isArray(items) || items.length === 0) {
     throw new AppError("Sale items are required", 400);
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async tx => {
+    /* -------------------- Normalize & Prepare -------------------- */
     let totalAmount = 0;
     let totalTaxableAmount = 0;
     let totalGstAmount = 0;
     let totalProfit = 0;
 
-    for (const item of saleItems) {
-      totalTaxableAmount += Number(item.taxableAmount);
-      totalGstAmount += Number(item.gstAmount);
-      totalAmount += Number(item.totalAmount);
+    const itemsData = [];
+
+    for (const item of items) {
+      const quantity = Number(item.quantity);
+      const pricePerUnit = Number(item.pricePerUnit);
+      const gstRate = Number(item.gstRate);
+      const taxableAmount = Number(item.taxableAmount);
+      const gstAmount = Number(item.gstAmount);
+      const amount = Number(item.amount);
+
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found`, 404);
+      }
+
+      const balanceBefore = Number(product.currentStock);
+
+      // Stock validation (SALE = OUT)
+      if (balanceBefore < quantity) {
+        throw new AppError(`Insufficient stock for product ${product.name}`, 400);
+      }
+
+      const costPrice = Number(product.avgCostPrice || 0);
+      const profit = (pricePerUnit - costPrice) * quantity;
+
+      totalTaxableAmount += taxableAmount;
+      totalGstAmount += gstAmount;
+      totalAmount += amount;
+      totalProfit += profit;
+
+      itemsData.push({
+        productId: item.productId,
+        quantity,
+        pricePerUnit,
+        gstRate,
+        taxableAmount,
+        gstAmount,
+        amount,
+        profit
+      });
     }
 
+    /* -------------------- Build Sale Data -------------------- */
+    const saleData = {
+      ...(date && { date }),
+      partyId,
+      ...(invoiceNumber && { invoiceNumber }),
+      totalAmount,
+      totalGstAmount,
+      totalTaxableAmount,
+      totalProfit,
+      receivedAmount: Number(receivedAmount),
+      ...(paymentMode && { paymentMode }),
+      ...(paymentReference && { paymentReference }),
+      ...(remarks && { remarks })
+    };
+
+    /* -------------------- Create Sale -------------------- */
     const sale = await tx.sale.create({
-      data: {
-        date,
-        partyId,
-        invoiceNumber,
-        paymentMode,
-        paymentReference,
-        remarks,
-        receivedAmount,
-        totalAmount,
-        totalGstAmount,
-        totalTaxableAmount,
-        totalProfit: 0,
-      },
+      data: saleData
     });
 
-    // Calculate profits and update stock
-    for (const item of saleItems) {
-      const profit = await createInventoryLogAndUpdateStock(tx, item, "SALE", sale.id);
-
+    /* -------------------- Create Items + Inline Inventory -------------------- */
+    for (const item of itemsData) {
+      // 1. Create sale item
       await tx.saleItem.create({
         data: {
           saleId: sale.id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          taxableAmount: item.taxableAmount,
-          totalAmount: item.totalAmount,
-          profit,
-        },
+          ...item
+        }
       });
 
-      totalProfit += profit;
+      // 2. Inline Inventory Logic (SALE = SUBTRACT)
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      const balanceBefore = Number(product.currentStock);
+      const balanceAfter = balanceBefore - item.quantity;
+
+      await tx.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          quantity: item.quantity,
+          type: "SUBTRACT",
+          referenceType: "SALE",
+          saleId: sale.id,
+          remark: `Sale #${sale.id}`,
+          balanceBefore,
+          balanceAfter
+        }
+      });
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { currentStock: balanceAfter }
+      });
     }
 
-    await tx.sale.update({ where: { id: sale.id }, data: { totalProfit } });
-
-    // Update party balance = totalAmount - receivedAmount owed
-    if (partyId) {
-      await adjustPartyBalanceOnSale(tx, partyId, 0, 0, totalAmount, receivedAmount);
+    /* -------------------- Party Balance Update -------------------- */
+    const receivableAmount = totalAmount - Number(receivedAmount);
+    if (partyId && receivableAmount > 0) {
+      await tx.party.update({
+        where: { id: partyId },
+        data: { currentBalance: { decrement: receivableAmount } }
+      });
     }
 
-    if (receivedAmount > 0 && partyId) {
+    /* -------------------- Payment Entry -------------------- */
+    if (partyId && Number(receivedAmount) > 0) {
       await tx.payment.create({
         data: {
+          date,
           partyId,
           type: "RECEIVED",
-          amount: receivedAmount,
+          amount: Number(receivedAmount),
           referenceType: "SALE",
-          referenceId: sale.id,
+          saleId: sale.id,
           paymentMode,
           paymentReference,
-          remark: remarks,
-        },
+          remark: remarks
+        }
       });
     }
 
+    /* -------------------- Audit Log -------------------- */
     await tx.auditLog.create({
       data: {
         tableName: "sales",
         recordId: String(sale.id),
         action: "CREATE",
         newValue: JSON.stringify(sale),
-        userId,
-      },
+        userId
+      }
     });
 
     return sale;
@@ -269,237 +346,471 @@ async function createSale(data, userId = null) {
 }
 
 /**
- * Update sale with consistent stock, profit, balance, payment handling
+ * Update sale with diff-based stock, party balance & audit log
  */
-async function updateSale(id, data, userId = null) {
-  if (!id) throw new AppError("Sale ID is required", 400);
-  if (!data) throw new AppError("Update data is required", 400);
+async function updateSale(saleId, data, userId = null) {
+  if (!saleId) {
+    throw new AppError("Sale ID is required", 400);
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    const existingSale = await tx.sale.findUnique({ where: { id }, include: { saleItems: true } });
-    if (!existingSale) throw new AppError("Sale not found", 404);
-
-    const {
-      saleItems = [],
-      receivedAmount = existingSale.receivedAmount,
-      paymentMode,
-      paymentReference,
-      partyId = existingSale.partyId,
-      remarks,
-    } = data;
-
-    // Revert stock and delete old sale items properly
-    for (const oldItem of existingSale.saleItems) {
-      // Fetch balances for revert log
-      const product = await tx.product.findUnique({ where: { id: oldItem.productId } });
-      if (!product || !product.isActive) throw new AppError(`Product ${oldItem.productId} not found or inactive`, 404);
-      const balanceBefore = Number(product.currentStock);
-      const balanceAfter = balanceBefore + Number(oldItem.quantity);
-
-      await tx.inventoryLog.create({
-        data: {
-          productId: oldItem.productId,
-          quantity: oldItem.quantity,
-          type: "ADD",
-          referenceType: "SALE",
-          referenceId: String(id),
-          remark: `Revert sale #${id} item before update`,
-          balanceBefore,
-          balanceAfter,
-        },
-      });
-
-      await tx.product.update({ where: { id: oldItem.productId }, data: { currentStock: balanceAfter } });
-      await tx.saleItem.delete({ where: { id: oldItem.id } });
-    }
-
-    let totalAmount = 0;
-    let totalTaxableAmount = 0;
-    let totalGstAmount = 0;
-    let totalProfit = 0;
-
-    for (const item of saleItems) {
-      const profit = await createInventoryLogAndUpdateStock(tx, item, "SALE", id);
-
-      await tx.saleItem.create({
-        data: {
-          saleId: id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          taxableAmount: item.taxableAmount,
-          totalAmount: item.totalAmount,
-          profit,
-        },
-      });
-
-      totalTaxableAmount += Number(item.taxableAmount);
-      totalGstAmount += Number(item.gstAmount);
-      totalAmount += Number(item.totalAmount);
-      totalProfit += profit;
-    }
-
-    await adjustPartyBalanceOnSale(tx, partyId, existingSale.totalAmount, existingSale.receivedAmount, totalAmount, receivedAmount);
-
-    const updatedSale = await tx.sale.update({
-      where: { id },
-      data: {
-        partyId,
-        receivedAmount,
-        paymentMode,
-        paymentReference,
-        remarks,
-        totalAmount,
-        totalTaxableAmount,
-        totalGstAmount,
-        totalProfit,
-      },
+  return prisma.$transaction(async tx => {
+    const existingSale = await tx.sale.findUnique({
+      where: { id: saleId },
+      include: { saleItems: true }
     });
 
-    // Payment update or delete if needed
-    const existingPayment = await tx.payment.findFirst({ where: { referenceType: "SALE", referenceId: id } });
+    if (!existingSale) {
+      throw new AppError("Sale not found", 404);
+    }
 
-    if (receivedAmount > 0 && partyId) {
-      if (existingPayment) {
-        await tx.payment.update({
-          where: { id: existingPayment.id },
-          data: {
-            partyId,
-            amount: receivedAmount,
-            paymentMode,
-            paymentReference,
-            remark: remarks,
-          },
+    const saleUpdateData = {};
+    let itemsWereModified = false;
+    let saleWasUpdated = false;
+
+    /* ------------------------------
+       Sale fields (partial updates)
+    ------------------------------ */
+    if (data.partyId !== undefined) {
+      saleUpdateData.partyId = data.partyId;
+    }
+
+    if (data.invoiceNumber !== undefined) {
+      saleUpdateData.invoiceNumber = Number(data.invoiceNumber);
+    }
+
+    if (data.receivedAmount !== undefined) {
+      saleUpdateData.receivedAmount = Number(data.receivedAmount);
+    }
+
+    if (data.paymentMode !== undefined) {
+      saleUpdateData.paymentMode = data.paymentMode;
+    }
+
+    if (data.paymentReference !== undefined) {
+      saleUpdateData.paymentReference = data.paymentReference;
+    }
+
+    if (data.remarks !== undefined) {
+      saleUpdateData.remarks = data.remarks;
+    }
+
+    if (data.date !== undefined) {
+      saleUpdateData.date = data.date;
+    }
+
+    /* ------------------------------
+       Sale items (ONLY if sent)
+    ------------------------------ */
+    if (Array.isArray(data.items)) {
+      itemsWereModified = true;
+
+      const incomingIds = data.items
+        .filter(item => typeof item.id === "number")
+        .map(item => item.id);
+
+      const itemsToDelete = existingSale.saleItems.filter(item => !incomingIds.includes(item.id));
+
+      /* ---- STEP 1: DELETE removed items ---- */
+      for (const itemToDelete of itemsToDelete) {
+        const product = await tx.product.findUnique({
+          where: { id: itemToDelete.productId }
         });
-      } else {
-        await tx.payment.create({
-          data: {
-            partyId,
-            type: "RECEIVED",
-            amount: receivedAmount,
-            referenceType: "SALE",
-            referenceId: id,
-            paymentMode,
-            paymentReference,
-            remark: remarks,
-          },
+
+        if (product) {
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore + Number(itemToDelete.quantity); // SALE undo
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "ADD",
+              quantity: itemToDelete.quantity,
+              referenceType: "SALE",
+              saleId,
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter,
+              remark: "Item removed from sale"
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
+        }
+
+        await tx.saleItem.delete({
+          where: { id: itemToDelete.id }
         });
       }
-    } else if (existingPayment) {
-      // Delete stale payment record if receivedAmount is zero now
-      await tx.payment.delete({ where: { id: existingPayment.id } });
+
+      /* ---- STEP 2 & 3: UPDATE existing + ADD new items ---- */
+      for (const incomingItem of data.items) {
+        /* ---- UPDATE existing item ---- */
+        if (incomingItem.id) {
+          const existingItem = existingSale.saleItems.find(item => item.id === incomingItem.id);
+
+          if (!existingItem) {
+            throw new AppError("Sale item not found", 404);
+          }
+
+          const product = await tx.product.findUnique({
+            where: { id: existingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const oldQty = Number(existingItem.quantity);
+          const newQty =
+            incomingItem.quantity !== undefined ? Number(incomingItem.quantity) : oldQty;
+
+          const qtyDiff = newQty - oldQty;
+
+          if (qtyDiff !== 0) {
+            const stockBefore = Number(product.currentStock);
+            const stockAfter = stockBefore - qtyDiff; // SALE logic
+
+            if (stockAfter < 0) {
+              throw new AppError(`Insufficient stock for product ${product.name}`, 400);
+            }
+
+            await tx.inventoryLog.create({
+              data: {
+                productId: product.id,
+                type: qtyDiff > 0 ? "SUBTRACT" : "ADD",
+                quantity: Math.abs(qtyDiff),
+                referenceType: "SALE",
+                saleId,
+                balanceBefore: stockBefore,
+                balanceAfter: stockAfter
+              }
+            });
+
+            await tx.product.update({
+              where: { id: product.id },
+              data: { currentStock: stockAfter }
+            });
+          }
+
+          const costPrice = Number(product.avgCostPrice || 0);
+          const profit =
+            (Number(incomingItem.pricePerUnit ?? existingItem.pricePerUnit) - costPrice) * newQty;
+
+          await tx.saleItem.update({
+            where: { id: existingItem.id },
+            data: {
+              quantity: newQty,
+              pricePerUnit: incomingItem.pricePerUnit ?? existingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate ?? existingItem.gstRate,
+              gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
+              amount: incomingItem.amount ?? existingItem.amount,
+              profit
+            }
+          });
+        } else {
+          /* ---- ADD new item ---- */
+          const product = await tx.product.findUnique({
+            where: { id: incomingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore - Number(incomingItem.quantity);
+
+          if (stockAfter < 0) {
+            throw new AppError(`Insufficient stock for product ${product.name}`, 400);
+          }
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "SUBTRACT",
+              quantity: incomingItem.quantity,
+              referenceType: "SALE",
+              saleId,
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
+
+          const costPrice = Number(product.avgCostPrice || 0);
+          const profit =
+            (Number(incomingItem.pricePerUnit) - costPrice) * Number(incomingItem.quantity);
+
+          await tx.saleItem.create({
+            data: {
+              saleId,
+              productId: incomingItem.productId,
+              quantity: incomingItem.quantity,
+              pricePerUnit: incomingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate,
+              gstAmount: incomingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount,
+              amount: incomingItem.amount,
+              profit
+            }
+          });
+        }
+      }
+
+      /* ---- Recalculate totals & profit ---- */
+      const allItems = await tx.saleItem.findMany({
+        where: { saleId }
+      });
+
+      saleUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.amount), 0);
+
+      saleUpdateData.totalTaxableAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.taxableAmount),
+        0
+      );
+
+      saleUpdateData.totalGstAmount = allItems.reduce((sum, i) => sum + Number(i.gstAmount), 0);
+
+      saleUpdateData.totalProfit = allItems.reduce((sum, i) => sum + Number(i.profit), 0);
     }
 
-    await tx.auditLog.create({
-      data: {
-        tableName: "sales",
-        recordId: String(id),
-        action: "UPDATE",
-        oldValue: JSON.stringify(existingSale),
-        newValue: JSON.stringify(updatedSale),
-        userId,
-      },
-    });
+    /* ------------------------------
+       Update sale record
+    ------------------------------ */
+    const updatedSale =
+      Object.keys(saleUpdateData).length > 0
+        ? await tx.sale.update({
+            where: { id: saleId },
+            data: saleUpdateData
+          })
+        : existingSale;
+
+    if (Object.keys(saleUpdateData).length > 0 || itemsWereModified) {
+      saleWasUpdated = true;
+    }
+
+    /* ------------------------------
+       Party balance adjustment (UNIFIED LOGIC)
+    ------------------------------ */
+    const oldPartyId = existingSale.partyId;
+    const oldTotal = Number(existingSale.totalAmount);
+    const oldReceived = Number(existingSale.receivedAmount || 0);
+    const oldReceivable = oldTotal - oldReceived;
+
+    const newPartyId = updatedSale.partyId;
+    const newTotal = Number(updatedSale.totalAmount);
+    const newReceived = Number(updatedSale.receivedAmount || 0);
+    const newReceivable = newTotal - newReceived;
+
+    const partyChanged = oldPartyId !== newPartyId;
+
+    if (partyChanged) {
+      // reverse old receivable, apply new receivable
+      await tx.party.update({
+        where: { id: oldPartyId },
+        data: { currentBalance: { increment: oldReceivable } }
+      });
+
+      await tx.party.update({
+        where: { id: newPartyId },
+        data: { currentBalance: { decrement: newReceivable } }
+      });
+    } else {
+      const receivableDiff = newReceivable - oldReceivable;
+
+      if (receivableDiff !== 0) {
+        await tx.party.update({
+          where: { id: oldPartyId },
+          data: { currentBalance: { decrement: receivableDiff } }
+        });
+      }
+    }
+
+    /* ------------------------------
+       Audit log
+    ------------------------------ */
+    if (saleWasUpdated) {
+      await tx.auditLog.create({
+        data: {
+          tableName: "sales",
+          recordId: String(saleId),
+          action: "UPDATE",
+          oldValue: JSON.stringify(existingSale),
+          newValue: JSON.stringify(updatedSale),
+          userId
+        }
+      });
+    }
 
     return updatedSale;
   });
 }
 
 /**
- * Delete sale with consistent balance, payment, stock, audit cleanup
+ * Delete sale:
+ * - Undo stock and inventory logs
+ * - Undo party balance on total receivable
+ * - Delete payment if any
+ * - Delete sale items and sale
+ * - Audit log
  */
-async function deleteSale(id, userId = null) {
-  if (!id) throw new AppError("Sale ID is required", 400);
+async function deleteSale(saleId, userId = null) {
+  if (!saleId) {
+    throw new AppError("Sale ID is required", 400);
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    const sale = await tx.sale.findUnique({ where: { id }, include: { saleItems: true } });
-    if (!sale) throw new AppError("Sale not found", 404);
+  return prisma.$transaction(async tx => {
+    /* ----------------------------------------
+       1. Load sale with items
+    ---------------------------------------- */
+    const existingSale = await tx.sale.findUnique({
+      where: { id: saleId },
+      include: { saleItems: true }
+    });
 
-    for (const item of sale.saleItems) {
-      const product = await tx.product.findUnique({ where: { id: item.productId } });
-      if (!product || !product.isActive) throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-      const balanceBefore = Number(product.currentStock);
-      const balanceAfter = balanceBefore + Number(item.quantity);
+    if (!existingSale) {
+      throw new AppError("Sale not found", 404);
+    }
+
+    /* ----------------------------------------
+       2. REVERSE INVENTORY (undo stock subtraction)
+    ---------------------------------------- */
+    for (const item of existingSale.saleItems) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found or inactive`, 404);
+      }
+
+      const stockBefore = Number(product.currentStock);
+      const stockAfter = stockBefore + Number(item.quantity); // SALE undo
 
       await tx.inventoryLog.create({
         data: {
-          productId: item.productId,
-          quantity: item.quantity,
+          productId: product.id,
           type: "ADD",
+          quantity: item.quantity,
           referenceType: "SALE",
-          referenceId: String(id),
-          remark: `Undo sale #${id} item deletion`,
-          balanceBefore,
-          balanceAfter,
-        },
+          saleId: Number(saleId),
+          remark: `Sale #${saleId} deleted`,
+          balanceBefore: stockBefore,
+          balanceAfter: stockAfter
+        }
       });
 
-      await tx.product.update({ where: { id: item.productId }, data: { currentStock: balanceAfter } });
-    }
-
-    // Reverse party owed balance
-    if (sale.partyId) {
-      const owed = sale.totalAmount - sale.receivedAmount;
-      await tx.party.update({
-        where: { id: sale.partyId },
-        data: { currentBalance: { increment: -owed } },
+      await tx.product.update({
+        where: { id: product.id },
+        data: { currentStock: stockAfter }
       });
     }
 
-    // Delete payment if exists
-    const payment = await tx.payment.findFirst({ where: { referenceType: "SALE", referenceId: id } });
-    if (payment) await tx.payment.delete({ where: { id: payment.id } });
+    /* ----------------------------------------
+       3. REVERSE PARTY BALANCE (receivable undo)
+    ---------------------------------------- */
+    if (existingSale.partyId) {
+      const receivableAmount =
+        Number(existingSale.totalAmount) -
+        Number(existingSale.receivedAmount || 0);
 
-    await tx.saleItem.deleteMany({ where: { saleId: id } });
+      if (receivableAmount !== 0) {
+        await tx.party.update({
+          where: { id: existingSale.partyId },
+          data: {
+            currentBalance: {
+              increment: receivableAmount
+            }
+          }
+        });
+      }
+    }
 
-    await tx.sale.delete({ where: { id } });
+    /* ----------------------------------------
+       4. DELETE ALL PAYMENTS LINKED TO SALE
+    ---------------------------------------- */
+    await tx.payment.deleteMany({
+      where: {
+        referenceType: "SALE",
+        saleId: Number(saleId)
+      }
+    });
 
+    /* ----------------------------------------
+       5. DELETE SALE ITEMS (cascade safe)
+    ---------------------------------------- */
+    await tx.saleItem.deleteMany({
+      where: { saleId }
+    });
+
+    /* ----------------------------------------
+       6. DELETE SALE
+    ---------------------------------------- */
+    await tx.sale.delete({
+      where: { id: saleId }
+    });
+
+    /* ----------------------------------------
+       7. AUDIT LOG (MANDATORY)
+    ---------------------------------------- */
     await tx.auditLog.create({
       data: {
         tableName: "sales",
-        recordId: String(id),
+        recordId: String(saleId),
         action: "DELETE",
-        oldValue: JSON.stringify(sale),
-        userId,
-      },
+        oldValue: JSON.stringify(existingSale),
+        userId
+      }
     });
 
     return true;
   });
 }
 
-/**
- * Bulk delete sales by IDs reusing single deleteSale for DRY
- */
-async function bulkDeleteSales(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of sale IDs is required", 400);
+async function getSaleSuggestionsByPartyId(partyId) {
+  if (!partyId) {
+    throw new AppError("Party ID is required", 400);
   }
 
-  return await prisma.$transaction(async (tx) => {
-    for (const id of ids) {
-      await deleteSale(id, userId); 
+  const sales = await prisma.sale.findMany({
+    where: {
+      partyId: Number(partyId)
+    },
+    orderBy: {
+      date: "desc"
+    },
+    take: 50, // suggestions only
+    include: {
+      party: true,
+      saleItems: {
+        include: {
+          product: {
+            include: {
+              category: true
+            }
+          }
+        }
+      }
     }
   });
+
+  return sales;
 }
 
 
-export {
-  listSales,
-  getSaleById,
-  createSale,
-  updateSale,
-  deleteSale,
-  bulkDeleteSales,
-};
+export { listSales, getSaleById, createSale, updateSale, deleteSale, getSaleSuggestionsByPartyId };
 export default {
   listSales,
   getSaleById,
   createSale,
   updateSale,
   deleteSale,
-  bulkDeleteSales,
+  getSaleSuggestionsByPartyId
 };

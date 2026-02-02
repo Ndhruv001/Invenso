@@ -1,6 +1,6 @@
 /**
  * routes/purchaseReturnRoutes.js
- * Routes for PurchaseReturn resource.
+ * Routes for Purchase Return resource.
  * RESTful CRUD routes with validation and auth middleware.
  */
 
@@ -9,23 +9,16 @@ const router = express.Router();
 
 import purchaseReturnController from "../controllers/purchaseReturnControllers.js";
 import {
-  validatePurchaseReturn,
-  validatePurchaseReturnId,
-  validatePurchaseReturnQuery,
-  validateBulkDelete,
+  validateCreatePurchaseReturn,
+  validateUpdatePurchaseReturn,
+  validatePurchaseReturnId
 } from "../validations/purchaseReturnValidations.js";
 
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 
 // List purchase returns with filters and stats
-router.get(
-  "/",
-  authMiddleware,
-  validatePurchaseReturnQuery,
-  validateRequest,
-  purchaseReturnController.listPurchaseReturns
-);
+router.get("/", authMiddleware, purchaseReturnController.listPurchaseReturns);
 
 // Get purchase return by ID
 router.get(
@@ -40,7 +33,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
-  validatePurchaseReturn,
+  validateCreatePurchaseReturn,
   validateRequest,
   purchaseReturnController.createPurchaseReturn
 );
@@ -50,7 +43,7 @@ router.put(
   "/:id",
   authMiddleware,
   validatePurchaseReturnId,
-  validatePurchaseReturn,
+  validateUpdatePurchaseReturn,
   validateRequest,
   purchaseReturnController.updatePurchaseReturn
 );
@@ -62,15 +55,6 @@ router.delete(
   validatePurchaseReturnId,
   validateRequest,
   purchaseReturnController.deletePurchaseReturn
-);
-
-// Bulk delete purchase returns
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  purchaseReturnController.bulkDeletePurchaseReturns
 );
 
 export default router;

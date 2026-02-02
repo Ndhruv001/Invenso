@@ -1,19 +1,24 @@
 import React, { useMemo, useEffect, useState, useCallback } from "react";
-import { Save, X, FileText, Plus, Trash2, Edit3, AlertCircle } from "lucide-react";
+import { Save, X, FileText, Trash2, Edit3, AlertCircle } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { purchaseCreateSchema, purchaseUpdateSchema } from "@/validations/purchaseValidations";
+import {
+  purchaseReturnCreateSchema,
+  purchaseReturnUpdateSchema
+} from "@/validations/purchaseReturnValidations";
+
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { PAYMENT_MODE_OPTIONS } from "@/constants/PAYMENT_MODES";
-import { GST_RATE_OPTIONS } from "@/constants/GST_RATES";
 import { toast } from "react-toastify";
 import { debounce } from "@/lib/helpers/debounce";
 import { usePartySuggestions } from "@/hooks/useParties";
-import { useProductSuggestions } from "@/hooks/useProducts";
+import { formatDate, formatCurrency } from "@/lib/helpers/formatters";
+import { usePurchaseSuggestionsbyPartyId } from "@/hooks/usePurchases";
+import { useCreatePurchaseReturn } from "@/hooks/usePurchaseReturns";
 
-function calculatePurchaseTotals(items = [], paidAmount = 0) {
+function calculatePurchaseReturnTotals(items = [], receivedAmount = 0) {
   let totalTaxableAmount = 0;
   let totalGstAmount = 0;
 
@@ -30,7 +35,7 @@ function calculatePurchaseTotals(items = [], paidAmount = 0) {
   });
 
   const totalAmount = totalTaxableAmount + totalGstAmount;
-  const balanceAmount = totalAmount - Number(paidAmount || 0);
+  const balanceAmount = totalAmount - Number(receivedAmount || 0);
 
   return {
     totalTaxableAmount: Math.round(totalTaxableAmount),
@@ -62,14 +67,15 @@ function toDateInputValue(isoString) {
 
 /* ----------------------------- COMPONENT ----------------------------- */
 
-const PurchaseModal = ({
+const PurchaseReturnModal = ({
   onSubmit,
   onCancel,
   isLoading = false,
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-  console.log("🚀 ~ PurchaseModal ~ initialData:", initialData);
+  
+  const isLinkedToPurchase = Boolean(initialData?.purchaseId);
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */
@@ -79,16 +85,9 @@ const PurchaseModal = ({
   const [showPartySuggestions, setShowPartySuggestions] = useState(false);
   const [selectedParty, setSelectedParty] = useState(initialData?.party || null);
 
-  /* -------------------------------- PRODUCT INPUT ---------------------- -----*/
-
-  const [productSearchQuery, setProductSearchQuery] = useState({
-    query: "",
-    rowIndex: null
-  });
-  const [productSuggestions, setProductSuggestions] = useState([]);
-  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
-  const [activeProductRowIndex, setActiveProductRowIndex] = useState(null);
-  const [productSearchText, setProductSearchText] = useState({});
+  /* -------------------------------- PURCHASE INVOICE INPUT ---------------------- -----*/
+  const [selectedPurchase, setSelectedPurchase] = useState(initialData?.purchase || null);
+  const [showPurchaseSuggestions, setShowPurchaseSuggestions] = useState(false);
 
   /* -------------------------- EDIT MODE -------------------------- */
 
@@ -102,23 +101,23 @@ const PurchaseModal = ({
     () => ({
       partyId: initialData?.partyId ?? "",
       phone: initialData?.party?.phone ?? "",
-      invoiceNumber: initialData?.invoiceNumber ?? "",
       date: initialData?.date
         ? toDateInputValue(initialData.date)
         : new Date().toISOString().slice(0, 10),
+      purchaseId: initialData?.purchaseId ?? "",
 
       paymentMode: initialData?.paymentMode ?? "NONE",
       paymentReference: initialData?.paymentReference ?? "",
-      paidAmount: Number(initialData?.paidAmount ?? 0),
-      remarks: initialData?.remarks ?? "",
+      receivedAmount: Number(initialData?.receivedAmount ?? 0),
+      reason: initialData?.reason ?? "",
       totalAmount: Number(initialData?.totalAmount ?? 0),
       totalTaxableAmount: Number(initialData?.totalTaxableAmount ?? 0),
       totalGstAmount: Number(initialData?.totalGstAmount ?? 0),
 
-      items: initialData?.purchaseItems?.map(item => ({
+      items: initialData?.purchaseReturnItems?.map(item => ({
         // --- identity / relations ---
         id: item.id,
-        purchaseId: item.purchaseId,
+        purchaseReturnId: item.purchaseReturnId,
         productId: Number(item.productId),
 
         // --- rich product object (used for display only) ---
@@ -134,7 +133,7 @@ const PurchaseModal = ({
       })) ?? [
         {
           id: null,
-          purchaseId: null,
+          purchaseReturnId: null,
           productId: "",
           product: null,
           quantity: 1,
@@ -161,8 +160,22 @@ const PurchaseModal = ({
     formState: { errors, isDirty, isSubmitting, dirtyFields }
   } = useForm({
     defaultValues,
-    resolver: yupResolver(initialData ? purchaseUpdateSchema : purchaseCreateSchema),
+    resolver: yupResolver(initialData ? purchaseReturnUpdateSchema : purchaseReturnCreateSchema),
     mode: "onSubmit"
+  });
+
+  /* --------------------- WATCHERS ----------------------------- */
+
+  const watchedItems = useWatch({
+    control,
+    name: "items"
+  });
+  const watchedReceivedAmount = watch("receivedAmount");
+  const watchedPartyId = watch("partyId");
+  const watechedPurchaseId = watch("purchaseId");
+
+  const { data: purchasesByParty = [] } = usePurchaseSuggestionsbyPartyId(watchedPartyId, {
+    enabled: !!watchedPartyId && !initialData
   });
 
   /* --------------------- PARTY SUGGESTIONS ---------------------- */
@@ -189,52 +202,19 @@ const PurchaseModal = ({
     }
   }, [partySuggestionsData]);
 
-  /* --------------------- PRODUCT SUGGESTIONS ---------------------- */
-  const { data: productSuggestionsData } = useProductSuggestions(productSearchQuery.query);
-
-  const debouncedProductSearch = useMemo(
-    () =>
-      debounce((value, rowIndex) => {
-        if (!value) {
-          setProductSuggestions([]);
-          setShowProductSuggestions(false);
-          setActiveProductRowIndex(null);
-          return;
-        }
-
-        setActiveProductRowIndex(rowIndex);
-        setProductSearchQuery({ query: value, rowIndex });
-        setShowProductSuggestions(true);
-      }, 800),
-    []
-  );
-
   useEffect(() => {
-    if (productSuggestionsData) {
-      setProductSuggestions(productSuggestionsData);
+    if (watechedPurchaseId) {
+      setShowPartySuggestions(false);
     }
-  }, [productSuggestionsData]);
-
-  const selectProduct = (product, index) => {
-    setValue(`items.${index}.product`, product);
-    setValue(`items.${index}.productId`, product.id);
-
-    // clear search text
-    setProductSearchText(prev => ({
-      ...prev,
-      [index]: ""
-    }));
-
-    setShowProductSuggestions(false);
-    setActiveProductRowIndex(null);
-  };
+  }, [watechedPurchaseId]);
 
   /* ---------------------- FIELD ARRAY ------------------------- */
 
   const {
     fields: purchaseItemFields,
     append: appendPurchaseItem,
-    remove: removePurchaseItemByIndex
+    remove: removePurchaseItemByIndex,
+    replace
   } = useFieldArray({
     control,
     name: "items"
@@ -246,20 +226,11 @@ const PurchaseModal = ({
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  /* --------------------- WATCHERS ----------------------------- */
-
-  const watchedItems = useWatch({
-    control,
-    name: "items"
-  });
-
-  const watchedPaidAmount = watch("paidAmount");
-
   /* -------------------- CALCULATIONS -------------------------- */
 
   const totals = useMemo(() => {
-    return calculatePurchaseTotals(watchedItems, watchedPaidAmount);
-  }, [watchedItems, watchedPaidAmount]);
+    return calculatePurchaseReturnTotals(watchedItems, watchedReceivedAmount);
+  }, [watchedItems, watchedReceivedAmount]);
 
   const calculatedItems = useMemo(() => {
     return watchedItems.map(item => {
@@ -296,6 +267,73 @@ const PurchaseModal = ({
     [purchaseItemFields.length, removePurchaseItemByIndex]
   );
 
+  const handleSelectPurchase = purchase => {
+
+    if (!purchase || initialData) return;
+
+    if (!Array.isArray(purchase.purchaseItems)) {
+      console.error("❌ purchaseItems missing", purchase);
+      return;
+    }
+
+    /* ------------------ FORM IDENTITY ------------------ */
+
+    setValue("purchaseId", purchase.id, { shouldDirty: true });
+    setValue("partyId", purchase.partyId);
+    setValue("paymentMode", "NONE");
+    setValue("receivedAmount", 0);
+
+    // UI-only state
+    setSelectedParty(purchase.party);
+
+    /* ------------------ HARD RESET ITEMS ------------------ */
+
+    replace([]); // 🔥 force clear first
+
+    replace(
+      purchase.purchaseItems.map(item => {
+        const quantity = Number(item.quantity || 0);
+        const pricePerUnit = Number(item.pricePerUnit || 0);
+        const gstRate = Number(item.gstRate || 0);
+
+        const taxableAmount = quantity * pricePerUnit;
+        const gstAmount = (taxableAmount * gstRate) / 100;
+        const amount = taxableAmount + gstAmount;
+
+        return {
+          productId: item.productId,
+          product: item.product, // display only
+
+          quantity,
+          maxQuantity: quantity, // 🔒 limit return qty
+          pricePerUnit,
+          gstRate,
+
+          taxableAmount: Math.round(taxableAmount),
+          gstAmount: Math.round(gstAmount),
+          amount: Math.round(amount)
+        };
+      })
+    );
+  };
+
+  const resetPurchaseContext = () => {
+    // purchase identity
+    setValue("purchaseId", null);
+    setValue("purchase", null);
+
+    // UI state
+    setSelectedPurchase(null);
+    setShowPurchaseSuggestions(false);
+
+    // items
+    replace([]); // 🔥 clears RHF items array safely
+
+    // optional dependent fields
+    setValue("receivedAmount", 0);
+    setValue("paymentMode", "NONE");
+  };
+
   /* -------------------- SUBMIT ------------------------------- */
 
   const submitHandler = handleSubmit(
@@ -312,6 +350,7 @@ const PurchaseModal = ({
         totalAmount: totals.totalAmount
       };
       onSubmit(payload);
+      console.log("🚀 ~ PurchaseReturnModal ~ payload:", payload);
 
       if (!initialData) {
         reset(defaultValues);
@@ -380,12 +419,16 @@ const PurchaseModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Invoice" : "View Invoice") : "Create Invoice"}
+                  {initialData
+                    ? isEditMode
+                      ? "Edit Purchase Return"
+                      : "View Purchase Return"
+                    : "Create Purchase Return"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
                   {!isEditMode && initialData
-                    ? "Invoice details (read-only)"
-                    : "Fill in the invoice details"}
+                    ? "Purchase return details (read-only)"
+                    : "Fill in the purchase return details"}
                 </p>
               </div>
             </div>
@@ -430,14 +473,14 @@ const PurchaseModal = ({
                     <input
                       type="text"
                       value={partyInputValue}
-                      disabled={isDisabled}
+                      disabled={isDisabled || isLinkedToPurchase}
                       onChange={e => {
                         const value = e.target.value;
 
                         if (selectedParty) {
                           setSelectedParty(null);
                           setValue("partyId", null);
-                          setValue("party", null);
+                          resetPurchaseContext();
                         }
 
                         setPartyInputValue(value);
@@ -461,8 +504,8 @@ const PurchaseModal = ({
                             onClick={() => {
                               setSelectedParty(party);
                               setPartyInputValue(party.name);
-                              setValue("party", party);
-                              setValue("partyId", party.id);
+                              setValue("partyId", party.id, { shouldDirty: true });
+                              resetPurchaseContext();
                               setShowPartySuggestions(false);
                             }}
                           >
@@ -487,30 +530,60 @@ const PurchaseModal = ({
                     />
                   </div>
 
-                  {/* Invoice Number */}
-                  <div>
+                  {/* Purchase Invoice */}
+                  <div className="relative">
                     <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                      Invoice Number <span className="text-red-500">*</span>
+                      Purchase Invoice <span className="text-red-500">*</span>
                     </label>
+
                     <input
                       type="text"
-                      {...register("invoiceNumber")}
-                      disabled={isDisabled}
-                      className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                      placeholder="INV-001"
+                      disabled={isDisabled || isLinkedToPurchase || !watch("partyId")}
+                      value={selectedPurchase?.invoiceNumber || ""}
+                      onFocus={() => {
+                        if (watch("partyId")) {
+                          setShowPurchaseSuggestions(true);
+                        }
+                      }}
+                      readOnly
+                      placeholder="Select purchase invoice"
+                      className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg ${theme.bg}`}
                     />
-                    {errors.invoiceNumber && (
-                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {errors.invoiceNumber.message}
-                      </p>
+
+                    {showPurchaseSuggestions && purchasesByParty.length > 0 && (
+                      <ul className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                        {purchasesByParty.map(purchase => (
+                          <li
+                            key={purchase.id}
+                            onClick={() => {
+                              setSelectedPurchase(purchase);
+                              setShowPurchaseSuggestions(false);
+                              handleSelectPurchase(purchase);
+                            }}
+                            className="px-3 py-2 cursor-pointer hover:bg-gray-50 transition"
+                          >
+                            {/* Row 1: Invoice */}
+                            <div className="text-sm font-medium text-gray-800">
+                              Purchase Invoice #{purchase.invoiceNumber}
+                            </div>
+
+                            {/* Row 2: Meta */}
+                            <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+                              <span>{formatDate(purchase.date)}</span>
+                              <span className="font-semibold text-gray-700">
+                                ₹{formatCurrency(purchase.totalAmount)}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
 
-                  {/* Invoice Date */}
+                  {/* Return Date */}
                   <div>
                     <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                      Invoice Date <span className="text-red-500">*</span>
+                      Return Date <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="date"
@@ -568,56 +641,24 @@ const PurchaseModal = ({
                               </td>
 
                               {/* Item Name (read from product) */}
-                              <td className={`border ${theme.border} px-2 py-2 relative`}>
+                              <td className={`border ${theme.border} px-2 py-2`}>
                                 <input
                                   type="text"
-                                  disabled={isDisabled}
-                                  value={
-                                    item.product
-                                      ? item.product.name
-                                      : productSearchText[index] || ""
-                                  }
-                                  onChange={e => {
-                                    const value = e.target.value;
-
-                                    // update typing text
-                                    setProductSearchText(prev => ({
-                                      ...prev,
-                                      [index]: value
-                                    }));
-
-                                    // clear selected product
-                                    setValue(`items.${index}.product`, null);
-                                    setValue(`items.${index}.productId`, "");
-
-                                    debouncedProductSearch(value, index);
-                                  }}
+                                  value={item.product?.name || ""}
+                                  disabled
                                   className="w-full px-2 py-1 text-sm border-0 outline-none bg-transparent"
                                 />
-                                {showProductSuggestions &&
-                                  activeProductRowIndex === index &&
-                                  productSuggestions.length > 0 && (
-                                    <ul className="absolute z-10 mt-1 w-full bg-white border rounded shadow">
-                                      {productSuggestions.map(product => (
-                                        <li
-                                          key={product.id}
-                                          onClick={() => selectProduct(product, index)}
-                                          className="px-2 py-1 text-sm cursor-pointer hover:bg-gray-100"
-                                        >
-                                          {product.name}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
                               </td>
 
                               {/* Quantity */}
                               <td className={`border ${theme.border} px-2 py-2`}>
                                 <input
                                   type="number"
-                                  {...register(`items.${index}.quantity`)}
+                                  {...register(`items.${index}.quantity`, {
+                                    min: 0,
+                                    max: item.maxQuantity
+                                  })}
                                   disabled={isDisabled}
-                                  min="1"
                                   className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
                                 />
                               </td>
@@ -635,9 +676,8 @@ const PurchaseModal = ({
                               <td className={`border ${theme.border} px-2 py-2`}>
                                 <input
                                   type="number"
-                                  {...register(`items.${index}.pricePerUnit`)}
-                                  disabled={isDisabled}
-                                  step="0.01"
+                                  value={item.pricePerUnit || 0}
+                                  disabled
                                   className={`w-full px-2 py-1 text-sm border-0 outline-none bg-transparent ${theme.text.primary}`}
                                 />
                               </td>
@@ -645,17 +685,12 @@ const PurchaseModal = ({
                               {/* GST */}
                               <td className={`border ${theme.border} px-1 py-2`}>
                                 <div className="grid grid-cols-2 gap-1 items-center">
-                                  <select
-                                    {...register(`items.${index}.gstRate`)}
-                                    disabled={isDisabled}
+                                  <input
+                                    type="number"
+                                    disabled
+                                    value={item.gstRate || 0}
                                     className={`w-full px-1 py-1 text-xs border-0 outline-none bg-transparent ${theme.text.primary}`}
-                                  >
-                                    {GST_RATE_OPTIONS.map(rate => (
-                                      <option key={rate.value} value={rate.value}>
-                                        {rate.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  />
 
                                   <div
                                     className={`px-1 py-1 text-xs text-right font-medium ${theme.text.primary}`}
@@ -702,7 +737,8 @@ const PurchaseModal = ({
                               <button
                                 type="button"
                                 onClick={handleAddItem}
-                                className={`inline-flex items-center border font-bold text-sm gap-1 px-3 py-1 cursor-pointer rounded-md ${theme.text.muted} hover:${theme.text.primary} transition`}
+                                disabled
+                                className={`inline-flex items-center border font-bold text-sm gap-1 px-3 py-1 cursor-not-allowed rounded-md ${theme.text.muted} hover:${theme.text.primary} transition`}
                               >
                                 + Add Item
                               </button>
@@ -768,14 +804,14 @@ const PurchaseModal = ({
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Remarks
+                        Reason
                       </label>
                       <textarea
-                        {...register("remarks")}
+                        {...register("reason")}
                         disabled={isDisabled}
                         rows={3}
                         className={`w-48 px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none resize-none ${theme.bg}`}
-                        placeholder="Additional remarks"
+                        placeholder="Additional reason"
                       />
                     </div>
                   </div>
@@ -790,10 +826,10 @@ const PurchaseModal = ({
                     </div>
 
                     <div className="flex justify-between items-center text-sm">
-                      <span>Paid</span>
+                      <span>Received</span>
                       <input
                         type="number"
-                        {...register("paidAmount")}
+                        {...register("receivedAmount")}
                         disabled={isDisabled}
                         className="w-24 px-2 py-1 text-lg font-bold text-right"
                       />
@@ -802,7 +838,7 @@ const PurchaseModal = ({
                     <div className="flex justify-between border-t pt-2 font-semibold cursor-not-allowed">
                       <span>Balance</span>
                       <span>
-                        ₹{(totals.totalAmount - Number(watch("paidAmount") || 0)).toFixed(2)}
+                        ₹{(totals.totalAmount - Number(watch("receivedAmount") || 0)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -834,7 +870,7 @@ const PurchaseModal = ({
                     ? "Saving..."
                     : initialData
                       ? "Save Changes"
-                      : "Create Invoice"}
+                      : "Create Purchase Return"}
                 </button>
               )}
             </div>
@@ -857,4 +893,4 @@ const PurchaseModal = ({
   );
 };
 
-export default PurchaseModal;
+export default PurchaseReturnModal;

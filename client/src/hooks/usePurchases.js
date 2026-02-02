@@ -1,12 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
-  getParties,
   getPurchases,
   getPurchase,
   createPurchase,
   updatePurchase,
   deletePurchase,
-  bulkDeletePurchases
+  getPurchaseSuggestionsByPartyId
 } from "@/services/purchaseServices";
 
 /**
@@ -18,20 +17,12 @@ import {
 
 // --------------------------------------------------
 // QUERY KEYS (Centralized)
-export const PURCHASE_KEYS = {
+const PURCHASE_KEYS = {
   all: ["purchases"],
   list: (filters = {}) => ["purchases", "list", filters],
-  detail: id => ["purchases", "detail", id]
+  detail: id => ["purchases", "detail", id],
+  byParty: partyId => ["purchases", "by-party", partyId]
 };
-
-export const useParties = () => {
-  return useQuery({
-    queryKey: ["parties", "list"],
-    queryFn: () => getParties(),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    cacheTime: 60 * 60 * 1000 // 1 hour
-  });
-}
 
 // --------------------------------------------------
 // QUERIES
@@ -96,18 +87,17 @@ export const useDeletePurchase = () => {
   });
 };
 
-export const useBulkDeletePurchases = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationKey: ["bulk-delete-purchases"],
-    mutationFn: bulkDeletePurchases,
-    onSuccess: ids => {
-      queryClient.invalidateQueries({ queryKey: PURCHASE_KEYS.all });
-      ids?.forEach(id => queryClient.removeQueries({ queryKey: PURCHASE_KEYS.detail(id) }));
-    }
+export const usePurchaseSuggestionsbyPartyId = (partyId, options = {}) => {
+  return useQuery({
+    queryKey: PURCHASE_KEYS.byParty(partyId),
+    queryFn: () => getPurchaseSuggestionsByPartyId(partyId),
+    enabled: !!partyId,
+    staleTime: 5 * 60 * 1000,
+    ...options
   });
 };
+
+
 
 // --------------------------------------------------
 // Default export
@@ -117,6 +107,5 @@ export default {
   useCreatePurchase,
   useUpdatePurchase,
   useDeletePurchase,
-  useBulkDeletePurchases,
-  PURCHASE_KEYS
+  usePurchaseSuggestionsbyPartyId
 };

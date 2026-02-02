@@ -3,11 +3,11 @@ import { PAYMENT_MODES } from "@/constants/PAYMENT_MODES";
 
 /**
  * -------------------------
- * Purchase Item Schema
+ * Purchase Return Item Schema
  * (Used in BOTH create & update)
  * -------------------------
  */
-const purchaseItemSchema = Yup.object({
+const purchaseReturnItemSchema = Yup.object({
   id: Yup.number().integer().positive().notRequired(), // present only for update
 
   productId: Yup.number()
@@ -29,42 +29,28 @@ const purchaseItemSchema = Yup.object({
   gstRate: Yup.number()
     .typeError("GST rate must be a number")
     .min(0, "GST rate cannot be negative")
-    .required("GST rate is required"),
-
-  taxableAmount: Yup.number()
-    .typeError("Taxable amount must be a number")
-    .min(0, "Taxable amount cannot be negative")
-    .required("Taxable amount is required"),
-
-  gstAmount: Yup.number()
-    .typeError("GST amount must be a number")
-    .min(0, "GST amount cannot be negative")
-    .required("GST amount is required"),
-
-  amount: Yup.number()
-    .typeError("Amount must be a number")
-    .min(0, "Amount cannot be negative")
-    .required("Amount is required")
+    .required("GST rate is required")
 });
 
 /**
  * -------------------------
- * Purchase CREATE Schema
+ * Purchase Return CREATE Schema
  * (Strict – everything required)
  * -------------------------
  */
-const purchaseCreateSchema = Yup.object({
+const purchaseReturnCreateSchema = Yup.object({
   date: Yup.date().typeError("Invalid date").required("Date is required"),
 
   partyId: Yup.number().typeError("Party is required").integer().positive().required(),
 
-  invoiceNumber: Yup.number()
-    .typeError("Invoice number is required")
+  purchaseId: Yup.number()
+    .typeError("Purchase reference must be a valid ID")
     .integer()
     .positive()
-    .required(),
+    .nullable()
+    .notRequired(),
 
-  paidAmount: Yup.number()
+  receivedAmount: Yup.number()
     .transform((value, originalValue) =>
       originalValue === "" || originalValue === null ? 0 : value
     )
@@ -75,25 +61,25 @@ const purchaseCreateSchema = Yup.object({
 
   paymentReference: Yup.string().trim().nullable().max(100),
 
-  remarks: Yup.string().trim().nullable().max(300),
+  reason: Yup.string().trim().nullable().max(300),
 
-  items: Yup.array().of(purchaseItemSchema).min(1).required()
+  items: Yup.array().of(purchaseReturnItemSchema).min(1).required()
 }).noUnknown(true); // 🔥 prevents sneaky fields
 
 /**
  * -------------------------
- * Purchase UPDATE Schema
+ * Purchase Return UPDATE Schema
  * (Flexible – partial updates)
  * -------------------------
  */
-const purchaseUpdateSchema = Yup.object({
+const purchaseReturnUpdateSchema = Yup.object({
   date: Yup.date().typeError("Invalid date").notRequired(),
 
   partyId: Yup.number().integer().positive().notRequired(),
 
-  invoiceNumber: Yup.number().integer().positive().notRequired(),
+  purchaseId: Yup.number().integer().positive().nullable().notRequired(),
 
-  paidAmount: Yup.number()
+  receivedAmount: Yup.number()
     .transform((value, originalValue) =>
       originalValue === "" || originalValue === null ? 0 : value
     )
@@ -105,9 +91,9 @@ const purchaseUpdateSchema = Yup.object({
 
   paymentReference: Yup.string().trim().nullable().max(100).notRequired(),
 
-  remarks: Yup.string().trim().nullable().max(300).notRequired(),
+  reason: Yup.string().trim().nullable().max(300).notRequired(),
 
-  items: Yup.array().of(purchaseItemSchema).min(1).required()
+  items: Yup.array().of(purchaseReturnItemSchema).min(1).required()
 }).noUnknown(true);
 
-export { purchaseItemSchema, purchaseCreateSchema, purchaseUpdateSchema };
+export { purchaseReturnItemSchema, purchaseReturnCreateSchema, purchaseReturnUpdateSchema };

@@ -6,7 +6,6 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  bulkDeleteProducts,
   suggestProducts
 } from "@/services/productServices";
 
@@ -100,18 +99,6 @@ export const useDeleteProduct = () => {
   });
 };
 
-export const useBulkDeleteProducts = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationKey: ["bulk-delete-products"],
-    mutationFn: bulkDeleteProducts,
-    onSuccess: ids => {
-      queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
-      ids?.forEach(id => queryClient.removeQueries({ queryKey: PRODUCT_KEYS.detail(id) }));
-    }
-  });
-};
 
 export const useProductSuggestions = query => {
   return useQuery({
@@ -131,7 +118,6 @@ export default {
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
-  useBulkDeleteProducts,
   useProductSuggestions,
   PRODUCT_KEYS
 };

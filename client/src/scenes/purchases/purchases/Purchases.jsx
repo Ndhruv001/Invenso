@@ -2,11 +2,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 
-import {
-  usePurchases,
-  useUpdatePurchase,
-  useDeletePurchase,
-} from "@/hooks/usePurchases";
+import { usePurchases, useUpdatePurchase, useDeletePurchase } from "@/hooks/usePurchases";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";

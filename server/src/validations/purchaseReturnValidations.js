@@ -1,127 +1,126 @@
 /**
- * validations/purchaseReturnValidations.js
- * Validation rules for PurchaseReturn resource using express-validator.
+ * @file express-validator middlewares for purchase return resource.
  */
 
-import { body, param, query } from "express-validator";
+import { body, param } from "express-validator";
+import { PaymentMode } from "@prisma/client";
 
-const paymentModes = [
-  "NONE",
-  "CASH",
-  "BANK_TRANSFER",
-  "CHEQUE",
-  "UPI",
-  "CARD",
-  "CREDIT",
-  "ONLINE",
+// Convert Prisma enums → arrays
+const PAYMENT_MODES = Object.values(PaymentMode);
+
+// --------------------
+// Validate purchase return ID param
+// --------------------
+const validatePurchaseReturnId = [
+  param("id")
+    .exists()
+    .withMessage("Purchase return ID param is required")
+    .isInt({ gt: 0 })
+    .withMessage("Purchase return ID must be a positive integer")
+    .toInt()
 ];
 
-// Validate purchase return create/update
-const validatePurchaseReturn = [
-  body("partyId")
-    .notEmpty()
-    .withMessage("Party ID is required")
-    .isInt({ gt: 0 })
-    .withMessage("Party ID must be a positive integer"),
+// --------------------
+// Validate purchase return create body
+// --------------------
+const validateCreatePurchaseReturn = [
+  // ---- Core fields ----
+  body("partyId").exists().withMessage("Party ID is required").isInt({ gt: 0 }).toInt(),
+
   body("purchaseId")
     .optional()
     .isInt({ gt: 0 })
-    .withMessage("Purchase ID must be a positive integer if provided"),
-  body("date").optional().isISO8601().withMessage("Date must be ISO8601 format"),
-  body("receivedAmount")
-    .optional()
-    .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Received amount must be a decimal with up to 2 decimals"),
+    .withMessage("Purchase ID must be a positive integer")
+    .toInt(),
+
+  body("date").optional().isISO8601().withMessage("Date must be ISO8601"),
+
   body("paymentMode")
     .optional()
-    .isIn(paymentModes)
-    .withMessage(`Payment Mode must be one of: ${paymentModes.join(", ")}`),
-  body("paymentReference").optional().isString(),
-  body("reason").optional().isString(),
+    .isIn(PAYMENT_MODES)
+    .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
 
-  // Validate purchaseReturnItems array
-  body("purchaseReturnItems")
+  body("paymentReference").optional().isString().trim(),
+
+  body("reason").optional().isString().trim(),
+
+  body("receivedAmount").optional().isDecimal().toFloat(),
+
+  body("totalAmount").exists().withMessage("Total amount is required").isDecimal().toFloat(),
+
+  body("totalTaxableAmount").exists().isDecimal().toFloat(),
+
+  body("totalGstAmount").exists().isDecimal().toFloat(),
+
+  // ---- Items ----
+  body("items")
+    .exists()
     .isArray({ min: 1 })
-    .withMessage("Purchase return items must be an array with at least 1 item"),
-  body("purchaseReturnItems.*.productId")
-    .notEmpty()
-    .withMessage("Product ID is required for each return item")
-    .isInt({ gt: 0 }),
-  body("purchaseReturnItems.*.size").optional().isString(),
-  body("purchaseReturnItems.*.quantity")
-    .notEmpty()
-    .withMessage("Quantity is required for each return item")
-    .isDecimal({ decimal_digits: "0,3" }),
-  body("purchaseReturnItems.*.pricePerUnit")
-    .notEmpty()
-    .withMessage("Price per unit is required for each return item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseReturnItems.*.gstRate")
-    .notEmpty()
-    .withMessage("GST rate is required for each return item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseReturnItems.*.gstAmount")
-    .notEmpty()
-    .withMessage("GST amount is required for each return item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseReturnItems.*.taxableAmount")
-    .notEmpty()
-    .withMessage("Taxable amount is required for each return item")
-    .isDecimal({ decimal_digits: "0,2" }),
-  body("purchaseReturnItems.*.totalAmount")
-    .notEmpty()
-    .withMessage("Total amount is required for each return item")
-    .isDecimal({ decimal_digits: "0,2" }),
+    .withMessage("At least one purchase return item is required"),
+
+  body("items.*.productId").exists().isInt({ gt: 0 }).toInt(),
+
+  body("items.*.quantity").exists().isDecimal().toFloat(),
+
+  body("items.*.pricePerUnit").exists().isDecimal().toFloat(),
+
+  body("items.*.gstRate").exists().isDecimal().toFloat(),
+
+  body("items.*.gstAmount").exists().isDecimal().toFloat(),
+
+  body("items.*.taxableAmount").exists().isDecimal().toFloat(),
+
+  body("items.*.amount").exists().isDecimal().toFloat()
 ];
 
-// Validate purchase return ID param
-const validatePurchaseReturnId = [
-  param("id").isInt({ gt: 0 }).withMessage("Valid purchase return ID is required"),
+// --------------------
+// Validate purchase return update body
+// --------------------
+const validateUpdatePurchaseReturn = [
+  body("partyId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("purchaseId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("date").optional().isISO8601(),
+
+  body("paymentMode").optional().isIn(PAYMENT_MODES),
+
+  body("paymentReference").optional().isString().trim(),
+
+  body("reason").optional().isString().trim(),
+
+  body("receivedAmount").optional().isDecimal().toFloat(),
+
+  body("totalAmount").optional().isDecimal().toFloat(),
+
+  body("totalTaxableAmount").optional().isDecimal().toFloat(),
+
+  body("totalGstAmount").optional().isDecimal().toFloat(),
+
+  body("items").optional().isArray({ min: 1 }),
+
+  body("items.*.productId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("items.*.quantity").optional().isDecimal().toFloat(),
+
+  body("items.*.pricePerUnit").optional().isDecimal().toFloat(),
+
+  body("items.*.gstRate").optional().isDecimal().toFloat(),
+
+  body("items.*.gstAmount").optional().isDecimal().toFloat(),
+
+  body("items.*.taxableAmount").optional().isDecimal().toFloat(),
+
+  body("items.*.amount").optional().isDecimal().toFloat()
 ];
 
-// Validate query params for list
-const validatePurchaseReturnQuery = [
-  query("page").optional().isInt({ min: 1 }).toInt(),
-  query("limit").optional().isInt({ min: 1 }).toInt(),
-  query("sortBy")
-    .optional()
-    .isIn(["date", "createdAt", "updatedAt", "totalAmount", "receivedAmount"])
-    .withMessage("Invalid sortBy value"),
-  query("sortOrder")
-    .optional()
-    .isIn(["asc", "desc"])
-    .withMessage("Invalid sortOrder value"),
-  query("filters").optional().custom((value) => {
-    if (typeof value === "string") {
-      try {
-        JSON.parse(value);
-      } catch {
-        throw new Error("Invalid JSON for filters");
-      }
-    }
-    return true;
-  }),
-];
+// --------------------
+// Exports
+// --------------------
+export { validateCreatePurchaseReturn, validateUpdatePurchaseReturn, validatePurchaseReturnId };
 
-// Validate bulk delete body
-const validateBulkDelete = [
-  body("ids")
-    .isArray({ min: 1 })
-    .withMessage("Array of purchase return IDs is required"),
-  body("ids.*")
-    .isInt({ gt: 0 })
-    .withMessage("Each purchase return ID must be a positive integer"),
-];
-
-export {
-  validatePurchaseReturn,
-  validatePurchaseReturnId,
-  validatePurchaseReturnQuery,
-  validateBulkDelete,
-};
 export default {
-  validatePurchaseReturn,
-  validatePurchaseReturnId,
-  validatePurchaseReturnQuery,
-  validateBulkDelete,
+  validateCreatePurchaseReturn,
+  validateUpdatePurchaseReturn,
+  validatePurchaseReturnId
 };

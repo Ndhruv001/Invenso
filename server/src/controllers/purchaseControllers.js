@@ -7,15 +7,14 @@
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as purchaseServices from "../services/purchaseServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /purchases
  * List purchases with filters, pagination, search, stats
  */
 const listPurchases = asyncHandler(async (req, res) => {
-
-   const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
   const query = {
     page: Number(page) || 1,
@@ -74,17 +73,22 @@ const deletePurchase = asyncHandler(async (req, res) => {
   return successResponse(res, "Purchase deleted successfully", deleted, 200);
 });
 
+/**
+ * GET /purchases/party-id/:partyId
+ * Get purchase by Party ID with items and party
+ */
+const getPurchaseByPartyId = asyncHandler(async (req, res) => {
+  const partyId = Number(req.params.partyId);
+  const purchase = await purchaseServices.getPurchaseSuggestionsByPartyId(partyId);
+  return successResponse(res, "Purchase suggestions fetched successfully", purchase, 200);
+});
+
 export default {
   listPurchases,
   getPurchase,
   createPurchase,
   updatePurchase,
   deletePurchase,
+  getPurchaseByPartyId
 };
-export {
-  listPurchases,
-  getPurchase,
-  createPurchase,
-  updatePurchase,
-  deletePurchase,
-};
+export { listPurchases, getPurchase, createPurchase, updatePurchase, deletePurchase, getPurchaseByPartyId };

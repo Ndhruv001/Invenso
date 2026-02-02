@@ -14,66 +14,18 @@ import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
 /**
- * Helper: Build date filter for purchase returns
+ * Helper: Build date filter for Prisma
+ * @param {Object} dateFilter {from, to}
  */
-function buildDateFilter(dateFilter) {
-  if (!dateFilter) return undefined;
+function buildDateFilter({ from, to }) {
   const cond = {};
-  if (dateFilter.from) cond.gte = new Date(dateFilter.from);
-  if (dateFilter.to) cond.lte = new Date(dateFilter.to);
+
+  if (from) cond.gte = new Date(from);
+  if (to) cond.lte = new Date(to);
+
   return Object.keys(cond).length ? cond : undefined;
 }
 
-/**
- * Helper: Update party current balance based on difference in receivedAmount
- */
-async function updatePartyBalanceForReceivedDiff(tx, partyId, oldReceived, newReceived) {
-  const diff = newReceived - oldReceived;
-  if (diff === 0) return;
-  // Positive diff means party paid more (reduce balance by diff)
-  // Negative diff means party paid less (increase balance by -diff)
-  await tx.party.update({
-    where: { id: partyId },
-    data: {
-      currentBalance: { increment: -diff }
-    }
-  });
-}
-
-/**
- * Helper: Create inventory log & update product stock (subtract)
- */
-async function createInventoryLogAndUpdateStock(tx, item, referenceType, referenceId) {
-  const product = await tx.product.findUnique({ where: { id: item.productId } });
-  if (!product || !product.isActive)
-    throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-
-  const balanceBefore = Number(product.currentStock);
-  const balanceAfter = balanceBefore - Number(item.quantity);
-  if (balanceAfter < 0) throw new AppError("Insufficient stock to subtract", 400);
-
-  await tx.inventoryLog.create({
-    data: {
-      productId: item.productId,
-      quantity: item.quantity,
-      type: "SUBTRACT",
-      referenceType,
-      referenceId: String(referenceId),
-      remark: item.remark || null,
-      balanceBefore,
-      balanceAfter
-    }
-  });
-
-  await tx.product.update({
-    where: { id: item.productId },
-    data: { currentStock: balanceAfter }
-  });
-}
-
-/**
- * List purchase returns with filters, pagination, stats
- */
 async function listPurchaseReturns({
   page = 1,
   limit = 10,
@@ -82,96 +34,154 @@ async function listPurchaseReturns({
   search = "",
   filters = {}
 }) {
+  /* -------------------- Base Where -------------------- */
+
   const where = {};
-  if (filters.date) {
-    const dateFilter = buildDateFilter(filters.date);
-    if (dateFilter) where.date = dateFilter;
+
+  /* -------------------- Filters -------------------- */
+
+  if (filters.partyId) {
+    where.partyId = Number(filters.partyId);
   }
 
-  // Pagination offset
+  if (filters.purchaseId) {
+    where.purchaseId = Number(filters.purchaseId);
+  }
+
+  if (filters.dateFrom || filters.dateTo) {
+    const dateFilter = buildDateFilter({
+      from: filters.dateFrom,
+      to: filters.dateTo
+    });
+
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
+  }
+
+  if (filters.paymentMode) {
+    where.paymentMode = filters.paymentMode;
+  }
+
+  /* -------------------- Search -------------------- */
+
+  if (search.trim()) {
+    const q = search.trim();
+    const isNumeric = !isNaN(Number(q));
+
+    where.OR = [
+      { reason: { contains: q, mode: "insensitive" } },
+      {
+        party: {
+          name: { contains: q, mode: "insensitive" }
+        }
+      },
+      ...(isNumeric ? [{ totalAmount: Number(q) }] : [])
+    ];
+  }
+
+  /* -------------------- Pagination -------------------- */
+
   const skip = (page - 1) * limit;
   const take = limit;
 
-  // Global search by party name or product name
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
+  /* -------------------- Safe Sorting -------------------- */
 
-    const matchingParties = await prisma.party.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true }
-    });
-    const partyIds = matchingParties.map(p => p.id);
+  const allowedSortFields = ["date", "totalAmount", "createdAt", "party"];
 
-    const matchingProducts = await prisma.product.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true }
-    });
-    const productIds = matchingProducts.map(p => p.id);
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
 
-    where.AND = where.AND || [];
-    where.AND.push({
-      OR: [
-        { partyId: { in: partyIds.length ? partyIds : [0] } },
-        {
-          purchaseReturnItems: {
-            some: {
-              productId: { in: productIds.length ? productIds : [0] }
+  const orderBy =
+    safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
+
+  /* -------------------- DB Transaction -------------------- */
+
+  const [purchaseReturns, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+    prisma.purchaseReturn.findMany({
+      where,
+      skip,
+      take,
+      orderBy,
+      include: {
+        party: true,
+        purchase: {
+          include: { purchaseItems: { include: { product: { include: { category: true } } } } }
+        },
+        purchaseReturnItems: {
+          include: {
+            product: {
+              include: { category: true }
             }
           }
-        },
-        { reason: { contains: trimmedSearch, mode: "insensitive" } }
-      ]
-    });
-  }
+        }
+      }
+    }),
 
-  const data = await prisma.purchaseReturn.findMany({
-    where,
-    orderBy: { [sortBy]: sortOrder },
-    skip,
-    take,
-    include: { party: true, purchaseReturnItems: true }
-  });
-
-  const totalRows = await prisma.purchaseReturn.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
-
-  // Stats
-  const [totalReturns, sumTotalAmount, sumTotalGst, sumReceivedAmount] = await Promise.all([
     prisma.purchaseReturn.count({ where }),
-    prisma.purchaseReturn
-      .aggregate({ where, _sum: { totalAmount: true } })
-      .then(r => Number(r._sum.totalAmount) || 0),
-    prisma.purchaseReturn
-      .aggregate({ where, _sum: { totalGstAmount: true } })
-      .then(r => Number(r._sum.totalGstAmount) || 0),
-    prisma.purchaseReturn
-      .aggregate({ where, _sum: { receivedAmount: true } })
-      .then(r => Number(r._sum.receivedAmount) || 0)
+
+    prisma.purchaseReturn.groupBy({
+      by: ["partyId"],
+      where
+    }),
+
+    prisma.purchaseReturn.aggregate({
+      where,
+      _sum: {
+        totalAmount: true,
+        totalGstAmount: true,
+        totalTaxableAmount: true,
+        receivedAmount: true
+      }
+    })
   ]);
 
+  /* -------------------- Stats -------------------- */
+
+  const stats = {
+    totalPurchaseReturns: totalRows,
+    totalParties: groupedParties.length,
+    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
+    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
+    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
+    sumTotalReceived: Number(aggregates._sum.receivedAmount) || 0
+  };
+
+  /* -------------------- Response -------------------- */
+
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
-    stats: {
-      totalReturns,
-      sumTotalAmount,
-      sumTotalGst,
-      sumReceivedAmount
-    }
+    data: purchaseReturns,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
+    stats
   };
 }
 
 /**
- * Get purchase return by ID
+ * Get purchase return by ID including items and party
  */
 async function getPurchaseReturnById(id) {
-  if (!id) throw new AppError("Purchase Return ID required", 400);
-  const pr = await prisma.purchaseReturn.findUnique({
+  if (!id) throw new AppError("Purchase Return ID is required", 400);
+
+  const purchaseReturn = await prisma.purchaseReturn.findUnique({
     where: { id },
-    include: { purchaseReturnItems: true, party: true }
+    include: {
+      party: true,
+      purchase: true,
+      purchaseReturnItems: {
+        include: { product: true }
+      }
+    }
   });
-  if (!pr) throw new AppError("Purchase Return not found", 404);
-  return pr;
+
+  if (!purchaseReturn) {
+    throw new AppError("Purchase Return not found", 404);
+  }
+
+  return purchaseReturn;
 }
 
 /**
@@ -182,87 +192,134 @@ async function createPurchaseReturn(data, userId = null) {
     date,
     partyId,
     purchaseId = null,
-    reason,
-    purchaseReturnItems,
     receivedAmount = 0,
     paymentMode,
-    paymentReference
+    paymentReference,
+    reason,
+    items
   } = data;
 
-  if (
-    !purchaseReturnItems ||
-    !Array.isArray(purchaseReturnItems) ||
-    purchaseReturnItems.length === 0
-  )
+  if (!Array.isArray(items) || items.length === 0) {
     throw new AppError("Purchase return items are required", 400);
+  }
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
+    /* -------------------- Normalize & Prepare -------------------- */
     let totalAmount = 0;
     let totalTaxableAmount = 0;
     let totalGstAmount = 0;
 
-    for (const item of purchaseReturnItems) {
-      totalTaxableAmount += Number(item.taxableAmount);
-      totalGstAmount += Number(item.gstAmount);
-      totalAmount += Number(item.totalAmount);
-    }
+    const itemsData = items.map(item => {
+      const quantity = Number(item.quantity);
+      const pricePerUnit = Number(item.pricePerUnit);
+      const gstRate = Number(item.gstRate);
+      const taxableAmount = Number(item.taxableAmount);
+      const gstAmount = Number(item.gstAmount);
+      const amount = Number(item.amount);
 
-    const purchaseReturn = await tx.purchaseReturn.create({
-      data: {
-        date,
-        partyId,
-        purchaseId,
-        reason,
-        receivedAmount,
-        paymentMode,
-        paymentReference,
-        totalAmount,
-        totalTaxableAmount,
-        totalGstAmount
-      }
+      totalTaxableAmount += taxableAmount;
+      totalGstAmount += gstAmount;
+      totalAmount += amount;
+
+      return {
+        productId: item.productId,
+        quantity,
+        pricePerUnit,
+        gstRate,
+        taxableAmount,
+        gstAmount,
+        amount
+      };
     });
 
-    for (const item of purchaseReturnItems) {
+    /* -------------------- Build Purchase Return Data -------------------- */
+    const purchaseReturnData = {
+      ...(date && { date }),
+      partyId,
+      ...(purchaseId && { purchaseId }),
+      totalAmount,
+      totalGstAmount,
+      totalTaxableAmount,
+      receivedAmount: Number(receivedAmount),
+      ...(paymentMode && { paymentMode }),
+      ...(paymentReference && { paymentReference }),
+      ...(reason && { reason })
+    };
+
+    /* -------------------- Create Purchase Return -------------------- */
+    const purchaseReturn = await tx.purchaseReturn.create({
+      data: purchaseReturnData
+    });
+
+    /* -------------------- Create Items + Inline Inventory -------------------- */
+    for (const item of itemsData) {
+      // 1. Create the item record
       await tx.purchaseReturnItem.create({
         data: {
           purchaseReturnId: purchaseReturn.id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          taxableAmount: item.taxableAmount,
-          totalAmount: item.totalAmount
+          ...item
         }
       });
 
-      // Subtract stock since this is a return
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
+      // 2. Inline Inventory Logic (REVERSED from Purchase)
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found`, 404);
+      }
+
+      const balanceBefore = Number(product.currentStock);
+      const balanceAfter = balanceBefore - item.quantity;
+
+      if (balanceAfter < 0) {
+        throw new AppError(`Insufficient stock for product ${item.productId}`, 400);
+      }
+
+      // Log the movement
+      await tx.inventoryLog.create({
+        data: {
           productId: item.productId,
           quantity: item.quantity,
-        },
-        "PURCHASE_RETURN",
-        purchaseReturn.id
-      );
+          type: "SUBTRACT", // ⬅️ reversed
+          referenceType: "PURCHASE_RETURN",
+          purchaseReturnId: purchaseReturn.id,
+          remark: `Purchase Return #${purchaseReturn.id}`,
+          balanceBefore,
+          balanceAfter
+        }
+      });
+
+      // Update actual stock
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { currentStock: balanceAfter }
+      });
     }
 
-    // Update party current balance based on received amount
-    if (partyId) {
-      await updatePartyBalanceForReceivedDiff(tx, partyId, 0, receivedAmount);
+    /* -------------------- Party Balance Update -------------------- */
+    // Purchase increased payable → Purchase Return decreases payable
+    const payableReduction = totalAmount - Number(receivedAmount);
+
+    if (partyId && payableReduction > 0) {
+      await tx.party.update({
+        where: { id: partyId },
+        data: { currentBalance: { decrement: payableReduction } }
+      });
     }
 
-    // Create payment if receivedAmount > 0
-    if (receivedAmount > 0 && partyId) {
+    /* -------------------- Payment Entry -------------------- */
+    // Money received from supplier on return
+    if (partyId && Number(receivedAmount) > 0) {
       await tx.payment.create({
         data: {
+          date,
           partyId,
           type: "RECEIVED",
-          amount: receivedAmount,
+          amount: Number(receivedAmount),
           referenceType: "PURCHASE_RETURN",
-          referenceId: purchaseReturn.id,
+          purchaseReturnId: purchaseReturn.id,
           paymentMode,
           paymentReference,
           remark: reason
@@ -270,10 +327,10 @@ async function createPurchaseReturn(data, userId = null) {
       });
     }
 
-    // Audit log
+    /* -------------------- Audit Log -------------------- */
     await tx.auditLog.create({
       data: {
-        tableName: "purchaseReturns",
+        tableName: "purchase_returns",
         recordId: String(purchaseReturn.id),
         action: "CREATE",
         newValue: JSON.stringify(purchaseReturn),
@@ -288,202 +345,415 @@ async function createPurchaseReturn(data, userId = null) {
 /**
  * Update purchase return
  */
-async function updatePurchaseReturn(id, data, userId = null) {
-  if (!id) throw new AppError("Purchase Return ID is required", 400);
+async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
+  if (!purchaseReturnId) {
+    throw new AppError("Purchase Return ID is required", 400);
+  }
 
-  return await prisma.$transaction(async tx => {
-    const existing = await tx.purchaseReturn.findUnique({
-      where: { id },
+  return prisma.$transaction(async tx => {
+    const existingPurchaseReturn = await tx.purchaseReturn.findUnique({
+      where: { id: purchaseReturnId },
       include: { purchaseReturnItems: true }
     });
-    if (!existing) throw new AppError("Purchase Return not found", 404);
 
-    const {
-      purchaseReturnItems = [],
-      receivedAmount = existing.receivedAmount,
-      paymentMode,
-      paymentReference,
-      reason,
-      partyId = existing.partyId
-    } = data;
-
-    // Revert stock and delete old purchaseReturnItems
-    for (const item of existing.purchaseReturnItems) {
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "ADD",
-          remark: `Revert purchase return #${id} before update`
-        },
-        "PURCHASE_RETURN",
-        id
-      );
-      await tx.purchaseReturnItem.delete({ where: { id: item.id } });
+    if (!existingPurchaseReturn) {
+      throw new AppError("Purchase Return not found", 404);
     }
 
-    // Insert new purchaseReturnItems and subtract stock
-    let totalAmount = 0;
-    let totalTaxableAmount = 0;
-    let totalGstAmount = 0;
+    const purchaseReturnUpdateData = {};
+    let itemsWereModified = false;
+    let purchaseReturnWasUpdated = false;
 
-    for (const item of purchaseReturnItems) {
-      totalTaxableAmount += Number(item.taxableAmount);
-      totalGstAmount += Number(item.gstAmount);
-      totalAmount += Number(item.totalAmount);
+    /* ------------------------------
+       Purchase Return fields (partial updates)
+    ------------------------------ */
+    if (data.partyId !== undefined) {
+      purchaseReturnUpdateData.partyId = data.partyId;
+    }
 
-      await tx.purchaseReturnItem.create({
-        data: {
-          purchaseReturnId: id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          taxableAmount: item.taxableAmount,
-          totalAmount: item.totalAmount
+    if (data.purchaseId !== undefined) {
+      purchaseReturnUpdateData.purchaseId = data.purchaseId;
+    }
+
+    if (data.receivedAmount !== undefined) {
+      purchaseReturnUpdateData.receivedAmount = Number(data.receivedAmount);
+    }
+
+    if (data.paymentMode !== undefined) {
+      purchaseReturnUpdateData.paymentMode = data.paymentMode;
+    }
+
+    if (data.paymentReference !== undefined) {
+      purchaseReturnUpdateData.paymentReference = data.paymentReference;
+    }
+
+    if (data.reason !== undefined) {
+      purchaseReturnUpdateData.reason = data.reason;
+    }
+
+    if (data.date !== undefined) {
+      purchaseReturnUpdateData.date = data.date;
+    }
+
+    /* ------------------------------
+       Purchase Return items (ONLY if sent)
+    ------------------------------ */
+    if (Array.isArray(data.items)) {
+      itemsWereModified = true;
+
+      const incomingIds = data.items
+        .filter(item => typeof item.id === "number")
+        .map(item => item.id);
+
+      const itemsToDelete = existingPurchaseReturn.purchaseReturnItems.filter(
+        item => !incomingIds.includes(item.id)
+      );
+
+      /* ---- STEP 1: DELETE removed items (REVERSED) ---- */
+      for (const itemToDelete of itemsToDelete) {
+        const product = await tx.product.findUnique({
+          where: { id: itemToDelete.productId }
+        });
+
+        if (product) {
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore + Number(itemToDelete.quantity);
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "ADD",
+              quantity: itemToDelete.quantity,
+              referenceType: "PURCHASE_RETURN",
+              purchaseReturnId: Number(purchaseReturnId),
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter,
+              remark: "Item removed from purchase return"
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
         }
+
+        await tx.purchaseReturnItem.delete({
+          where: { id: itemToDelete.id }
+        });
+      }
+
+      /* ---- STEP 2 & 3: UPDATE existing + ADD new items ---- */
+      for (const incomingItem of data.items) {
+        /* ---- UPDATE existing item ---- */
+        if (incomingItem.id) {
+          const existingItem = existingPurchaseReturn.purchaseReturnItems.find(
+            item => item.id === incomingItem.id
+          );
+
+          if (!existingItem) {
+            throw new AppError("Purchase return item not found", 404);
+          }
+
+          const product = await tx.product.findUnique({
+            where: { id: existingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const oldQty = Number(existingItem.quantity);
+          const newQty =
+            incomingItem.quantity !== undefined ? Number(incomingItem.quantity) : oldQty;
+
+          const qtyDiff = newQty - oldQty;
+
+          if (qtyDiff !== 0) {
+            const stockBefore = Number(product.currentStock);
+            const stockAfter = stockBefore - qtyDiff; // ⬅️ reversed
+
+            if (stockAfter < 0) {
+              throw new AppError(`Insufficient stock for product ${product.name}`, 400);
+            }
+
+            await tx.inventoryLog.create({
+              data: {
+                productId: product.id,
+                type: qtyDiff > 0 ? "SUBTRACT" : "ADD",
+                quantity: Math.abs(qtyDiff),
+                referenceType: "PURCHASE_RETURN",
+                purchaseReturnId: Number(purchaseReturnId),
+                balanceBefore: stockBefore,
+                balanceAfter: stockAfter
+              }
+            });
+
+            await tx.product.update({
+              where: { id: product.id },
+              data: { currentStock: stockAfter }
+            });
+          }
+
+          await tx.purchaseReturnItem.update({
+            where: { id: existingItem.id },
+            data: {
+              quantity: newQty,
+              pricePerUnit: incomingItem.pricePerUnit ?? existingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate ?? existingItem.gstRate,
+              gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
+              amount: incomingItem.amount ?? existingItem.amount
+            }
+          });
+        } else {
+          /* ---- ADD new item (REVERSED) ---- */
+          const product = await tx.product.findUnique({
+            where: { id: incomingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore - Number(incomingItem.quantity);
+
+          if (stockAfter < 0) {
+            throw new AppError(`Insufficient stock for product ${product.name}`, 400);
+          }
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "SUBTRACT",
+              quantity: incomingItem.quantity,
+              referenceType: "PURCHASE_RETURN",
+              purchaseReturnId: Number(purchaseReturnId),
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
+
+          await tx.purchaseReturnItem.create({
+            data: {
+              purchaseReturnId,
+              productId: incomingItem.productId,
+              quantity: incomingItem.quantity,
+              pricePerUnit: incomingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate,
+              gstAmount: incomingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount,
+              amount: incomingItem.amount
+            }
+          });
+        }
+      }
+
+      /* ---- Recalculate totals ---- */
+      const allItems = await tx.purchaseReturnItem.findMany({
+        where: { purchaseReturnId }
       });
 
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
-          productId: item.productId,
-          quantity: item.quantity
-        },
-        "PURCHASE_RETURN",
-        id
+      purchaseReturnUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.amount), 0);
+
+      purchaseReturnUpdateData.totalTaxableAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.taxableAmount),
+        0
+      );
+
+      purchaseReturnUpdateData.totalGstAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.gstAmount),
+        0
       );
     }
 
-    // Update party balance with diff in receivedAmount
-    if (partyId) {
-      await updatePartyBalanceForReceivedDiff(tx, partyId, existing.receivedAmount, receivedAmount);
+    /* ------------------------------
+       Update purchase return record
+    ------------------------------ */
+    const updatedPurchaseReturn =
+      Object.keys(purchaseReturnUpdateData).length > 0
+        ? await tx.purchaseReturn.update({
+            where: { id: purchaseReturnId },
+            data: purchaseReturnUpdateData
+          })
+        : existingPurchaseReturn;
+
+    if (Object.keys(purchaseReturnUpdateData).length > 0 || itemsWereModified) {
+      purchaseReturnWasUpdated = true;
     }
 
-    // Update purchaseReturn
-    const updated = await tx.purchaseReturn.update({
-      where: { id },
-      data: {
-        partyId,
-        receivedAmount,
-        paymentMode,
-        paymentReference,
-        reason,
-        totalAmount,
-        totalTaxableAmount,
-        totalGstAmount
-      }
-    });
+    /* ------------------------------
+       Party balance adjustment (REVERSED LOGIC)
+    ------------------------------ */
+    const oldPartyId = existingPurchaseReturn.partyId;
+    const oldTotal = Number(existingPurchaseReturn.totalAmount);
+    const oldReceived = Number(existingPurchaseReturn.receivedAmount || 0);
+    const oldReduction = oldTotal - oldReceived;
 
-    // Update or create payment
-    const existingPayment = await tx.payment.findFirst({
-      where: { referenceType: "PURCHASE_RETURN", referenceId: id }
-    });
+    const newPartyId = updatedPurchaseReturn.partyId;
+    const newTotal = Number(updatedPurchaseReturn.totalAmount);
+    const newReceived = Number(updatedPurchaseReturn.receivedAmount || 0);
+    const newReduction = newTotal - newReceived;
 
-    if (receivedAmount > 0 && partyId) {
-      if (existingPayment) {
-        await tx.payment.update({
-          where: { id: existingPayment.id },
-          data: {
-            partyId,
-            amount: receivedAmount,
-            paymentMode,
-            paymentReference,
-            remark: reason
-          }
-        });
-      } else {
-        await tx.payment.create({
-          data: {
-            partyId,
-            type: "RECEIVED",
-            amount: receivedAmount,
-            referenceType: "PURCHASE_RETURN",
-            referenceId: id,
-            paymentMode,
-            paymentReference,
-            remark: reason
-          }
+    const partyChanged = oldPartyId !== newPartyId;
+
+    if (partyChanged) {
+      await tx.party.update({
+        where: { id: oldPartyId },
+        data: { currentBalance: { increment: oldReduction } } // revert reduction
+      });
+
+      await tx.party.update({
+        where: { id: newPartyId },
+        data: { currentBalance: { decrement: newReduction } }
+      });
+    } else {
+      const reductionDiff = newReduction - oldReduction;
+
+      if (reductionDiff !== 0) {
+        await tx.party.update({
+          where: { id: oldPartyId },
+          data: { currentBalance: { decrement: reductionDiff } }
         });
       }
     }
 
-    // Audit log
-    await tx.auditLog.create({
-      data: {
-        tableName: "purchaseReturns",
-        recordId: String(id),
-        action: "UPDATE",
-        oldValue: JSON.stringify(existing),
-        newValue: JSON.stringify(updated),
-        userId
-      }
-    });
+    /* ------------------------------
+       Audit log
+    ------------------------------ */
+    if (purchaseReturnWasUpdated) {
+      await tx.auditLog.create({
+        data: {
+          tableName: "purchase_returns",
+          recordId: String(purchaseReturnId),
+          action: "UPDATE",
+          oldValue: JSON.stringify(existingPurchaseReturn),
+          newValue: JSON.stringify(updatedPurchaseReturn),
+          userId
+        }
+      });
+    }
 
-    return updated;
+    return updatedPurchaseReturn;
   });
 }
 
 /**
  * Delete purchase return
  */
-async function deletePurchaseReturn(id, userId = null) {
-  if (!id) throw new AppError("Purchase Return ID is required", 400);
+async function deletePurchaseReturn(purchaseReturnId, userId = null) {
+  if (!purchaseReturnId) {
+    throw new AppError("Purchase Return ID is required", 400);
+  }
 
-  return await prisma.$transaction(async tx => {
-    const pr = await tx.purchaseReturn.findUnique({
-      where: { id },
+  return prisma.$transaction(async tx => {
+    /* ----------------------------------------
+       1. Load purchase return with items
+    ---------------------------------------- */
+    const existingPurchaseReturn = await tx.purchaseReturn.findUnique({
+      where: { id: purchaseReturnId },
       include: { purchaseReturnItems: true }
     });
-    if (!pr) throw new AppError("Purchase Return not found", 404);
 
-    // Undo stock for each item
-    for (const item of pr.purchaseReturnItems) {
-      await createInventoryLogAndUpdateStock(
-        tx,
-        {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "ADD",
-          remark: `Undo purchase return #${id} item deletion`
-        },
-        "PURCHASE_RETURN",
-        id
-      );
+    if (!existingPurchaseReturn) {
+      throw new AppError("Purchase Return not found", 404);
     }
 
-    // Undo party balance for received amount
-    if (pr.partyId) {
-      await tx.party.update({
-        where: { id: pr.partyId },
+    /* ----------------------------------------
+       2. REVERSE INVENTORY
+       (undo stock subtraction → ADD back)
+    ---------------------------------------- */
+    for (const item of existingPurchaseReturn.purchaseReturnItems) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found or inactive`, 404);
+      }
+
+      const stockBefore = Number(product.currentStock);
+      const stockAfter = stockBefore + Number(item.quantity);
+
+      await tx.inventoryLog.create({
         data: {
-          currentBalance: { increment: pr.totalAmount - pr.receivedAmount }
+          productId: product.id,
+          type: "ADD",
+          quantity: item.quantity,
+          referenceType: "PURCHASE_RETURN",
+          purchaseReturnId: Number(purchaseReturnId),
+          remark: `Purchase Return #${purchaseReturnId} deleted`,
+          balanceBefore: stockBefore,
+          balanceAfter: stockAfter
         }
+      });
+
+      await tx.product.update({
+        where: { id: product.id },
+        data: { currentStock: stockAfter }
       });
     }
 
-    // Delete payment if any
-    const payment = await tx.payment.findFirst({
-      where: { referenceType: "PURCHASE_RETURN", referenceId: id }
+    /* ----------------------------------------
+       3. REVERSE PARTY BALANCE
+       (undo payable reduction)
+    ---------------------------------------- */
+    if (existingPurchaseReturn.partyId) {
+      const reductionAmount =
+        Number(existingPurchaseReturn.totalAmount) -
+        Number(existingPurchaseReturn.receivedAmount || 0);
+
+      if (reductionAmount !== 0) {
+        await tx.party.update({
+          where: { id: existingPurchaseReturn.partyId },
+          data: {
+            currentBalance: {
+              increment: reductionAmount
+            }
+          }
+        });
+      }
+    }
+
+    /* ----------------------------------------
+       4. DELETE ALL PAYMENTS LINKED TO RETURN
+    ---------------------------------------- */
+    await tx.payment.deleteMany({
+      where: {
+        referenceType: "PURCHASE_RETURN",
+        purchaseReturnId: Number(purchaseReturnId)
+      }
     });
-    if (payment) await tx.payment.delete({ where: { id: payment.id } });
 
-    // Delete purchaseReturnItems
-    await tx.purchaseReturnItem.deleteMany({ where: { purchaseReturnId: id } });
+    /* ----------------------------------------
+       5. DELETE PURCHASE RETURN ITEMS
+    ---------------------------------------- */
+    await tx.purchaseReturnItem.deleteMany({
+      where: { purchaseReturnId }
+    });
 
-    // Delete purchaseReturn record
-    await tx.purchaseReturn.delete({ where: { id } });
+    /* ----------------------------------------
+       6. DELETE PURCHASE RETURN
+    ---------------------------------------- */
+    await tx.purchaseReturn.delete({
+      where: { id: purchaseReturnId }
+    });
 
-    // Audit log
+    /* ----------------------------------------
+       7. AUDIT LOG
+    ---------------------------------------- */
     await tx.auditLog.create({
       data: {
-        tableName: "purchaseReturns",
-        recordId: String(id),
+        tableName: "purchase_returns",
+        recordId: String(purchaseReturnId),
         action: "DELETE",
-        oldValue: JSON.stringify(pr),
+        oldValue: JSON.stringify(existingPurchaseReturn),
         userId
       }
     });
@@ -492,90 +762,17 @@ async function deletePurchaseReturn(id, userId = null) {
   });
 }
 
-/**
- * Bulk delete purchase returns by IDs with related cleanup
- * Undo stock, party balance, payments, delete items and purchase returns, audit log
- * @param {number[]} ids array of purchaseReturn IDs
- * @param {number|null} userId for audit logging
- */
-async function bulkDeletePurchaseReturns(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of purchase return IDs is required", 400);
-  }
-
-  return await prisma.$transaction(async (tx) => {
-    const existingReturns = await tx.purchaseReturn.findMany({
-      where: { id: { in: ids } },
-      include: { purchaseReturnItems: true },
-    });
-
-    if (existingReturns.length !== ids.length) {
-      throw new AppError("Some purchase returns not found", 404);
-    }
-
-    for (const pr of existingReturns) {
-      // Undo stock for each item
-      for (const item of pr.purchaseReturnItems) {
-        await createInventoryLogAndUpdateStock(tx, {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "ADD",
-          remark: `Undo bulk delete purchase return #${pr.id} item`,
-        }, "PURCHASE_RETURN", pr.id);
-      }
-
-      // Undo party balance for received amount
-      if (pr.partyId) {
-        await tx.party.update({
-          where: { id: pr.partyId },
-          data: { currentBalance: { increment: pr.totalAmount - pr.receivedAmount } },
-        });
-      }
-
-      // Delete payment if exists
-      const payment = await tx.payment.findFirst({
-        where: { referenceType: "PURCHASE_RETURN", referenceId: pr.id },
-      });
-      if (payment) {
-        await tx.payment.delete({ where: { id: payment.id } });
-      }
-
-      // Delete purchase return items
-      await tx.purchaseReturnItem.deleteMany({ where: { purchaseReturnId: pr.id } });
-
-      // Delete purchase return record
-      await tx.purchaseReturn.delete({ where: { id: pr.id } });
-
-      // Audit log
-      await tx.auditLog.create({
-        data: {
-          tableName: "purchaseReturns",
-          recordId: String(pr.id),
-          action: "DELETE",
-          oldValue: JSON.stringify(pr),
-          userId,
-        },
-      });
-    }
-
-    return true;
-  });
-}
-
-
 export {
   listPurchaseReturns,
   getPurchaseReturnById,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn, 
-  bulkDeletePurchaseReturns
+  deletePurchaseReturn
 };
 export default {
   listPurchaseReturns,
   getPurchaseReturnById,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn,
-  bulkDeletePurchaseReturns
+  deletePurchaseReturn
 };

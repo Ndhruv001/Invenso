@@ -65,89 +65,40 @@ const validateCreatePurchase = [
 ];
 
 const validateUpdatePurchase = [
-  body("partyId")
-    .optional()
-    .isInt({ gt: 0 })
-    .toInt(),
+  body("partyId").optional().isInt({ gt: 0 }).toInt(),
 
-  body("date")
-    .optional()
-    .isISO8601(),
+  body("date").optional().isISO8601(),
 
-  body("paymentMode")
-    .optional()
-    .isIn(PAYMENT_MODES),
+  body("paymentMode").optional().isIn(PAYMENT_MODES),
 
-  body("paymentReference")
-    .optional()
-    .isString()
-    .trim(),
+  body("paymentReference").optional().isString().trim(),
 
-  body("remarks")
-    .optional()
-    .isString()
-    .trim(),
+  body("remarks").optional().isString().trim(),
 
-  body("paidAmount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("paidAmount").optional().isDecimal().toFloat(),
 
-  body("totalAmount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("totalAmount").optional().isDecimal().toFloat(),
 
-  body("totalTaxableAmount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("totalTaxableAmount").optional().isDecimal().toFloat(),
 
-  body("totalGstAmount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("totalGstAmount").optional().isDecimal().toFloat(),
 
-  body("items")
-    .optional()
-    .isArray({ min: 1 }),
+  body("items").optional().isArray({ min: 1 }),
 
-  body("items.*.productId")
-    .optional()
-    .isInt({ gt: 0 })
-    .toInt(),
+  body("items.*.productId").optional().isInt({ gt: 0 }).toInt(),
 
-  body("items.*.quantity")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("items.*.quantity").optional().isDecimal().toFloat(),
 
-  body("items.*.pricePerUnit")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("items.*.pricePerUnit").optional().isDecimal().toFloat(),
 
-  body("items.*.gstRate")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("items.*.gstRate").optional().isDecimal().toFloat(),
 
-  body("items.*.gstAmount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("items.*.gstAmount").optional().isDecimal().toFloat(),
 
-  body("items.*.taxableAmount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("items.*.taxableAmount").optional().isDecimal().toFloat(),
 
-  body("items.*.amount")
-    .optional()
-    .isDecimal()
-    .toFloat(),
+  body("items.*.amount").optional().isDecimal().toFloat()
 ];
-
 
 // --------------------
 // Exports
