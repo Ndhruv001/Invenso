@@ -94,7 +94,7 @@ export const deletePurchase = async id => {
 };
 
 // Fetch purchase suggestions by partyId (for dropdown / selection)
-export const getPurchaseSuggestionsByPartyId = async (partyId) => {
+export const getPurchaseSuggestionsByPartyId = async partyId => {
   if (!partyId) return [];
 
   try {
@@ -105,7 +105,6 @@ export const getPurchaseSuggestionsByPartyId = async (partyId) => {
     handleAxiosError(error, "Failed to fetch purchase suggestions");
   }
 };
-
 
 export const purchasesApi = {
   getPurchases,

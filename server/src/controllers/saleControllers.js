@@ -1,35 +1,29 @@
 /**
  * saleControllers.js
- * Controllers for Sale resource.
- * Wrap service functions with asyncHandler,
- * respond using successResponse utility.
+ * Controllers for Sale resource CRUD operations.
+ * Each controller method wraps service calls with asyncHandler.
+ * Uses successResponse for consistent response format.
  */
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as saleServices from "../services/saleServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /sales
- * List sales with filters, pagination, stats (including profit)
+ * List sales with filters, pagination, search, stats
  */
 const listSales = asyncHandler(async (req, res) => {
-  const query = {
-    page: Number(req.query.page) || 1,
-    limit: Number(req.query.limit) || 10,
-    sortBy: req.query.sortBy || "date",
-    sortOrder: req.query.sortOrder || "desc",
-    search: req.query.search || "",
-    filters: req.query.filters || {},
-  };
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
-  if (typeof query.filters === "string") {
-    try {
-      query.filters = JSON.parse(query.filters);
-    } catch {
-      query.filters = {};
-    }
-  }
+  const query = {
+    page: Number(page) || 1,
+    limit: Number(limit) || 10,
+    sortBy: sortBy || "createdAt",
+    sortOrder: sortOrder || "desc",
+    search: search || "",
+    filters: rest || {}
+  };
 
   const result = await saleServices.listSales(query);
   return successResponse(res, "Sales fetched successfully", result, 200);
@@ -37,7 +31,7 @@ const listSales = asyncHandler(async (req, res) => {
 
 /**
  * GET /sales/:id
- * Get single sale details with items and party
+ * Get sale by ID with items and party
  */
 const getSale = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -47,7 +41,7 @@ const getSale = asyncHandler(async (req, res) => {
 
 /**
  * POST /sales
- * Create a new sale transaction
+ * Create new sale with items, payment, inventory, stock, audit log
  */
 const createSale = asyncHandler(async (req, res) => {
   const saleData = req.body;
@@ -58,7 +52,7 @@ const createSale = asyncHandler(async (req, res) => {
 
 /**
  * PUT /sales/:id
- * Update existing sale with payment, stock, profit, audit log
+ * Update sale with items update, payment diff, stock adjustments, audit log
  */
 const updateSale = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -70,7 +64,7 @@ const updateSale = asyncHandler(async (req, res) => {
 
 /**
  * DELETE /sales/:id
- * Delete sale transaction, revert stock and payments
+ * Delete sale with stock revert, payment deletion, audit log
  */
 const deleteSale = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -80,14 +74,13 @@ const deleteSale = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /sales/bulk-delete
- * Bulk delete multiple sales by IDs
+ * GET /sales/party-id/:partyId
+ * Get sale suggestions by Party ID
  */
-const bulkDeleteSales = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await saleServices.bulkDeleteSales(ids, userId);
-  return successResponse(res, "Sales deleted successfully", deleted, 200);
+const getSalesByPartyId = asyncHandler(async (req, res) => {
+  const partyId = Number(req.params.partyId);
+  const sales = await saleServices.getSaleSuggestionsByPartyId(partyId);
+  return successResponse(res, "Sale suggestions fetched successfully", sales, 200);
 });
 
 export default {
@@ -96,13 +89,7 @@ export default {
   createSale,
   updateSale,
   deleteSale,
-  bulkDeleteSales,
+  getSalesByPartyId
 };
-export {
-  listSales,
-  getSale,
-  createSale,
-  updateSale,
-  deleteSale,
-  bulkDeleteSales,
-};
+
+export { listSales, getSale, createSale, updateSale, deleteSale, getSalesByPartyId };

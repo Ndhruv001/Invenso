@@ -46,7 +46,7 @@ import AddPaymentIn from "./scenes/accounting/payments/PaymentModal";
 import AddExpense from "./scenes/accounting/expenses/ExpenseModal";
 import AddTransport from "./scenes/transport/AddTransport";
 import ComingSoon from "./components/common/ComingSoon";
-import AddSale from "./scenes/sales/sales/AddSale";
+import AddSale from "./scenes/sales/sales/SaleModal";
 import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
 
 function App() {

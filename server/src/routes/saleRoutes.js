@@ -1,6 +1,7 @@
 /**
  * routes/saleRoutes.js
- * Routes for Sale resource with CRUD and bulk delete.
+ * Routes for Sale resource.
+ * RESTful CRUD routes with validation and auth middleware.
  */
 
 import express from "express";
@@ -8,22 +9,26 @@ const router = express.Router();
 
 import saleController from "../controllers/saleControllers.js";
 import {
-  validateSale,
-  validateSaleId,
-  validateSaleQuery,
-  validateBulkDelete,
+  validateCreateSale,
+  validateUpdateSale,
+  validateSaleId
 } from "../validations/saleValidations.js";
 
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 
-// List sales
+// List sales with filters and stats
 router.get(
   "/",
   authMiddleware,
-  validateSaleQuery,
-  validateRequest,
   saleController.listSales
+);
+
+// Get sales by Party ID (suggestions)
+router.get(
+  "/party-id/:partyId",
+  authMiddleware,
+  saleController.getSalesByPartyId
 );
 
 // Get sale by ID
@@ -39,7 +44,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
-  validateSale,
+  validateCreateSale,
   validateRequest,
   saleController.createSale
 );
@@ -49,7 +54,7 @@ router.put(
   "/:id",
   authMiddleware,
   validateSaleId,
-  validateSale,
+  validateUpdateSale,
   validateRequest,
   saleController.updateSale
 );
@@ -61,15 +66,6 @@ router.delete(
   validateSaleId,
   validateRequest,
   saleController.deleteSale
-);
-
-// Bulk delete sales
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  saleController.bulkDeleteSales
 );
 
 export default router;

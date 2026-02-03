@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
+import {
   getPurchases,
   getPurchase,
   createPurchase,
@@ -27,15 +27,15 @@ const PURCHASE_KEYS = {
 // --------------------------------------------------
 // QUERIES
 export const usePurchases = (filters = {}) => {
-    return useQuery({
-        queryKey: PURCHASE_KEYS.list(filters),
-        queryFn: () => {
-          return getPurchases(filters);
-        },
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        cacheTime: 30 * 60 * 1000, // 30 minutes
-        keepPreviousData: true
-    });
+  return useQuery({
+    queryKey: PURCHASE_KEYS.list(filters),
+    queryFn: () => {
+      return getPurchases(filters);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 30 * 60 * 1000, // 30 minutes
+    keepPreviousData: true
+  });
 };
 
 export const usePurchase = id =>
@@ -96,8 +96,6 @@ export const usePurchaseSuggestionsbyPartyId = (partyId, options = {}) => {
     ...options
   });
 };
-
-
 
 // --------------------------------------------------
 // Default export
