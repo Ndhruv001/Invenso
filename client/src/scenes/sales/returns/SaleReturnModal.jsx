@@ -4,9 +4,9 @@ import { useTheme } from "@/hooks/useTheme";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-  purchaseReturnCreateSchema,
-  purchaseReturnUpdateSchema
-} from "@/validations/purchaseReturnValidations";
+  saleReturnCreateSchema,
+  saleReturnUpdateSchema
+} from "@/validations/saleReturnValidations";
 
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -15,9 +15,9 @@ import { toast } from "react-toastify";
 import { debounce } from "@/lib/helpers/debounce";
 import { usePartySuggestions } from "@/hooks/useParties";
 import { formatDate, formatCurrency } from "@/lib/helpers/formatters";
-import { usePurchaseSuggestionsbyPartyId } from "@/hooks/usePurchases";
+import { useSaleSuggestionsByPartyId } from "@/hooks/useSales";
 
-function calculatePurchaseReturnTotals(items = [], receivedAmount = 0) {
+function calculateSaleReturnTotals(items = [], paidAmount = 0) {
   let totalTaxableAmount = 0;
   let totalGstAmount = 0;
 
@@ -34,7 +34,7 @@ function calculatePurchaseReturnTotals(items = [], receivedAmount = 0) {
   });
 
   const totalAmount = totalTaxableAmount + totalGstAmount;
-  const balanceAmount = totalAmount - Number(receivedAmount || 0);
+  const balanceAmount = totalAmount - Number(paidAmount || 0);
 
   return {
     totalTaxableAmount: Math.round(totalTaxableAmount),
@@ -66,15 +66,16 @@ function toDateInputValue(isoString) {
 
 /* ----------------------------- COMPONENT ----------------------------- */
 
-const PurchaseReturnModal = ({
+const SaleReturnModal = ({
   onSubmit,
   onCancel,
   isLoading = false,
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-  const isLinkedToPurchase = Boolean(initialData?.purchaseId);
+  console.log("🚀 ~ SaleReturnModal ~ initialData:", initialData);
   const { theme } = useTheme();
+  const isLinkedToSale = Boolean(initialData?.saleId);
 
   /* ----------------------- PARTY INPUT ------------------------ */
   const [partyInputValue, setPartyInputValue] = useState(initialData?.party?.name || "");
@@ -83,9 +84,9 @@ const PurchaseReturnModal = ({
   const [showPartySuggestions, setShowPartySuggestions] = useState(false);
   const [selectedParty, setSelectedParty] = useState(initialData?.party || null);
 
-  /* -------------------------------- PURCHASE INVOICE INPUT ---------------------- -----*/
-  const [selectedPurchase, setSelectedPurchase] = useState(initialData?.purchase || null);
-  const [showPurchaseSuggestions, setShowPurchaseSuggestions] = useState(false);
+  /* -------------------------------- SALE INVOICE INPUT ---------------------- -----*/
+  const [selectedSale, setSelectedSale] = useState(initialData?.sale || null);
+  const [showSaleSuggestions, setShowSaleSuggestions] = useState(false);
 
   /* -------------------------- EDIT MODE -------------------------- */
 
@@ -102,20 +103,20 @@ const PurchaseReturnModal = ({
       date: initialData?.date
         ? toDateInputValue(initialData.date)
         : new Date().toISOString().slice(0, 10),
-      purchaseId: initialData?.purchaseId ?? "",
+      saleId: initialData?.saleId ?? "",
 
       paymentMode: initialData?.paymentMode ?? "NONE",
       paymentReference: initialData?.paymentReference ?? "",
-      receivedAmount: Number(initialData?.receivedAmount ?? 0),
+      paidAmount: Number(initialData?.paidAmount ?? 0),
       reason: initialData?.reason ?? "",
       totalAmount: Number(initialData?.totalAmount ?? 0),
       totalTaxableAmount: Number(initialData?.totalTaxableAmount ?? 0),
       totalGstAmount: Number(initialData?.totalGstAmount ?? 0),
 
-      items: initialData?.purchaseReturnItems?.map(item => ({
+      items: initialData?.saleReturnItems?.map(item => ({
         // --- identity / relations ---
         id: item.id,
-        purchaseReturnId: item.purchaseReturnId,
+        saleReturnId: item.saleReturnId,
         productId: Number(item.productId),
 
         // --- rich product object (used for display only) ---
@@ -131,7 +132,7 @@ const PurchaseReturnModal = ({
       })) ?? [
         {
           id: null,
-          purchaseReturnId: null,
+          saleReturnId: null,
           productId: "",
           product: null,
           quantity: 1,
@@ -158,7 +159,7 @@ const PurchaseReturnModal = ({
     formState: { errors, isDirty, isSubmitting, dirtyFields }
   } = useForm({
     defaultValues,
-    resolver: yupResolver(initialData ? purchaseReturnUpdateSchema : purchaseReturnCreateSchema),
+    resolver: yupResolver(initialData ? saleReturnUpdateSchema : saleReturnCreateSchema),
     mode: "onSubmit"
   });
 
@@ -168,11 +169,11 @@ const PurchaseReturnModal = ({
     control,
     name: "items"
   });
-  const watchedReceivedAmount = watch("receivedAmount");
+  const watchedpaidAmount = watch("paidAmount");
   const watchedPartyId = watch("partyId");
-  const watechedPurchaseId = watch("purchaseId");
+  const watchedSaleId = watch("saleId");
 
-  const { data: purchasesByParty = [] } = usePurchaseSuggestionsbyPartyId(watchedPartyId, {
+  const { data: salesByParty = [] } = useSaleSuggestionsByPartyId(watchedPartyId, {
     enabled: !!watchedPartyId && !initialData
   });
 
@@ -201,17 +202,17 @@ const PurchaseReturnModal = ({
   }, [partySuggestionsData]);
 
   useEffect(() => {
-    if (watechedPurchaseId) {
+    if (watchedSaleId) {
       setShowPartySuggestions(false);
     }
-  }, [watechedPurchaseId]);
+  }, [watchedSaleId]);
 
   /* ---------------------- FIELD ARRAY ------------------------- */
 
   const {
-    fields: purchaseItemFields,
-    append: appendPurchaseItem,
-    remove: removePurchaseItemByIndex,
+    fields: saleItemFields,
+    append: appendSaleItem,
+    remove: removeSaleItemByIndex,
     replace
   } = useFieldArray({
     control,
@@ -227,8 +228,8 @@ const PurchaseReturnModal = ({
   /* -------------------- CALCULATIONS -------------------------- */
 
   const totals = useMemo(() => {
-    return calculatePurchaseReturnTotals(watchedItems, watchedReceivedAmount);
-  }, [watchedItems, watchedReceivedAmount]);
+    return calculateSaleReturnTotals(watchedItems, watchedpaidAmount);
+  }, [watchedItems, watchedpaidAmount]);
 
   const calculatedItems = useMemo(() => {
     return watchedItems.map(item => {
@@ -248,47 +249,47 @@ const PurchaseReturnModal = ({
   /* -------------------- ITEMS ------------------------------- */
 
   const handleAddItem = useCallback(() => {
-    appendPurchaseItem({
+    appendSaleItem({
       productId: "",
       quantity: 1,
       pricePerUnit: 0,
       gstRate: 0
     });
-  }, [appendPurchaseItem]);
+  }, [appendSaleItem]);
 
   const handleRemoveItem = useCallback(
     index => {
-      if (purchaseItemFields.length > 1) {
-        removePurchaseItemByIndex(index);
+      if (saleItemFields.length > 1) {
+        removeSaleItemByIndex(index);
       }
     },
-    [purchaseItemFields.length, removePurchaseItemByIndex]
+    [saleItemFields.length, removeSaleItemByIndex]
   );
 
-  const handleSelectPurchase = purchase => {
-    if (!purchase || initialData) return;
+  const handleSelectSale = sale => {
+    if (!sale || initialData) return;
 
-    if (!Array.isArray(purchase.purchaseItems)) {
-      console.error("❌ purchaseItems missing", purchase);
+    if (!Array.isArray(sale.saleItems)) {
+      console.error("❌ saleItems missing", sale);
       return;
     }
 
     /* ------------------ FORM IDENTITY ------------------ */
 
-    setValue("purchaseId", purchase.id, { shouldDirty: true });
-    setValue("partyId", purchase.partyId);
+    setValue("saleId", sale.id, { shouldDirty: true });
+    setValue("partyId", sale.partyId);
     setValue("paymentMode", "NONE");
-    setValue("receivedAmount", 0);
+    setValue("paidAmount", 0);
 
     // UI-only state
-    setSelectedParty(purchase.party);
+    setSelectedParty(sale.party);
 
     /* ------------------ HARD RESET ITEMS ------------------ */
 
     replace([]); // 🔥 force clear first
 
     replace(
-      purchase.purchaseItems.map(item => {
+      sale.saleItems.map(item => {
         const quantity = Number(item.quantity || 0);
         const pricePerUnit = Number(item.pricePerUnit || 0);
         const gstRate = Number(item.gstRate || 0);
@@ -320,14 +321,14 @@ const PurchaseReturnModal = ({
     setValue("purchase", null);
 
     // UI state
-    setSelectedPurchase(null);
-    setShowPurchaseSuggestions(false);
+    setSelectedSale(null);
+    setShowSaleSuggestions(false);
 
     // items
     replace([]); // 🔥 clears RHF items array safely
 
     // optional dependent fields
-    setValue("receivedAmount", 0);
+    setValue("paidAmount", 0);
     setValue("paymentMode", "NONE");
   };
 
@@ -347,7 +348,7 @@ const PurchaseReturnModal = ({
         totalAmount: totals.totalAmount
       };
       onSubmit(payload);
-      console.log("🚀 ~ PurchaseReturnModal ~ payload:", payload);
+      console.log("🚀 ~ SaleReturnModal ~ payload:", payload);
 
       if (!initialData) {
         reset(defaultValues);
@@ -404,13 +405,13 @@ const PurchaseReturnModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 flex purchaseItems-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-black/50 flex saleItems-center justify-center p-4 z-50">
         <div
           className={`${theme.card} rounded-2xl shadow-2xl w-full max-w-7xl border ${theme.border} max-h-[95vh] flex flex-col overflow-hidden`}
         >
           {/* Header */}
-          <div className={`flex purchaseItems-center justify-between p-4 border-b ${theme.border}`}>
-            <div className="flex purchaseItems-center gap-3">
+          <div className={`flex saleItems-center justify-between p-4 border-b ${theme.border}`}>
+            <div className="flex saleItems-center gap-3">
               <div className={`p-2 rounded-lg bg-gradient-to-r ${theme.accent}`}>
                 <FileText className={`w-5 h-5 ${theme.text.primary}`} />
               </div>
@@ -418,18 +419,18 @@ const PurchaseReturnModal = ({
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
                   {initialData
                     ? isEditMode
-                      ? "Edit Purchase Return"
-                      : "View Purchase Return"
-                    : "Create Purchase Return"}
+                      ? "Edit Sale Return"
+                      : "View Sale Return"
+                    : "Create Sale Return"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
                   {!isEditMode && initialData
-                    ? "Purchase return details (read-only)"
-                    : "Fill in the purchase return details"}
+                    ? "Sale return details (read-only)"
+                    : "Fill in the sale return details"}
                 </p>
               </div>
             </div>
-            <div className="flex purchaseItems-center gap-2">
+            <div className="flex saleItems-center gap-2">
               {initialData && (
                 <button
                   type="button"
@@ -470,7 +471,7 @@ const PurchaseReturnModal = ({
                     <input
                       type="text"
                       value={partyInputValue}
-                      disabled={isDisabled || isLinkedToPurchase}
+                      disabled={isDisabled || isLinkedToSale}
                       onChange={e => {
                         const value = e.target.value;
 
@@ -527,48 +528,48 @@ const PurchaseReturnModal = ({
                     />
                   </div>
 
-                  {/* Purchase Invoice */}
+                  {/* Sale Invoice */}
                   <div className="relative">
                     <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                      Purchase Invoice <span className="text-red-500">*</span>
+                      Sale Invoice <span className="text-red-500">*</span>
                     </label>
 
                     <input
                       type="text"
-                      disabled={isDisabled || isLinkedToPurchase || !watch("partyId")}
-                      value={selectedPurchase?.invoiceNumber || ""}
+                      disabled={isDisabled || isLinkedToSale || !watch("partyId")}
+                      value={selectedSale?.invoiceNumber || ""}
                       onFocus={() => {
                         if (watch("partyId")) {
-                          setShowPurchaseSuggestions(true);
+                          setShowSaleSuggestions(true);
                         }
                       }}
                       readOnly
-                      placeholder="Select purchase invoice"
+                      placeholder="Select sale invoice"
                       className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg ${theme.bg}`}
                     />
 
-                    {showPurchaseSuggestions && purchasesByParty.length > 0 && (
+                    {showSaleSuggestions && salesByParty.length > 0 && (
                       <ul className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
-                        {purchasesByParty.map(purchase => (
+                        {salesByParty.map(sale => (
                           <li
-                            key={purchase.id}
+                            key={sale.id}
                             onClick={() => {
-                              setSelectedPurchase(purchase);
-                              setShowPurchaseSuggestions(false);
-                              handleSelectPurchase(purchase);
+                              setSelectedSale(sale);
+                              setShowSaleSuggestions(false);
+                              handleSelectSale(sale);
                             }}
                             className="px-3 py-2 cursor-pointer hover:bg-gray-50 transition"
                           >
                             {/* Row 1: Invoice */}
                             <div className="text-sm font-medium text-gray-800">
-                              Purchase Invoice #{purchase.invoiceNumber}
+                              Sale Invoice #{sale.invoiceNumber}
                             </div>
 
                             {/* Row 2: Meta */}
                             <div className="flex justify-between text-xs text-gray-500 mt-0.5">
-                              <span>{formatDate(purchase.date)}</span>
+                              <span>{formatDate(sale.date)}</span>
                               <span className="font-semibold text-gray-700">
-                                ₹{formatCurrency(purchase.totalAmount)}
+                                ₹{formatCurrency(sale.totalAmount)}
                               </span>
                             </div>
                           </li>
@@ -597,9 +598,9 @@ const PurchaseReturnModal = ({
                   </div>
                 </div>
 
-                {/* purchaseItems Table */}
+                {/* saleItems Table */}
                 <div className="space-y-3">
-                  <h3 className={`text-lg font-semibold ${theme.text.primary}`}>purchaseItems</h3>
+                  <h3 className={`text-lg font-semibold ${theme.text.primary}`}>saleItems</h3>
 
                   <div className={`overflow-x-auto border ${theme.border} rounded-lg`}>
                     <table className="w-full min-w-max table-fixed" style={{ minWidth: "1200px" }}>
@@ -618,7 +619,7 @@ const PurchaseReturnModal = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {purchaseItemFields.map((field, index) => {
+                        {saleItemFields.map((field, index) => {
                           const item = watchedItems[index] || {};
 
                           const qty = Number(item.quantity || 0);
@@ -707,7 +708,7 @@ const PurchaseReturnModal = ({
                               {/* Action */}
                               {(isEditMode || !initialData) && (
                                 <td className={`border ${theme.border} px-2 py-2 text-center`}>
-                                  {purchaseItemFields.length > 1 && (
+                                  {saleItemFields.length > 1 && (
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveItem(index)}
@@ -823,10 +824,10 @@ const PurchaseReturnModal = ({
                     </div>
 
                     <div className="flex justify-between items-center text-sm">
-                      <span>Received</span>
+                      <span>Paid</span>
                       <input
                         type="number"
-                        {...register("receivedAmount")}
+                        {...register("paidAmount")}
                         disabled={isDisabled}
                         className="w-24 px-2 py-1 text-lg font-bold text-right"
                       />
@@ -835,7 +836,7 @@ const PurchaseReturnModal = ({
                     <div className="flex justify-between border-t pt-2 font-semibold cursor-not-allowed">
                       <span>Balance</span>
                       <span>
-                        ₹{(totals.totalAmount - Number(watch("receivedAmount") || 0)).toFixed(2)}
+                        ₹{(totals.totalAmount - Number(watch("paidAmount") || 0)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -856,7 +857,7 @@ const PurchaseReturnModal = ({
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}
-                  className={`flex-1 flex purchaseItems-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${theme.accentFrom} ${theme.accentTo} ${theme.text.primary} transition-all ${
+                  className={`flex-1 flex saleItems-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${theme.accentFrom} ${theme.accentTo} ${theme.text.primary} transition-all ${
                     isLoading || isSubmitting
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:opacity-90 cursor-pointer"
@@ -890,4 +891,4 @@ const PurchaseReturnModal = ({
   );
 };
 
-export default PurchaseReturnModal;
+export default SaleReturnModal;

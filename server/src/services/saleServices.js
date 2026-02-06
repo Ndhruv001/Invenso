@@ -521,23 +521,12 @@ async function updateSale(saleId, data, userId = null) {
           }
 
           const stockBefore = Number(product.currentStock);
+
           const stockAfter = stockBefore - Number(incomingItem.quantity);
 
           if (stockAfter < 0) {
             throw new AppError(`Insufficient stock for product ${product.name}`, 400);
           }
-
-          await tx.inventoryLog.create({
-            data: {
-              productId: product.id,
-              type: "SUBTRACT",
-              quantity: incomingItem.quantity,
-              referenceType: "SALE",
-              saleId,
-              balanceBefore: stockBefore,
-              balanceAfter: stockAfter
-            }
-          });
 
           await tx.product.update({
             where: { id: product.id },
@@ -559,6 +548,18 @@ async function updateSale(saleId, data, userId = null) {
               taxableAmount: incomingItem.taxableAmount,
               amount: incomingItem.amount,
               profit
+            }
+          });
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "SUBTRACT",
+              quantity: incomingItem.quantity,
+              referenceType: "SALE",
+              saleId,
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter
             }
           });
         }
@@ -718,8 +719,7 @@ async function deleteSale(saleId, userId = null) {
     ---------------------------------------- */
     if (existingSale.partyId) {
       const receivableAmount =
-        Number(existingSale.totalAmount) -
-        Number(existingSale.receivedAmount || 0);
+        Number(existingSale.totalAmount) - Number(existingSale.receivedAmount || 0);
 
       if (receivableAmount !== 0) {
         await tx.party.update({
@@ -803,7 +803,6 @@ async function getSaleSuggestionsByPartyId(partyId) {
 
   return sales;
 }
-
 
 export { listSales, getSaleById, createSale, updateSale, deleteSale, getSaleSuggestionsByPartyId };
 export default {

@@ -1,266 +1,369 @@
-/**
- * saleReturnServices.js
- * Prisma-based services for SaleReturn resource following sale return logic.
- *
- * Supports CRUD + bulk delete with consistent stock, party balance, profit/loss, payments, audit logs.
- */
-
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
 /**
  * Helper: Build date filter for Prisma
+ * @param {Object} dateFilter {from, to}
  */
-function buildDateFilter(dateFilter) {
-  if (!dateFilter) return undefined;
+function buildDateFilter({ from, to }) {
   const cond = {};
-  if (dateFilter.from) cond.gte = new Date(dateFilter.from);
-  if (dateFilter.to) cond.lte = new Date(dateFilter.to);
+
+  if (from) cond.gte = new Date(from);
+  if (to) cond.lte = new Date(to);
+
   return Object.keys(cond).length ? cond : undefined;
 }
 
 /**
- * Helper: Adjust party balance based on old and new owed amount
- * owed = totalAmount - paidAmount (for returns, 'paidAmount' is amount credited back)
+ * listSaleReturns
+ * List sale returns with filters, pagination, search, stats
  */
-async function adjustPartyBalanceOnSaleReturn(
-  tx, partyId,
-  oldTotal, oldPaid,
-  newTotal, newPaid
-) {
-  const oldOwed = oldTotal - oldPaid;
-  const newOwed = newTotal - newPaid;
-  const diff = newOwed - oldOwed;
+async function listSaleReturns({
+  page = 1,
+  limit = 10,
+  sortBy = "date",
+  sortOrder = "desc",
+  search = "",
+  filters = {}
+}) {
+  /* -------------------- Base Where -------------------- */
 
-  if (diff !== 0) {
-    await tx.party.update({
-      where: { id: partyId },
-      data: { currentBalance: { increment: diff } },
-    });
-  }
-}
-
-/**
- * Helper: Create inventory log and update product stock on sale return (Add stock back)
- */
-async function createInventoryLogAndUpdateStock(tx, item, referenceType, referenceId) {
-  const product = await tx.product.findUnique({ where: { id: item.productId } });
-  if (!product || !product.isActive) throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-
-  const balanceBefore = Number(product.currentStock);
-  const balanceAfter = balanceBefore + Number(item.quantity);
-
-  const avgCostPrice = Number(product.avgCostPrice || 0);
-  const profitLoss = (Number(item.pricePerUnit) - avgCostPrice) * Number(item.quantity);
-
-  await tx.inventoryLog.create({
-    data: {
-      productId: item.productId,
-      quantity: item.quantity,
-      type: "ADD",
-      referenceType,
-      referenceId: String(referenceId),
-      remark: item.remark || null,
-      balanceBefore,
-      balanceAfter,
-    },
-  });
-
-  await tx.product.update({
-    where: { id: item.productId },
-    data: { currentStock: balanceAfter },
-  });
-
-  return profitLoss;
-}
-
-/**
- * List sale returns with global search and stats including totalProfitLoss
- */
-async function listSaleReturns({ page = 1, limit = 10, sortBy = "date", sortOrder = "desc", search = "", filters = {} }) {
   const where = {};
 
-  if (filters.date) {
-    const dateFilter = buildDateFilter(filters.date);
-    if (dateFilter) where.date = dateFilter;
+  /* -------------------- Filters -------------------- */
+
+  if (filters.partyId) {
+    where.partyId = Number(filters.partyId);
   }
 
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
-
-    const matchingParties = await prisma.party.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true },
-    });
-    const partyIds = matchingParties.map((p) => p.id);
-
-    const matchingProducts = await prisma.product.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true },
-    });
-    const productIds = matchingProducts.map((p) => p.id);
-
-    where.AND = where.AND || [];
-    where.AND.push({
-      OR: [
-        { partyId: { in: partyIds.length ? partyIds : [0] } },
-        { reason: { contains: trimmedSearch, mode: "insensitive" } },
-        {
-          saleReturnItems: {
-            some: { productId: { in: productIds.length ? productIds : [0] } },
-          },
-        },
-      ],
-    });
+  if (filters.saleId) {
+    where.saleId = Number(filters.saleId);
   }
+
+  if (filters.dateFrom || filters.dateTo) {
+    const dateFilter = buildDateFilter({
+      from: filters.dateFrom,
+      to: filters.dateTo
+    });
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
+  }
+
+  if (filters.paymentMode) {
+    where.paymentMode = filters.paymentMode;
+  }
+
+  /* -------------------- Search -------------------- */
+
+  if (search.trim()) {
+    const q = search.trim();
+    const isNumeric = !isNaN(Number(q));
+
+    const orConditions = [
+      { reason: { contains: q, mode: "insensitive" } },
+
+      {
+        party: {
+          name: { contains: q, mode: "insensitive" }
+        }
+      },
+
+      ...(isNumeric ? [{ saleId: Number(q) }] : []),
+      ...(isNumeric ? [{ totalAmount: Number(q) }] : [])
+    ];
+
+    where.OR = orConditions;
+  }
+
+  /* -------------------- Pagination -------------------- */
 
   const skip = (page - 1) * limit;
   const take = limit;
 
-  const data = await prisma.saleReturn.findMany({
-    where,
-    orderBy: { [sortBy]: sortOrder },
-    skip,
-    take,
-    include: { party: true, saleReturnItems: true },
-  });
+  /* -------------------- Safe Sorting -------------------- */
 
-  const totalRows = await prisma.saleReturn.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
+  const allowedSortFields = ["date", "totalAmount", "createdAt", "party"];
 
-  const [totalReturns, sumTotalAmount, sumTotalGst, sumPaidAmount, sumTotalProfitLoss] = await Promise.all([
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
+
+  const orderBy =
+    safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
+
+  /* -------------------- DB Transaction -------------------- */
+
+  const [saleReturns, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+    prisma.saleReturn.findMany({
+      where,
+      skip,
+      take,
+      orderBy,
+      include: {
+        party: true,
+        sale: true,
+        saleReturnItems: {
+          include: {
+            product: {
+              include: { category: true }
+            }
+          }
+        }
+      }
+    }),
+
     prisma.saleReturn.count({ where }),
-    prisma.saleReturn.aggregate({ where, _sum: { totalAmount: true } }).then((r) => Number(r._sum.totalAmount) || 0),
-    prisma.saleReturn.aggregate({ where, _sum: { totalGstAmount: true } }).then((r) => Number(r._sum.totalGstAmount) || 0),
-    prisma.saleReturn.aggregate({ where, _sum: { paidAmount: true } }).then((r) => Number(r._sum.paidAmount) || 0),
-    prisma.saleReturn.aggregate({ where, _sum: { totalProfitLoss: true } }).then((r) => Number(r._sum.totalProfitLoss) || 0),
+
+    prisma.saleReturn.groupBy({
+      by: ["partyId"],
+      where
+    }),
+
+    prisma.saleReturn.aggregate({
+      where,
+      _sum: {
+        totalAmount: true,
+        totalGstAmount: true,
+        totalTaxableAmount: true,
+        paidAmount: true,
+        totalProfitLoss: true
+      }
+    })
   ]);
 
+  /* -------------------- Stats -------------------- */
+
+  const stats = {
+    totalSaleReturns: totalRows,
+    totalParties: groupedParties.length,
+    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
+    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
+    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
+    sumTotalPaid: Number(aggregates._sum.paidAmount) || 0,
+    sumTotalProfitLoss: Number(aggregates._sum.totalProfitLoss) || 0
+  };
+
+  /* -------------------- Response -------------------- */
+
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
-    stats: {
-      totalReturns,
-      sumTotalAmount,
-      sumTotalGst,
-      sumPaidAmount,
-      sumTotalProfitLoss,
+    data: saleReturns,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
     },
+    stats
   };
 }
 
 /**
- * Get sale return by ID
+ * Get sale return by ID including items, party, and sale
  */
 async function getSaleReturnById(id) {
   if (!id) throw new AppError("Sale Return ID is required", 400);
 
   const saleReturn = await prisma.saleReturn.findUnique({
     where: { id },
-    include: { saleReturnItems: true, party: true },
+    include: {
+      saleReturnItems: true,
+      party: true,
+      sale: true
+    }
   });
 
   if (!saleReturn) throw new AppError("Sale Return not found", 404);
+
   return saleReturn;
 }
 
 /**
- * Create sale return
+ * Create sale return with items, inventory logs, stock, payment, party balance, audit log
+ * @param {Object} data sale return data with items array
+ * @param {number|null} userId
  */
 async function createSaleReturn(data, userId = null) {
   const {
     date,
     partyId,
-    saleId = null,
-    reason,
-    saleReturnItems,
+    saleId,
     paidAmount = 0,
     paymentMode,
     paymentReference,
+    reason,
+    items
   } = data;
 
-  if (!saleReturnItems || !Array.isArray(saleReturnItems) || saleReturnItems.length === 0) {
+  if (!Array.isArray(items) || items.length === 0) {
     throw new AppError("Sale return items are required", 400);
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async tx => {
+    /* -------------------- Normalize & Prepare -------------------- */
     let totalAmount = 0;
     let totalTaxableAmount = 0;
     let totalGstAmount = 0;
     let totalProfitLoss = 0;
 
-    for (const item of saleReturnItems) {
-      totalTaxableAmount += Number(item.taxableAmount);
-      totalGstAmount += Number(item.gstAmount);
-      totalAmount += Number(item.totalAmount);
+    const itemsData = [];
+
+    // Optional: Validate sale exists (if provided)
+    const sale =
+      saleId &&
+      (await tx.sale.findUnique({
+        where: { id: saleId },
+        include: { saleItems: true }
+      }));
+
+    if (saleId && !sale) {
+      throw new AppError("Original sale not found", 404);
     }
 
+    for (const item of items) {
+      const quantity = Number(item.quantity);
+      const pricePerUnit = Number(item.pricePerUnit);
+      const gstRate = Number(item.gstRate);
+      const taxableAmount = Number(item.taxableAmount);
+      const gstAmount = Number(item.gstAmount);
+      const amount = Number(item.amount);
+
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found`, 404);
+      }
+
+      // Optional guard: return quantity should not exceed sold quantity
+      if (sale) {
+        const soldQty = sale.saleItems
+          .filter(si => si.productId === item.productId)
+          .reduce((sum, si) => sum + Number(si.quantity), 0);
+
+        if (quantity > soldQty) {
+          throw new AppError(
+            `Return quantity exceeds sold quantity for product ${product.name}`,
+            400
+          );
+        }
+      }
+
+      const costPrice = Number(product.avgCostPrice || 0);
+
+      // SALE RETURN = reverse profit (could be loss or reversal)
+      const profitLoss = (pricePerUnit - costPrice) * quantity * -1;
+
+      totalTaxableAmount += taxableAmount;
+      totalGstAmount += gstAmount;
+      totalAmount += amount;
+      totalProfitLoss += profitLoss;
+
+      itemsData.push({
+        productId: item.productId,
+        quantity,
+        pricePerUnit,
+        gstRate,
+        taxableAmount,
+        gstAmount,
+        amount,
+        profitLoss
+      });
+    }
+
+    /* -------------------- Build Sale Return Data -------------------- */
+    const saleReturnData = {
+      ...(date && { date }),
+      partyId,
+      saleId,
+      totalAmount,
+      totalGstAmount,
+      totalTaxableAmount,
+      totalProfitLoss,
+      paidAmount: Number(paidAmount),
+      ...(paymentMode && { paymentMode }),
+      ...(paymentReference && { paymentReference }),
+      ...(reason && { reason })
+    };
+
+    /* -------------------- Create Sale Return -------------------- */
     const saleReturn = await tx.saleReturn.create({
-      data: {
-        date,
-        partyId,
-        saleId,
-        reason,
-        paidAmount,
-        paymentMode,
-        paymentReference,
-        totalAmount,
-        totalTaxableAmount,
-        totalGstAmount,
-        totalProfitLoss: 0,
-      },
+      data: saleReturnData
     });
 
-    for (const item of saleReturnItems) {
-      const profitLoss = await createInventoryLogAndUpdateStock(tx, item, "SALE_RETURN", saleReturn.id);
-
+    /* -------------------- Create Items + Inline Inventory -------------------- */
+    for (const item of itemsData) {
+      // 1. Create sale return item
       await tx.saleReturnItem.create({
         data: {
           saleReturnId: saleReturn.id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          taxableAmount: item.taxableAmount,
-          totalAmount: item.totalAmount,
-          profitLoss,
-        },
+          ...item
+        }
       });
 
-      totalProfitLoss += profitLoss;
+      // 2. Inline Inventory Logic (SALE RETURN = ADD)
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      const balanceBefore = Number(product.currentStock);
+      const balanceAfter = balanceBefore + item.quantity;
+
+      await tx.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          quantity: item.quantity,
+          type: "ADD",
+          referenceType: "SALE_RETURN",
+          saleReturnId: saleReturn.id,
+          remark: `Sale Return #${saleReturn.id}`,
+          balanceBefore,
+          balanceAfter
+        }
+      });
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { currentStock: balanceAfter }
+      });
     }
 
-    await tx.saleReturn.update({ where: { id: saleReturn.id }, data: { totalProfitLoss } });
+    /* -------------------- Party Balance Update -------------------- */
+    // SALE RETURN decreases receivable (customer owes less)
+    const receivableReduction = totalAmount - Number(paidAmount);
 
-    if (partyId) {
-      await adjustPartyBalanceOnSaleReturn(tx, partyId, 0, 0, totalAmount, paidAmount);
+    if (partyId && receivableReduction > 0) {
+      await tx.party.update({
+        where: { id: partyId },
+        data: { currentBalance: { increment: receivableReduction } }
+      });
     }
 
-    if (paidAmount > 0 && partyId) {
+    /* -------------------- Payment Entry -------------------- */
+    if (partyId && Number(paidAmount) > 0) {
       await tx.payment.create({
         data: {
+          date,
           partyId,
           type: "PAID",
-          amount: paidAmount,
-          referenceType: "SALERETURN",
-          referenceId: saleReturn.id,
+          amount: Number(paidAmount),
+          referenceType: "SALE_RETURN",
+          saleReturnId: saleReturn.id,
           paymentMode,
           paymentReference,
-          remark: reason,
-        },
+          remark: reason
+        }
       });
     }
 
+    /* -------------------- Audit Log -------------------- */
     await tx.auditLog.create({
       data: {
-        tableName: "saleReturns",
+        tableName: "sale_returns",
         recordId: String(saleReturn.id),
         action: "CREATE",
         newValue: JSON.stringify(saleReturn),
-        userId,
-      },
+        userId
+      }
     });
 
     return saleReturn;
@@ -268,223 +371,475 @@ async function createSaleReturn(data, userId = null) {
 }
 
 /**
- * Update sale return
+ * Update sale return with diff-based stock, party balance & audit log
  */
-async function updateSaleReturn(id, data, userId = null) {
-  if (!id) throw new AppError("Sale Return ID is required", 400);
+async function updateSaleReturn(saleReturnId, data, userId = null) {
+  if (!saleReturnId) {
+    throw new AppError("Sale Return ID is required", 400);
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    const existing = await tx.saleReturn.findUnique({ where: { id }, include: { saleReturnItems: true } });
-    if (!existing) throw new AppError("Sale Return not found", 404);
-
-    const {
-      saleReturnItems = [],
-      paidAmount = existing.paidAmount,
-      paymentMode,
-      paymentReference,
-      reason,
-      partyId = existing.partyId,
-    } = data;
-
-    // Revert stock and delete old saleReturnItems
-    for (const item of existing.saleReturnItems) {
-      const product = await tx.product.findUnique({ where: { id: item.productId } });
-      if (!product || !product.isActive) throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-      const balanceBefore = Number(product.currentStock);
-      const balanceAfter = balanceBefore - Number(item.quantity);
-
-      await tx.inventoryLog.create({
-        data: {
-          productId: item.productId,
-          quantity: item.quantity,
-          type: "SUBTRACT",
-          referenceType: "SALE_RETURN",
-          referenceId: String(id),
-          remark: `Revert sale return #${id} before update`,
-          balanceBefore,
-          balanceAfter,
-        },
-      });
-
-      await tx.product.update({ where: { id: item.productId }, data: { currentStock: balanceAfter } });
-      await tx.saleReturnItem.delete({ where: { id: item.id } });
-    }
-
-    let totalAmount = 0;
-    let totalTaxableAmount = 0;
-    let totalGstAmount = 0;
-    let totalProfitLoss = 0;
-
-    for (const item of saleReturnItems) {
-      const profitLoss = await createInventoryLogAndUpdateStock(tx, item, "SALE_RETURN", id);
-
-      await tx.saleReturnItem.create({
-        data: {
-          saleReturnId: id,
-          productId: item.productId,
-          size: item.size || "NONE",
-          quantity: item.quantity,
-          pricePerUnit: item.pricePerUnit,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          taxableAmount: item.taxableAmount,
-          totalAmount: item.totalAmount,
-          profitLoss,
-        },
-      });
-
-      totalTaxableAmount += Number(item.taxableAmount);
-      totalGstAmount += Number(item.gstAmount);
-      totalAmount += Number(item.totalAmount);
-      totalProfitLoss += profitLoss;
-    }
-
-    await adjustPartyBalanceOnSaleReturn(tx, partyId, existing.totalAmount, existing.paidAmount, totalAmount, paidAmount);
-
-    const updated = await tx.saleReturn.update({
-      where: { id },
-      data: {
-        partyId,
-        paidAmount,
-        paymentMode,
-        paymentReference,
-        reason,
-        totalAmount,
-        totalTaxableAmount,
-        totalGstAmount,
-        totalProfitLoss,
-      },
+  return prisma.$transaction(async tx => {
+    const existingSaleReturn = await tx.saleReturn.findUnique({
+      where: { id: saleReturnId },
+      include: { saleReturnItems: true }
     });
 
-    // Update or create payment
-    const existingPayment = await tx.payment.findFirst({
-      where: { referenceType: "SALERETURN", referenceId: id },
-    });
+    if (!existingSaleReturn) {
+      throw new AppError("Sale Return not found", 404);
+    }
 
-    if (paidAmount > 0 && partyId) {
-      if (existingPayment) {
-        await tx.payment.update({
-          where: { id: existingPayment.id },
-          data: {
-            partyId,
-            amount: paidAmount,
-            paymentMode,
-            paymentReference,
-            remark: reason,
-          },
+    const saleReturnUpdateData = {};
+    let itemsWereModified = false;
+    let saleReturnWasUpdated = false;
+
+    /* ------------------------------
+       Sale Return fields (partial updates)
+    ------------------------------ */
+    if (data.partyId !== undefined) {
+      saleReturnUpdateData.partyId = data.partyId;
+    }
+
+    if (data.saleId !== undefined) {
+      saleReturnUpdateData.saleId = data.saleId;
+    }
+
+    if (data.paidAmount !== undefined) {
+      saleReturnUpdateData.paidAmount = Number(data.paidAmount);
+    }
+
+    if (data.paymentMode !== undefined) {
+      saleReturnUpdateData.paymentMode = data.paymentMode;
+    }
+
+    if (data.paymentReference !== undefined) {
+      saleReturnUpdateData.paymentReference = data.paymentReference;
+    }
+
+    if (data.reason !== undefined) {
+      saleReturnUpdateData.reason = data.reason;
+    }
+
+    if (data.date !== undefined) {
+      saleReturnUpdateData.date = data.date;
+    }
+
+    /* ------------------------------
+       Sale return items (ONLY if sent)
+    ------------------------------ */
+    if (Array.isArray(data.items)) {
+      itemsWereModified = true;
+
+      const incomingIds = data.items
+        .filter(item => typeof item.id === "number")
+        .map(item => item.id);
+
+      const itemsToDelete = existingSaleReturn.saleReturnItems.filter(
+        item => !incomingIds.includes(item.id)
+      );
+
+      /* ---- STEP 1: DELETE removed items ---- */
+      for (const itemToDelete of itemsToDelete) {
+        const product = await tx.product.findUnique({
+          where: { id: itemToDelete.productId }
         });
-      } else {
-        await tx.payment.create({
-          data: {
-            partyId,
-            type: "PAID",
-            amount: paidAmount,
-            referenceType: "SALERETURN",
-            referenceId: id,
-            paymentMode,
-            paymentReference,
-            remark: reason,
-          },
+
+        if (product) {
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore - Number(itemToDelete.quantity); // SALE RETURN undo
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "SUBTRACT",
+              quantity: itemToDelete.quantity,
+              referenceType: "SALE_RETURN",
+              saleReturnId,
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter,
+              remark: "Item removed from sale return"
+            }
+          });
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
+        }
+
+        await tx.saleReturnItem.delete({
+          where: { id: itemToDelete.id }
         });
       }
-    } else if (existingPayment) {
-      // Delete stale payment if now zero
-      await tx.payment.delete({ where: { id: existingPayment.id } });
+
+      /* ---- STEP 2 & 3: UPDATE existing + ADD new items ---- */
+      for (const incomingItem of data.items) {
+        /* ---- UPDATE existing item ---- */
+        if (incomingItem.id) {
+          const existingItem = existingSaleReturn.saleReturnItems.find(
+            item => item.id === incomingItem.id
+          );
+
+          if (!existingItem) {
+            throw new AppError("Sale return item not found", 404);
+          }
+
+          const product = await tx.product.findUnique({
+            where: { id: existingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const oldQty = Number(existingItem.quantity);
+          const newQty =
+            incomingItem.quantity !== undefined ? Number(incomingItem.quantity) : oldQty;
+
+          const qtyDiff = newQty - oldQty;
+
+          if (qtyDiff !== 0) {
+            const stockBefore = Number(product.currentStock);
+            const stockAfter = stockBefore + qtyDiff; // SALE RETURN logic
+
+            if (stockAfter < 0) {
+              throw new AppError(`Invalid stock adjustment for product ${product.name}`, 400);
+            }
+
+            await tx.inventoryLog.create({
+              data: {
+                productId: product.id,
+                type: qtyDiff > 0 ? "ADD" : "SUBTRACT",
+                quantity: Math.abs(qtyDiff),
+                referenceType: "SALE_RETURN",
+                saleReturnId,
+                balanceBefore: stockBefore,
+                balanceAfter: stockAfter
+              }
+            });
+
+            await tx.product.update({
+              where: { id: product.id },
+              data: { currentStock: stockAfter }
+            });
+          }
+
+          const costPrice = Number(product.avgCostPrice || 0);
+          const profitLoss =
+            (Number(incomingItem.pricePerUnit ?? existingItem.pricePerUnit) - costPrice) *
+            newQty *
+            -1;
+
+          await tx.saleReturnItem.update({
+            where: { id: existingItem.id },
+            data: {
+              quantity: newQty,
+              pricePerUnit: incomingItem.pricePerUnit ?? existingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate ?? existingItem.gstRate,
+              gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
+              amount: incomingItem.amount ?? existingItem.amount,
+              profitLoss
+            }
+          });
+        } else {
+          /* ---- ADD new item ---- */
+          const product = await tx.product.findUnique({
+            where: { id: incomingItem.productId }
+          });
+
+          if (!product || !product.isActive) {
+            throw new AppError("Product not found or inactive", 404);
+          }
+
+          const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore + Number(incomingItem.quantity);
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { currentStock: stockAfter }
+          });
+
+          const costPrice = Number(product.avgCostPrice || 0);
+          const profitLoss =
+            (Number(incomingItem.pricePerUnit) - costPrice) * Number(incomingItem.quantity) * -1;
+
+          await tx.saleReturnItem.create({
+            data: {
+              saleReturnId,
+              productId: incomingItem.productId,
+              quantity: incomingItem.quantity,
+              pricePerUnit: incomingItem.pricePerUnit,
+              gstRate: incomingItem.gstRate,
+              gstAmount: incomingItem.gstAmount,
+              taxableAmount: incomingItem.taxableAmount,
+              amount: incomingItem.amount,
+              profitLoss
+            }
+          });
+
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "ADD",
+              quantity: incomingItem.quantity,
+              referenceType: "SALE_RETURN",
+              saleReturnId,
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter
+            }
+          });
+        }
+      }
+
+      /* ---- Recalculate totals & profit/loss ---- */
+      const allItems = await tx.saleReturnItem.findMany({
+        where: { saleReturnId }
+      });
+
+      saleReturnUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.amount), 0);
+
+      saleReturnUpdateData.totalTaxableAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.taxableAmount),
+        0
+      );
+
+      saleReturnUpdateData.totalGstAmount = allItems.reduce(
+        (sum, i) => sum + Number(i.gstAmount),
+        0
+      );
+
+      saleReturnUpdateData.totalProfitLoss = allItems.reduce(
+        (sum, i) => sum + Number(i.profitLoss),
+        0
+      );
     }
 
-    await tx.auditLog.create({
-      data: {
-        tableName: "saleReturns",
-        recordId: String(id),
-        action: "UPDATE",
-        oldValue: JSON.stringify(existing),
-        newValue: JSON.stringify(updated),
-        userId,
-      },
-    });
+    /* ------------------------------
+       Update sale return record
+    ------------------------------ */
+    const updatedSaleReturn =
+      Object.keys(saleReturnUpdateData).length > 0
+        ? await tx.saleReturn.update({
+            where: { id: saleReturnId },
+            data: saleReturnUpdateData
+          })
+        : existingSaleReturn;
 
-    return updated;
+    if (Object.keys(saleReturnUpdateData).length > 0 || itemsWereModified) {
+      saleReturnWasUpdated = true;
+    }
+
+    /* ------------------------------
+       Party balance adjustment (UNIFIED LOGIC)
+    ------------------------------ */
+    const oldPartyId = existingSaleReturn.partyId;
+    const oldTotal = Number(existingSaleReturn.totalAmount);
+    const oldPaid = Number(existingSaleReturn.paidAmount || 0);
+    const oldReceivableReduction = oldTotal - oldPaid;
+
+    const newPartyId = updatedSaleReturn.partyId;
+    const newTotal = Number(updatedSaleReturn.totalAmount);
+    const newPaid = Number(updatedSaleReturn.paidAmount || 0);
+    const newReceivableReduction = newTotal - newPaid;
+
+    const partyChanged = oldPartyId !== newPartyId;
+
+    if (partyChanged) {
+      // reverse old reduction, apply new reduction
+      await tx.party.update({
+        where: { id: oldPartyId },
+        data: { currentBalance: { decrement: oldReceivableReduction } }
+      });
+
+      await tx.party.update({
+        where: { id: newPartyId },
+        data: { currentBalance: { increment: newReceivableReduction } }
+      });
+    } else {
+      const reductionDiff = newReceivableReduction - oldReceivableReduction;
+
+      if (reductionDiff !== 0) {
+        await tx.party.update({
+          where: { id: oldPartyId },
+          data: { currentBalance: { increment: reductionDiff } }
+        });
+      }
+    }
+
+    /* ------------------------------
+       Audit log
+    ------------------------------ */
+    if (saleReturnWasUpdated) {
+      await tx.auditLog.create({
+        data: {
+          tableName: "sale_returns",
+          recordId: String(saleReturnId),
+          action: "UPDATE",
+          oldValue: JSON.stringify(existingSaleReturn),
+          newValue: JSON.stringify(updatedSaleReturn),
+          userId
+        }
+      });
+    }
+
+    return updatedSaleReturn;
   });
 }
 
 /**
- * Delete sale return with stock revert, party balance, payment delete, audit
+ * Delete sale return:
+ * - Undo stock and inventory logs
+ * - Undo party balance on receivable reduction
+ * - Delete payment if any
+ * - Delete sale return items and sale return
+ * - Audit log
  */
-async function deleteSaleReturn(id, userId = null) {
-  if (!id) throw new AppError("Sale Return ID is required", 400);
+async function deleteSaleReturn(saleReturnId, userId = null) {
+  if (!saleReturnId) {
+    throw new AppError("Sale Return ID is required", 400);
+  }
 
-  return await prisma.$transaction(async (tx) => {
-    const saleReturn = await tx.saleReturn.findUnique({ where: { id }, include: { saleReturnItems: true } });
-    if (!saleReturn) throw new AppError("Sale Return not found", 404);
+  return prisma.$transaction(async tx => {
+    /* ----------------------------------------
+       1. Load sale return with items
+    ---------------------------------------- */
+    const existingSaleReturn = await tx.saleReturn.findUnique({
+      where: { id: saleReturnId },
+      include: { saleReturnItems: true }
+    });
 
-    for (const item of saleReturn.saleReturnItems) {
-      const product = await tx.product.findUnique({ where: { id: item.productId } });
-      if (!product || !product.isActive) throw new AppError(`Product ${item.productId} not found or inactive`, 404);
-      const balanceBefore = Number(product.currentStock);
-      const balanceAfter = balanceBefore - Number(item.quantity);
+    if (!existingSaleReturn) {
+      throw new AppError("Sale Return not found", 404);
+    }
+
+    /* ----------------------------------------
+       2. REVERSE INVENTORY (undo stock addition)
+    ---------------------------------------- */
+    for (const item of existingSaleReturn.saleReturnItems) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId }
+      });
+
+      if (!product || !product.isActive) {
+        throw new AppError(`Product ${item.productId} not found or inactive`, 404);
+      }
+
+      const stockBefore = Number(product.currentStock);
+      const stockAfter = stockBefore - Number(item.quantity); // SALE RETURN undo
+
+      if (stockAfter < 0) {
+        throw new AppError(`Invalid stock reversal for product ${product.name}`, 400);
+      }
 
       await tx.inventoryLog.create({
         data: {
-          productId: item.productId,
-          quantity: item.quantity,
+          productId: product.id,
           type: "SUBTRACT",
+          quantity: item.quantity,
           referenceType: "SALE_RETURN",
-          referenceId: String(id),
-          remark: `Undo sale return #${id} item deletion`,
-          balanceBefore,
-          balanceAfter,
-        },
+          saleReturnId: Number(saleReturnId),
+          remark: `Sale Return #${saleReturnId} deleted`,
+          balanceBefore: stockBefore,
+          balanceAfter: stockAfter
+        }
       });
 
-      await tx.product.update({ where: { id: item.productId }, data: { currentStock: balanceAfter } });
-    }
-
-    if (saleReturn.partyId) {
-      const owed = saleReturn.totalAmount - saleReturn.paidAmount;
-      await tx.party.update({
-        where: { id: saleReturn.partyId },
-        data: { currentBalance: { increment: -owed } },
+      await tx.product.update({
+        where: { id: product.id },
+        data: { currentStock: stockAfter }
       });
     }
 
-    const payment = await tx.payment.findFirst({
-      where: { referenceType: "SALERETURN", referenceId: id },
+    /* ----------------------------------------
+       3. REVERSE PARTY BALANCE (receivable reduction undo)
+    ---------------------------------------- */
+    if (existingSaleReturn.partyId) {
+      const receivableReduction =
+        Number(existingSaleReturn.totalAmount) - Number(existingSaleReturn.paidAmount || 0);
+
+      if (receivableReduction !== 0) {
+        await tx.party.update({
+          where: { id: existingSaleReturn.partyId },
+          data: {
+            currentBalance: {
+              decrement: receivableReduction
+            }
+          }
+        });
+      }
+    }
+
+    /* ----------------------------------------
+       4. DELETE ALL PAYMENTS LINKED TO SALE RETURN
+    ---------------------------------------- */
+    await tx.payment.deleteMany({
+      where: {
+        referenceType: "SALE_RETURN",
+        saleReturnId: Number(saleReturnId)
+      }
     });
-    if (payment) await tx.payment.delete({ where: { id: payment.id } });
 
-    await tx.saleReturnItem.deleteMany({ where: { saleReturnId: id } });
+    /* ----------------------------------------
+       5. DELETE SALE RETURN ITEMS (cascade safe)
+    ---------------------------------------- */
+    await tx.saleReturnItem.deleteMany({
+      where: { saleReturnId }
+    });
 
-    await tx.saleReturn.delete({ where: { id } });
+    /* ----------------------------------------
+       6. DELETE SALE RETURN
+    ---------------------------------------- */
+    await tx.saleReturn.delete({
+      where: { id: saleReturnId }
+    });
 
+    /* ----------------------------------------
+       7. AUDIT LOG (MANDATORY)
+    ---------------------------------------- */
     await tx.auditLog.create({
       data: {
-        tableName: "saleReturns",
-        recordId: String(id),
+        tableName: "sale_returns",
+        recordId: String(saleReturnId),
         action: "DELETE",
-        oldValue: JSON.stringify(saleReturn),
-        userId,
-      },
+        oldValue: JSON.stringify(existingSaleReturn),
+        userId
+      }
     });
 
     return true;
   });
 }
 
-/**
- * Bulk delete sale returns by calling deleteSaleReturn for each id (DRY)
- */
-async function bulkDeleteSaleReturns(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of sale return IDs is required", 400);
+async function getSaleReturnSuggestionsByPartyId(partyId) {
+  if (!partyId) {
+    throw new AppError("Party ID is required", 400);
   }
 
-  return await prisma.$transaction(async (tx) => {
-    for (const id of ids) {
-      await deleteSaleReturn(id, userId);
+  const saleReturns = await prisma.saleReturn.findMany({
+    where: {
+      partyId: Number(partyId)
+    },
+    orderBy: {
+      date: "desc"
+    },
+    take: 50, // suggestions only
+    include: {
+      party: true,
+      sale: true,
+      saleReturnItems: {
+        include: {
+          product: {
+            include: {
+              category: true
+            }
+          }
+        }
+      }
     }
   });
-}
 
+  return saleReturns;
+}
 
 export {
   listSaleReturns,
@@ -492,13 +847,14 @@ export {
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  bulkDeleteSaleReturns,
+  getSaleReturnSuggestionsByPartyId
 };
+
 export default {
   listSaleReturns,
   getSaleReturnById,
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  bulkDeleteSaleReturns,
+  getSaleReturnSuggestionsByPartyId
 };

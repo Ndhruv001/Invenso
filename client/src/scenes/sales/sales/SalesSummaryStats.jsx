@@ -1,56 +1,41 @@
 /**
  * @file SalesSummaryStats.jsx
- * @description Displays responsive stat cards for sales summary using API stats.
+ * @description Displays key sales summary statistics with visual hierarchy.
  */
 
 import React from "react";
-import { Users, CreditCard, DollarSign, FileText } from "lucide-react";
+import { FileText, CreditCard, DollarSign, TrendingUp } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 
-/**
- * @typedef {Object} SalesSummaryStatsProps
- * @property {Object} stats - API stats object.
- * @property {number} stats.totalParties
- * @property {number} stats.sumTotalAmount
- * @property {number} stats.sumTotalGst
- * @property {number} stats.sumTotalReceived
- */
-
-/**
- * SalesSummaryStats - Renders a responsive grid of StatCards.
- *
- * @param {SalesSummaryStatsProps} props
- * @returns {JSX.Element}
- */
 const SalesSummaryStats = ({ stats }) => {
   const items = [
     {
-      title: "Total Parties",
-      value: stats?.totalParties ?? 0,
-      subtitle: "Customers and clients",
-      icon: Users,
-      color: "success"
-    },
-    {
       title: "Total Sales Amount",
       value: stats?.sumTotalAmount?.toLocaleString() ?? 0,
-      subtitle: "Overall sales value (₹)",
+      subtitle: "Gross sales value (₹)",
       icon: FileText,
       color: "primary"
     },
     {
+      title: "Total Received",
+      value: stats?.sumTotalReceived?.toLocaleString() ?? 0,
+      subtitle: "Cash received from customers (₹)",
+      icon: CreditCard,
+      color: "info"
+    },
+    {
       title: "Total GST",
       value: stats?.sumTotalGst?.toLocaleString() ?? 0,
-      subtitle: "Total GST collected (₹)",
+      subtitle: "GST collected on sales (₹)",
       icon: DollarSign,
       color: "warning"
     },
     {
-      title: "Total Received Amount",
-      value: stats?.sumTotalReceived?.toLocaleString() ?? 0,
-      subtitle: "Total amount received (₹)",
-      icon: CreditCard,
-      color: "info"
+      title: "Total Profit",
+      value: stats?.sumTotalProfit?.toLocaleString() ?? 0,
+      subtitle: "Net profit earned (₹)",
+      icon: TrendingUp,
+      color: "success" // 💚 highest emphasis
     }
   ];
 

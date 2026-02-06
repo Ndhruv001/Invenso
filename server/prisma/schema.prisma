@@ -384,7 +384,7 @@ model Payment {
 
   party           Party?             @relation(fields: [partyId], references: [id])
   purchase        Purchase?          @relation("PurchasePayments", fields: [purchaseId], references: [id])
-  sale            Sale?              @relation("SalePayments", fields: [saleId], references: [invoiceNumber])
+  sale            Sale?              @relation("SalePayments", fields: [saleId], references: [id])
   purchaseReturn  PurchaseReturn?    @relation("PurchaseReturnPayments", fields: [purchaseReturnId], references: [id])
   saleReturn      SaleReturn?        @relation("SaleReturnPayments", fields: [saleReturnId], references: [id])
   transport       Transport?         @relation("TransportPayments", fields: [transportId], references: [id])
@@ -448,7 +448,7 @@ model InventoryLog {
 
   product         Product         @relation(fields: [productId], references: [id])
   purchase        Purchase?       @relation("PurchaseInventoryLogs", fields: [purchaseId], references: [id])
-  sale            Sale?           @relation("SaleInventoryLogs", fields: [saleId], references: [invoiceNumber])
+  sale            Sale?           @relation("SaleInventoryLogs", fields: [saleId], references: [id])
   purchaseReturn  PurchaseReturn? @relation("PurchaseReturnInventoryLogs", fields: [purchaseReturnId], references: [id])
   saleReturn      SaleReturn?     @relation("SaleReturnInventoryLogs", fields: [saleReturnId], references: [id])
 

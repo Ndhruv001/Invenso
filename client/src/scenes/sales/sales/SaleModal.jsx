@@ -13,7 +13,7 @@ import { debounce } from "@/lib/helpers/debounce";
 import { usePartySuggestions } from "@/hooks/useParties";
 import { useProductSuggestions } from "@/hooks/useProducts";
 
-function calculateSaleTotals(items = [], paidAmount = 0) {
+function calculateSaleTotals(items = [], receivedAmount = 0) {
   let totalTaxableAmount = 0;
   let totalGstAmount = 0;
 
@@ -30,7 +30,7 @@ function calculateSaleTotals(items = [], paidAmount = 0) {
   });
 
   const totalAmount = totalTaxableAmount + totalGstAmount;
-  const balanceAmount = totalAmount - Number(paidAmount || 0);
+  const balanceAmount = totalAmount - Number(receivedAmount || 0);
 
   return {
     totalTaxableAmount: Math.round(totalTaxableAmount),
@@ -101,7 +101,6 @@ const SaleModal = ({
   const defaultValues = useMemo(
     () => ({
       partyId: initialData?.partyId ?? "",
-      phone: initialData?.party?.phone ?? "",
       invoiceNumber: initialData?.invoiceNumber ?? "",
       date: initialData?.date
         ? toDateInputValue(initialData.date)
@@ -109,16 +108,16 @@ const SaleModal = ({
 
       paymentMode: initialData?.paymentMode ?? "NONE",
       paymentReference: initialData?.paymentReference ?? "",
-      paidAmount: Number(initialData?.paidAmount ?? 0),
+      receivedAmount: Number(initialData?.receivedAmount ?? 0),
       remarks: initialData?.remarks ?? "",
       totalAmount: Number(initialData?.totalAmount ?? 0),
       totalTaxableAmount: Number(initialData?.totalTaxableAmount ?? 0),
       totalGstAmount: Number(initialData?.totalGstAmount ?? 0),
 
-      items: initialData?.purchaseItems?.map(item => ({
+      items: initialData?.saleItems?.map(item => ({
         // --- identity / relations ---
         id: item.id,
-        purchaseId: item.purchaseId,
+        saleId: item.saleId,
         productId: Number(item.productId),
 
         // --- rich product object (used for display only) ---
@@ -134,7 +133,7 @@ const SaleModal = ({
       })) ?? [
         {
           id: null,
-          purchaseId: null,
+          saleId: null,
           productId: "",
           product: null,
           quantity: 1,
@@ -161,7 +160,7 @@ const SaleModal = ({
     formState: { errors, isDirty, isSubmitting, dirtyFields }
   } = useForm({
     defaultValues,
-    resolver: yupResolver(initialData ? purchaseUpdateSchema : purchaseCreateSchema),
+    resolver: yupResolver(initialData ? saleUpdateSchema : saleCreateSchema),
     mode: "onSubmit"
   });
 
@@ -232,9 +231,9 @@ const SaleModal = ({
   /* ---------------------- FIELD ARRAY ------------------------- */
 
   const {
-    fields: purchaseItemFields,
-    append: appendPurchaseItem,
-    remove: removePurchaseItemByIndex
+    fields: saleItemFields,
+    append: appendSaleItem,
+    remove: removeSaleItemByIndex
   } = useFieldArray({
     control,
     name: "items"
@@ -253,13 +252,13 @@ const SaleModal = ({
     name: "items"
   });
 
-  const watchedPaidAmount = watch("paidAmount");
+  const watchedreceivedAmount = watch("receivedAmount");
 
   /* -------------------- CALCULATIONS -------------------------- */
 
   const totals = useMemo(() => {
-    return calculateSaleTotals(watchedItems, watchedPaidAmount);
-  }, [watchedItems, watchedPaidAmount]);
+    return calculateSaleTotals(watchedItems, watchedreceivedAmount);
+  }, [watchedItems, watchedreceivedAmount]);
 
   const calculatedItems = useMemo(() => {
     return watchedItems.map(item => {
@@ -279,21 +278,21 @@ const SaleModal = ({
   /* -------------------- ITEMS ------------------------------- */
 
   const handleAddItem = useCallback(() => {
-    appendPurchaseItem({
+    appendSaleItem({
       productId: "",
       quantity: 1,
       pricePerUnit: 0,
       gstRate: 0
     });
-  }, [appendPurchaseItem]);
+  }, [appendSaleItem]);
 
   const handleRemoveItem = useCallback(
     index => {
-      if (purchaseItemFields.length > 1) {
-        removePurchaseItemByIndex(index);
+      if (saleItemFields.length > 1) {
+        removeSaleItemByIndex(index);
       }
     },
-    [purchaseItemFields.length, removePurchaseItemByIndex]
+    [saleItemFields.length, removeSaleItemByIndex]
   );
 
   /* -------------------- SUBMIT ------------------------------- */
@@ -368,13 +367,13 @@ const SaleModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 flex purchaseItems-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-black/50 flex saleItems-center justify-center p-4 z-50">
         <div
           className={`${theme.card} rounded-2xl shadow-2xl w-full max-w-7xl border ${theme.border} max-h-[95vh] flex flex-col overflow-hidden`}
         >
           {/* Header */}
-          <div className={`flex purchaseItems-center justify-between p-4 border-b ${theme.border}`}>
-            <div className="flex purchaseItems-center gap-3">
+          <div className={`flex saleItems-center justify-between p-4 border-b ${theme.border}`}>
+            <div className="flex saleItems-center gap-3">
               <div className={`p-2 rounded-lg bg-gradient-to-r ${theme.accent}`}>
                 <FileText className={`w-5 h-5 ${theme.text.primary}`} />
               </div>
@@ -389,7 +388,7 @@ const SaleModal = ({
                 </p>
               </div>
             </div>
-            <div className="flex purchaseItems-center gap-2">
+            <div className="flex saleItems-center gap-2">
               {initialData && (
                 <button
                   type="button"
@@ -527,9 +526,9 @@ const SaleModal = ({
                   </div>
                 </div>
 
-                {/* purchaseItems Table */}
+                {/* saleItems Table */}
                 <div className="space-y-3">
-                  <h3 className={`text-lg font-semibold ${theme.text.primary}`}>purchaseItems</h3>
+                  <h3 className={`text-lg font-semibold ${theme.text.primary}`}>saleItems</h3>
 
                   <div className={`overflow-x-auto border ${theme.border} rounded-lg`}>
                     <table className="w-full min-w-max table-fixed" style={{ minWidth: "1200px" }}>
@@ -548,7 +547,7 @@ const SaleModal = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {purchaseItemFields.map((field, index) => {
+                        {saleItemFields.map((field, index) => {
                           const item = watchedItems[index] || {};
 
                           const qty = Number(item.quantity || 0);
@@ -675,7 +674,7 @@ const SaleModal = ({
                               {/* Action */}
                               {(isEditMode || !initialData) && (
                                 <td className={`border ${theme.border} px-2 py-2 text-center`}>
-                                  {purchaseItemFields.length > 1 && (
+                                  {saleItemFields.length > 1 && (
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveItem(index)}
@@ -790,10 +789,10 @@ const SaleModal = ({
                     </div>
 
                     <div className="flex justify-between items-center text-sm">
-                      <span>Paid</span>
+                      <span>Received</span>
                       <input
                         type="number"
-                        {...register("paidAmount")}
+                        {...register("receivedAmount")}
                         disabled={isDisabled}
                         className="w-24 px-2 py-1 text-lg font-bold text-right"
                       />
@@ -802,7 +801,7 @@ const SaleModal = ({
                     <div className="flex justify-between border-t pt-2 font-semibold cursor-not-allowed">
                       <span>Balance</span>
                       <span>
-                        ₹{(totals.totalAmount - Number(watch("paidAmount") || 0)).toFixed(2)}
+                        ₹{(totals.totalAmount - Number(watch("receivedAmount") || 0)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -823,7 +822,7 @@ const SaleModal = ({
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}
-                  className={`flex-1 flex purchaseItems-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${theme.accentFrom} ${theme.accentTo} ${theme.text.primary} transition-all ${
+                  className={`flex-1 flex saleItems-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${theme.accentFrom} ${theme.accentTo} ${theme.text.primary} transition-all ${
                     isLoading || isSubmitting
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:opacity-90 cursor-pointer"

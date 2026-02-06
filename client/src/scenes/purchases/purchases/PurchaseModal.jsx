@@ -101,7 +101,6 @@ const PurchaseModal = ({
   const defaultValues = useMemo(
     () => ({
       partyId: initialData?.partyId ?? "",
-      phone: initialData?.party?.phone ?? "",
       invoiceNumber: initialData?.invoiceNumber ?? "",
       date: initialData?.date
         ? toDateInputValue(initialData.date)

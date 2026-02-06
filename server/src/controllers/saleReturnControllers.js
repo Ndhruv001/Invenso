@@ -1,34 +1,29 @@
 /**
  * saleReturnControllers.js
- * Controllers for SaleReturn resource.
- * Wrap service calls with asyncHandler and respond with successResponse.
+ * Controllers for SaleReturn resource CRUD operations.
+ * Each controller method wraps service calls with asyncHandler.
+ * Uses successResponse for consistent response format.
  */
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as saleReturnServices from "../services/saleReturnServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /sale-returns
- * List sale returns with pagination, filters, search, and stats
+ * List sale returns with filters, pagination, search, stats
  */
 const listSaleReturns = asyncHandler(async (req, res) => {
-  const query = {
-    page: Number(req.query.page) || 1,
-    limit: Number(req.query.limit) || 10,
-    sortBy: req.query.sortBy || "date",
-    sortOrder: req.query.sortOrder || "desc",
-    search: req.query.search || "",
-    filters: req.query.filters || {},
-  };
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
-  if (typeof query.filters === "string") {
-    try {
-      query.filters = JSON.parse(query.filters);
-    } catch {
-      query.filters = {};
-    }
-  }
+  const query = {
+    page: Number(page) || 1,
+    limit: Number(limit) || 10,
+    sortBy: sortBy || "createdAt",
+    sortOrder: sortOrder || "desc",
+    search: search || "",
+    filters: rest
+  };
 
   const result = await saleReturnServices.listSaleReturns(query);
   return successResponse(res, "Sale returns fetched successfully", result, 200);
@@ -36,7 +31,7 @@ const listSaleReturns = asyncHandler(async (req, res) => {
 
 /**
  * GET /sale-returns/:id
- * Fetch sale return by ID
+ * Get sale return by ID with items and party
  */
 const getSaleReturn = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -46,47 +41,52 @@ const getSaleReturn = asyncHandler(async (req, res) => {
 
 /**
  * POST /sale-returns
- * Create new sale return
+ * Create new sale return with items, stock revert, payment adjustment, audit log
  */
 const createSaleReturn = asyncHandler(async (req, res) => {
-  const data = req.body;
+  const saleReturnData = req.body;
   const userId = req.user?.id || null;
-  const createdSaleReturn = await saleReturnServices.createSaleReturn(data, userId);
+
+  const createdSaleReturn = await saleReturnServices.createSaleReturn(saleReturnData, userId);
+
   return successResponse(res, "Sale return created successfully", createdSaleReturn, 201);
 });
 
 /**
  * PUT /sale-returns/:id
- * Update sale return
+ * Update sale return with item diff, stock re-adjustment, audit log
  */
 const updateSaleReturn = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  const data = req.body;
+  const updateData = req.body;
   const userId = req.user?.id || null;
-  const updatedSaleReturn = await saleReturnServices.updateSaleReturn(id, data, userId);
+
+  const updatedSaleReturn = await saleReturnServices.updateSaleReturn(id, updateData, userId);
+
   return successResponse(res, "Sale return updated successfully", updatedSaleReturn, 200);
 });
 
 /**
  * DELETE /sale-returns/:id
- * Delete sale return
+ * Delete sale return with stock re-apply, audit log
  */
 const deleteSaleReturn = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const userId = req.user?.id || null;
+
   const deleted = await saleReturnServices.deleteSaleReturn(id, userId);
   return successResponse(res, "Sale return deleted successfully", deleted, 200);
 });
 
 /**
- * POST /sale-returns/bulk-delete
- * Bulk delete sale returns by IDs
+ * GET /sale-returns/party-id/:partyId
+ * Get sale return suggestions by Party ID
  */
-const bulkDeleteSaleReturns = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await saleReturnServices.bulkDeleteSaleReturns(ids, userId);
-  return successResponse(res, "Sale returns deleted successfully", deleted, 200);
+const getSaleReturnsByPartyId = asyncHandler(async (req, res) => {
+  const partyId = Number(req.params.partyId);
+  const saleReturns = await saleReturnServices.getSaleReturnSuggestionsByPartyId(partyId);
+
+  return successResponse(res, "Sale return suggestions fetched successfully", saleReturns, 200);
 });
 
 export default {
@@ -95,13 +95,14 @@ export default {
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  bulkDeleteSaleReturns,
+  getSaleReturnsByPartyId
 };
+
 export {
   listSaleReturns,
   getSaleReturn,
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  bulkDeleteSaleReturns,
+  getSaleReturnsByPartyId
 };

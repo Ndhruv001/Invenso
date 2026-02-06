@@ -1,6 +1,7 @@
 /**
  * routes/saleReturnRoutes.js
- * Routes for SaleReturn resource with full CRUD and bulk delete support.
+ * Routes for SaleReturn resource.
+ * RESTful CRUD routes with validation and auth middleware.
  */
 
 import express from "express";
@@ -8,23 +9,19 @@ const router = express.Router();
 
 import saleReturnController from "../controllers/saleReturnControllers.js";
 import {
-  validateSaleReturn,
-  validateSaleReturnId,
-  validateSaleReturnQuery,
-  validateBulkDelete,
+  validateCreateSaleReturn,
+  validateUpdateSaleReturn,
+  validateSaleReturnId
 } from "../validations/saleReturnValidations.js";
 
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 
-// List sale returns
-router.get(
-  "/",
-  authMiddleware,
-  validateSaleReturnQuery,
-  validateRequest,
-  saleReturnController.listSaleReturns
-);
+// List sale returns with filters and stats
+router.get("/", authMiddleware, saleReturnController.listSaleReturns);
+
+// Get sale returns by Party ID (suggestions)
+router.get("/party-id/:partyId", authMiddleware, saleReturnController.getSaleReturnsByPartyId);
 
 // Get sale return by ID
 router.get(
@@ -39,7 +36,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
-  validateSaleReturn,
+  validateCreateSaleReturn,
   validateRequest,
   saleReturnController.createSaleReturn
 );
@@ -49,7 +46,7 @@ router.put(
   "/:id",
   authMiddleware,
   validateSaleReturnId,
-  validateSaleReturn,
+  validateUpdateSaleReturn,
   validateRequest,
   saleReturnController.updateSaleReturn
 );
@@ -61,15 +58,6 @@ router.delete(
   validateSaleReturnId,
   validateRequest,
   saleReturnController.deleteSaleReturn
-);
-
-// Bulk delete sale returns
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  saleReturnController.bulkDeleteSaleReturns
 );
 
 export default router;
