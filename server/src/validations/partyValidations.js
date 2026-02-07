@@ -1,134 +1,83 @@
 /**
- * validations/partyValidations.js
- * Validation rules for Party resource using express-validator.
+ * @file express-validator middlewares for party resource.
  */
 
 import { body, param, query } from "express-validator";
+import { PartyType } from "@prisma/client";
 
-// Validate fields on party creation and update
-const validateParty = [
-  body("name")
-    .notEmpty()
-    .withMessage("Party name is required")
-    .isLength({ max: 255 })
-    .withMessage("Name must be at most 255 characters"),
-  body("type")
-    .notEmpty()
-    .withMessage("Party type is required")
-    .isIn(["CUSTOMER", "SUPPLIER", "BOTH", "EMPLOYEE", "DRIVER", "OTHER"])
-    .withMessage("Invalid party type"),
-  body("balanceType")
-    .optional()
-    .isIn(["RECEIVABLE", "PAYABLE"])
-    .withMessage("Invalid balance type"),
-  body("phone")
-    .optional()
-    .isMobilePhone()
-    .withMessage("Invalid phone number"),
-  body("gstNumber")
-    .optional()
-    .isLength({ max: 15 })
-    .withMessage("GST number max length is 15"),
-  body("openingBalance")
-    .optional()
-    .isDecimal()
-    .withMessage("Opening balance must be a decimal number"),
-  body("currentBalance").optional().isDecimal().withMessage("Current balance must be decimal"),
-  body("address").optional().isString(),
-  body("remark").optional().isString(),
-];
+// Convert Prisma enums → arrays (IMPORTANT)
+const PARTY_TYPES = Object.values(PartyType);
 
+// --------------------
 // Validate party ID param
+// --------------------
 const validatePartyId = [
-  param("id").isInt({ gt: 0 }).withMessage("Valid party ID is required"),
-];
-
-// Validate query params for list (pagination, filters, search, sorting)
-
-const validatePartyQuery = [
-  // ✅ Pagination
-  query("page")
-    .optional()
-    .isInt({ min: 1 })
-    .toInt()
-    .withMessage("Page must be an integer >= 1"),
-
-  query("limit")
-    .optional()
-    .isInt({ min: 1 })
-    .toInt()
-    .withMessage("Limit must be an integer >= 1"),
-
-  // ✅ Sorting
-  query("sortBy")
-    .optional()
-    .isIn([
-      "id",
-      "name",
-      "identifier",
-      "type",
-      "phone",
-      "balanceType",
-      "currentBalance",
-      "openingBalance",
-      "createdAt",
-    ])
-    .withMessage("Invalid sortBy field"),
-
-  query("sortOrder")
-    .optional()
-    .isIn(["asc", "desc"])
-    .withMessage("Invalid sortOrder value"),
-
-  // ✅ Filters (safe JSON check + known keys)
-  query("filters")
-    .optional()
-    .custom((value) => {
-      if (typeof value === "string") {
-        try {
-          const parsed = JSON.parse(value);
-          const allowedKeys = ["type", "balanceType"];
-          const invalidKeys = Object.keys(parsed).filter(
-            (key) => !allowedKeys.includes(key)
-          );
-          if (invalidKeys.length > 0) {
-            throw new Error(`Invalid filter keys: ${invalidKeys.join(", ")}`);
-          }
-          return true;
-        } catch {
-          throw new Error("Invalid JSON for filters");
-        }
-      }
-      return true;
-    }),
-
-  // ✅ Search
-  query("search")
-    .optional()
-    .isString()
-    .trim()
-    .withMessage("Search must be a string"),
-];
-
-// Validate bulk delete request body
-const validateBulkDelete = [
-  body("ids")
-    .isArray({ min: 1 })
-    .withMessage("Array of party IDs is required"),
-  body("ids.*")
+  param("id")
+    .exists()
+    .withMessage("Party ID is required")
     .isInt({ gt: 0 })
-    .withMessage("Each party ID must be a positive integer"),
+    .withMessage("Party ID must be a positive integer")
+    .toInt()
 ];
 
-export {
-  validateParty,
-  validatePartyId,
-  validatePartyQuery,
-  validateBulkDelete,
-};
+// --------------------
+// Validate party create body
+// --------------------
+const validateCreateParty =[
+  body("name").exists().withMessage("Party name is required").isString().trim().notEmpty(),
+
+  body("type")
+    .exists()
+    .withMessage("Party type is required")
+    .isIn(PARTY_TYPES)
+    .withMessage(`Party type must be one of: ${PARTY_TYPES.join(", ")}`),
+
+  body("identifier").optional().isString().trim(),
+
+  body("phone").optional().isString().trim(),
+
+  body("gstNumber").optional().isString().trim(),
+
+  body("openingBalance").optional().isDecimal().toFloat(),
+
+  body("remark").optional().isString().trim()
+];
+
+// --------------------
+// Validate party update body
+// --------------------
+const validateUpdateParty = [
+  body("name").optional().isString().trim().notEmpty(),
+
+  body("type")
+    .optional()
+    .isIn(PARTY_TYPES)
+    .withMessage(`Party type must be one of: ${PARTY_TYPES.join(", ")}`),
+
+  body("identifier").optional().isString().trim(),
+
+  body("phone").optional().isString().trim(),
+
+  body("gstNumber").optional().isString().trim(),
+
+  body("openingBalance").optional().isDecimal().toFloat(),
+
+  body("remark").optional().isString().trim()
+];
+
+// --------------------
+// Validate query for suggest/search
+// --------------------
+const validateSuggest = [query("q").exists().isString().trim().notEmpty()];
+
+// --------------------
+// Exports
+// --------------------
+export { validateCreateParty, validateUpdateParty, validatePartyId, validateSuggest };
+
 export default {
-  validateParty,
+  validateCreateParty,
+  validateUpdateParty,
   validatePartyId,
-  validatePartyQuery,
-  validateBulkDelete,
+  validateSuggest
 };

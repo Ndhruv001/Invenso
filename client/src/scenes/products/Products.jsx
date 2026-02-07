@@ -114,40 +114,40 @@ const Products = () => {
     [activeProduct, updateProductMutation, handleCancel]
   );
 
-const handleDelete = useCallback(() => {
-  if (!selectedRows?.length) {
-    toast.error("No products selected");
-    return;
-  }
-
-  openDialog({
-    title: "Delete Selected Products",
-    message: `Are you sure you want to delete ${selectedRows.length} product(s)?`,
-    onConfirm: async () => {
-      try {
-        // Use Promise.allSettled to handle each delete safely
-        const results = await Promise.allSettled(
-          selectedRows.map(p => deleteProductMutation.mutateAsync(p.id))
-        );
-
-        const successCount = results.filter(r => r.status === "fulfilled").length;
-        const failedCount = results.length - successCount;
-
-        if (successCount > 0) {
-          toast.success(`${successCount} product(s) deleted successfully`);
-          handleSelectionChange([]);
-          refetch();
-        }
-
-        if (failedCount > 0) {
-          toast.error(`${failedCount} product(s) failed to delete`);
-        }
-      } catch (err) {
-        toast.error(err?.message || "Unexpected error during deletion");
-      }
+  const handleDelete = useCallback(() => {
+    if (!selectedRows?.length) {
+      toast.error("No products selected");
+      return;
     }
-  });
-}, [selectedRows, deleteProductMutation, openDialog, handleSelectionChange, refetch]);
+
+    openDialog({
+      title: "Delete Selected Products",
+      message: `Are you sure you want to delete ${selectedRows.length} product(s)?`,
+      onConfirm: async () => {
+        try {
+          // Use Promise.allSettled to handle each delete safely
+          const results = await Promise.allSettled(
+            selectedRows.map(p => deleteProductMutation.mutateAsync(p.id))
+          );
+
+          const successCount = results.filter(r => r.status === "fulfilled").length;
+          const failedCount = results.length - successCount;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} product(s) deleted successfully`);
+            handleSelectionChange([]);
+            refetch();
+          }
+
+          if (failedCount > 0) {
+            toast.error(`${failedCount} product(s) failed to delete`);
+          }
+        } catch (err) {
+          toast.error(err?.message || "Unexpected error during deletion");
+        }
+      }
+    });
+  }, [selectedRows, deleteProductMutation, openDialog, handleSelectionChange, refetch]);
 
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);

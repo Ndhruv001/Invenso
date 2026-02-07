@@ -1,49 +1,77 @@
-/**
- * routes/partyRoutes.js
- * Routes for Party resource.
- * Sets up RESTful endpoints with auth and validations.
- */
+// routes/partyRoutes.js
 
 import express from "express";
 const router = express.Router();
 
-import partyController from "../controllers/partyControllers.js";
+import authMiddleware from "../middlewares/authMiddleware.js";
 import {
-  validateParty,
+  validateCreateParty,
+  validateUpdateParty,
   validatePartyId,
-  validatePartyQuery,
-  validateBulkDelete,
+  validateSuggest
 } from "../validations/partyValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
-import authMiddleware from "../middlewares/authMiddleware.js";
+import partyController from "../controllers/partyControllers.js";
 
-// Party name suggestions for dropdown (with q param)
+/**
+ * ---------------------------
+ * STATIC & FEATURE ROUTES
+ * ---------------------------
+ */
+
+// Party name suggestions
 router.get(
   "/suggest",
   authMiddleware,
+  validateSuggest,
+  validateRequest,
   partyController.suggestPartyNames
 );
 
-// List parties with filters, pagination, sorting
-router.get("/", authMiddleware, validatePartyQuery, validateRequest, partyController.listParties);
+/**
+ * ---------------------------
+ * COLLECTION ROUTES
+ * ---------------------------
+ */
 
-// Get party by ID
-router.get("/:id", authMiddleware, validatePartyId, validateRequest, partyController.getParty);
+// List parties
+router.get("/", authMiddleware, partyController.listParties);
 
 // Create new party
-router.post("/", authMiddleware, validateParty, validateRequest, partyController.createParty);
+router.post(
+  "/",
+  authMiddleware,
+  validateCreateParty,
+  validateRequest,
+  partyController.createParty
+);
 
-// Update party by ID
+/**
+ * ---------------------------
+ * PARAMETERIZED ROUTES
+ * ---------------------------
+ */
+
+// Get single party
+router.get(
+  "/:id",
+  authMiddleware,
+  validatePartyId,
+  validateRequest,
+  partyController.getParty
+);
+
+// Update party
 router.put(
   "/:id",
   authMiddleware,
   validatePartyId,
-  validateParty,
+  validateUpdateParty,
   validateRequest,
   partyController.updateParty
 );
 
-// Soft delete party by ID
+// Delete party
 router.delete(
   "/:id",
   authMiddleware,
@@ -52,25 +80,5 @@ router.delete(
   partyController.deleteParty
 );
 
-// Bulk soft delete parties
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  partyController.bulkDeleteParties
-);
-
-// Global search parties (with q param)
-router.get(
-  "/search",
-  authMiddleware,
-  validateRequest,
-  partyController.globalSearchParties
-);
-
-
-
-
 export default router;
-export { router };
+export { router as partyRouter };

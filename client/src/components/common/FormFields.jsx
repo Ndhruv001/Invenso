@@ -29,23 +29,29 @@ export const TextField = React.memo(
   ({
     name,
     label,
+    defaultValue = "",
     placeholder,
     icon: Icon,
     type = "text",
     required = false,
     inputProps = {},
-    errors,
+    errors = {},
     register,
     isEditMode,
     initialData,
-    isDisabled,
+    isDisabled = false,
+    readOnly = false,
     theme
   }) => {
-    const hasError = Boolean(errors[name]?.message);
-    const errorMessage = errors[name]?.message;
+    const hasError = Boolean(errors?.[name]?.message);
+    const errorMessage = errors?.[name]?.message;
+
+    const shouldDisable = isDisabled || readOnly;
+
     return (
       <div>
         <FieldLabel required={required}>{label}</FieldLabel>
+
         <div className="relative">
           {Icon && (
             <Icon
@@ -53,26 +59,33 @@ export const TextField = React.memo(
               aria-hidden="true"
             />
           )}
+
           <input
             type={type}
-            {...register(name)}
             placeholder={!isEditMode && initialData ? "Not specified" : placeholder}
-            disabled={isDisabled}
             aria-invalid={hasError}
             aria-describedby={`${name}-error`}
-            className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-3 border rounded-xl ${
-              hasError
-                ? "border-red-300 bg-red-50"
-                : isDisabled
-                  ? "border-gray-100 bg-gray-50"
-                  : theme.border
-            } ${theme.text.primary} ${theme.bg} placeholder:${theme.text.muted}
-              outline-none transition-all ${
-                isEditMode && !isDisabled ? "focus:border-blue-500 cursor-text" : "cursor-default"
-              }`}
+            disabled={shouldDisable}
+            defaultValue={defaultValue}
+            readOnly={readOnly}
+            className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-3 border rounded-xl
+              ${
+                hasError
+                  ? "border-red-300 bg-red-50"
+                  : shouldDisable
+                    ? "border-gray-200 bg-gray-100 cursor-not-allowed"
+                    : theme.border
+              }
+              ${theme.text.primary} ${theme.bg}
+              placeholder:${theme.text.muted}
+              outline-none transition-all
+              ${!shouldDisable ? "focus:border-blue-500 cursor-text" : ""}
+            `}
+            {...(!readOnly && register ? register(name) : {})}
             {...inputProps}
           />
         </div>
+
         <FieldError message={errorMessage} />
       </div>
     );
@@ -186,8 +199,8 @@ export const SelectField = React.memo(
                   {opt}
                 </option>
               ) : (
-                <option key={opt.id} value={opt.id}>
-                  {opt.name}
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               )
             )}

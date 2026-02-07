@@ -1,4 +1,4 @@
-// src/validations/product.schema.js
+// src/validations/productValidations.js
 import * as Yup from "yup";
 import { UNIT_TYPES } from "@/constants/UNIT_TYPES";
 

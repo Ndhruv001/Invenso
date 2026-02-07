@@ -1,29 +1,22 @@
 /**
  * partyServices.js
- * Prisma-based services for Party resource.
+ * prisma-based services for Party resource.
  *
- * Supports:
- * - List with filters (partyType, balanceType), pagination, search, sorting, stats
+ * Mirrors Product service patterns:
+ * - List with filters, search, pagination, sorting, stats
  * - Get by ID
- * - Create with opening/current balance and audit log
- * - Update with balance adjustments and audit log
+ * - Create with opening balance logic
+ * - Update with opening balance adjustment logic
  * - Soft Delete with audit log
- * - Bulk delete with audit logs
- * - Custom global search
- * - Name suggestions for dropdowns
+ * - Name suggestions
  */
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
 /**
- * List parties with pagination, filters, search, and stats
- * @param {Object} params
- * @returns {Object} { data, pagination, stats }
- * 
+ * List parties with pagination, filters, search, stats
  */
-
-
 async function listParties({
   page = 1,
   limit = 10,
@@ -32,87 +25,107 @@ async function listParties({
   search = "",
   filters = {}
 }) {
-  const where = { isActive: true };
+  const where = {
+    isActive: true
+  };
 
-  // ✅ Apply filters
-  if (filters.partyType) where.type = (filters.partyType);
-  if (filters.balanceType) where.balanceType = (filters.balanceType);
+  /* -------------------- Filters -------------------- */
 
-  // ✅ Search across all relevant fields including foreign keys + numeric IDs
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
-
-    // Build OR conditions for string matches
-    const orConditions = [
-      { name: { contains: trimmedSearch, mode: "insensitive" } },
-      { identifier: { contains: trimmedSearch, mode: "insensitive" } },
-      { phone: { contains: trimmedSearch, mode: "insensitive" } },
-      { gstNumber: { contains: trimmedSearch, mode: "insensitive" } },
-      { remark: { contains: trimmedSearch, mode: "insensitive" } }
-    ];
-
-    // ✅ If search term is numeric, include numeric matches
-    if (!isNaN(Number(trimmedSearch))) {
-      const numericValue = Number(trimmedSearch);
-
-      orConditions.push(
-        { id: numericValue },
-        { openingBalance: numericValue },
-        { currentBalance: numericValue }
-      );
-    }
-
-    where.OR = orConditions;
+  if (filters.partyType) {
+    where.type = filters.partyType;
   }
 
-  // ✅ Pagination setup
+  if (filters.balanceType) {
+    switch (filters.balanceType) {
+      case "RECEIVABLE":
+        where.currentBalance = { lt: 0 };
+        break;
+      case "PAYABLE":
+        where.currentBalance = { gt: 0 };
+        break;
+      case "SETTLED":
+        where.currentBalance = 0;
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* -------------------- Search -------------------- */
+
+  if (search.trim()) {
+    const q = search.trim();
+
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { identifier: { contains: q, mode: "insensitive" } },
+      { phone: { contains: q, mode: "insensitive" } },
+      { gstNumber: { contains: q, mode: "insensitive" } },
+      { remark: { contains: q, mode: "insensitive" } }
+    ];
+
+    if (!isNaN(Number(q))) {
+      where.OR.push(
+        { id: Number(q) },
+        { openingBalance: Number(q) },
+        { currentBalance: Number(q) }
+      );
+    }
+  }
+
+  /* -------------------- Pagination -------------------- */
+
   const skip = (page - 1) * limit;
-  const take = limit;
 
-  // ✅ Count total rows
-  const totalRows = await prisma.party.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
+  /* -------------------- DB Transaction -------------------- */
 
-  // ✅ Fetch data with sorting + relations
-  const data = await prisma.party.findMany({
-    where,
-    orderBy: { [sortBy]: sortOrder },
-    skip,
-    take,
-  });
+  const [parties, totalRows, balanceRows] = await prisma.$transaction([
+    prisma.party.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { [sortBy]: sortOrder }
+    }),
 
-  // ✅ Stats (filtered scope, not all)
-  const [totalParty, totalReceivable, totalPayable, totalOpeningBalance] = await Promise.all([
-    prisma.party.count({ where }), // same filter
+    prisma.party.count({ where }),
 
-    prisma.party
-      .aggregate({
-        where: { ...where},
-        _sum: { currentBalance: true }
-      })
-      .then(res => Number(res._sum.currentBalance) || 0),
-
-    prisma.party
-      .aggregate({
-        where: { ...where },
-        _sum: { currentBalance: true }
-      })
-      .then(res => Number(res._sum.currentBalance) || 0),
-
-    prisma.party
-      .aggregate({
-        where,
-        _sum: { openingBalance: true }
-      })
-      .then(res => Number(res._sum.openingBalance) || 0)
+    prisma.party.findMany({
+      where,
+      select: {
+        currentBalance: true,
+        openingBalance: true
+      }
+    })
   ]);
 
-  // ✅ Final response
+  /* -------------------- Derived Stats -------------------- */
+
+  const totalReceivable = balanceRows.reduce((sum, p) => {
+    const bal = Number(p.currentBalance) || 0;
+    return bal < 0 ? sum + Math.abs(bal) : sum;
+  }, 0);
+
+  const totalPayable = balanceRows.reduce((sum, p) => {
+    const bal = Number(p.currentBalance) || 0;
+    return bal > 0 ? sum + bal : sum;
+  }, 0);
+
+  const totalOpeningBalance = balanceRows.reduce((sum, p) => {
+    return sum + Number(p.openingBalance || 0);
+  }, 0);
+
+  /* -------------------- Response -------------------- */
+
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
+    data: parties,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
     stats: {
-      totalParty,
+      totalParties: totalRows,
       totalReceivable,
       totalPayable,
       totalOpeningBalance
@@ -122,13 +135,13 @@ async function listParties({
 
 /**
  * Get party by ID
- * @param {number} id
- * @returns party object
  */
 async function getPartyById(id) {
   if (!id) throw new AppError("Party ID is required", 400);
 
-  const party = await prisma.party.findUnique({ where: { id } });
+  const party = await prisma.party.findUnique({
+    where: { id }
+  });
 
   if (!party || !party.isActive) throw new AppError("Party not found", 404);
 
@@ -136,26 +149,32 @@ async function getPartyById(id) {
 }
 
 /**
- * Create party with opening/current balance and audit log
- * Wraps in transaction for atomicity
- * @param {Object} data party data
- * @param {number|null} userId optional user ID for audit log
- * @returns created party
+ * Create party with opening balance logic
  */
 async function createParty(data, userId = null) {
-  const openingBalance = Number(data.openingBalance) || 0;
+  return prisma.$transaction(async tx => {
+    const openingBalance =
+      data.openingBalance !== undefined ? Number(data.openingBalance) : undefined;
 
-  return await prisma.$transaction(async tx => {
-    // Create party with currentBalance set to openingBalance or zero
-    const party = await tx.party.create({
-      data: {
-        ...data,
+    const partyData = {
+      name: data.name,
+      type: data.type,
+
+      ...(data.identifier !== undefined && { identifier: data.identifier }),
+      ...(data.phone !== undefined && { phone: data.phone }),
+      ...(data.gstNumber !== undefined && { gstNumber: data.gstNumber }),
+      ...(data.remark !== undefined && { remark: data.remark }),
+
+      ...(openingBalance !== undefined && {
         openingBalance,
         currentBalance: openingBalance
-      }
+      })
+    };
+
+    const party = await tx.party.create({
+      data: partyData
     });
 
-    // Create audit log for party creation
     await tx.auditLog.create({
       data: {
         tableName: "parties",
@@ -171,39 +190,69 @@ async function createParty(data, userId = null) {
 }
 
 /**
- * Update party data including balances with audit logs
- * Wraps in transaction
- * @param {number} id
- * @param {Object} data update data
- * @param {number|null} userId audit user id
- * @returns updated party
+ * Update party with opening balance adjustment logic
  */
 async function updateParty(id, data, userId = null) {
   if (!id) throw new AppError("Party ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
-    const existing = await tx.party.findUnique({ where: { id } });
-    if (!existing || !existing.isActive) throw new AppError("Party not found", 404);
+  return prisma.$transaction(async tx => {
+    const existing = await tx.party.findUnique({
+      where: { id }
+    });
 
-    const openingBalancePrev = Number(existing.openingBalance) || 0;
-    const openingBalanceNew =
-      data.openingBalance !== undefined ? Number(data.openingBalance) : openingBalancePrev;
+    if (!existing || !existing.isActive) {
+      throw new AppError("Party not found", 404);
+    }
 
-    const updateData = { ...data };
+    const updateData = {};
 
-    // If openingBalance changed, update currentBalance by the difference
-    if (openingBalanceNew !== openingBalancePrev) {
-      const diff = openingBalanceNew - openingBalancePrev;
+    if (data.name !== undefined && data.name !== existing.name) {
+      updateData.name = data.name;
+    }
+
+    if (data.type !== undefined && data.type !== existing.type) {
+      updateData.type = data.type;
+    }
+
+    if (data.identifier !== undefined && data.identifier !== existing.identifier) {
+      updateData.identifier = data.identifier;
+    }
+
+    if (data.phone !== undefined && data.phone !== existing.phone) {
+      updateData.phone = data.phone;
+    }
+
+    if (data.gstNumber !== undefined && data.gstNumber !== existing.gstNumber) {
+      updateData.gstNumber = data.gstNumber;
+    }
+
+    if (data.remark !== undefined && data.remark !== existing.remark) {
+      updateData.remark = data.remark;
+    }
+
+    /* -------- OPENING BALANCE ADJUSTMENT (CORE LOGIC) -------- */
+
+    if (
+      data.openingBalance !== undefined &&
+      Number(data.openingBalance) !== Number(existing.openingBalance)
+    ) {
+      const oldOpening = Number(existing.openingBalance) || 0;
+      const newOpening = Number(data.openingBalance);
+      const diff = newOpening - oldOpening;
+
+      updateData.openingBalance = newOpening;
       updateData.currentBalance = (Number(existing.currentBalance) || 0) + diff;
     }
 
-    // Update party
-    const updatedParty = await tx.party.update({
-      where: { id },
-      data: updateData
-    });
+    let updatedParty = existing;
 
-    // Audit log for update
+    if (Object.keys(updateData).length > 0) {
+      updatedParty = await tx.party.update({
+        where: { id },
+        data: updateData
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         tableName: "parties",
@@ -220,15 +269,12 @@ async function updateParty(id, data, userId = null) {
 }
 
 /**
- * Soft delete party by ID
- * @param {number} id
- * @param {number|null} userId optional user id
- * @returns boolean success
+ * Soft delete party
  */
 async function deleteParty(id, userId = null) {
   if (!id) throw new AppError("Party ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
     const existing = await tx.party.findUnique({ where: { id } });
     if (!existing || !existing.isActive) throw new AppError("Party not found", 404);
 
@@ -252,105 +298,30 @@ async function deleteParty(id, userId = null) {
 }
 
 /**
- * Bulk soft delete parties by IDs
- * @param {number[]} ids
- * @param {number|null} userId
- * @returns boolean success
- */
-async function bulkDeleteParties(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of party IDs is required", 400);
-  }
-
-  return await prisma.$transaction(async tx => {
-    const existingParties = await tx.party.findMany({
-      where: { id: { in: ids }, isActive: true }
-    });
-
-    if (existingParties.length !== ids.length) throw new AppError("Some parties not found", 404);
-
-    await tx.party.updateMany({
-      where: { id: { in: ids } },
-      data: { isActive: false }
-    });
-
-    await Promise.all(
-      existingParties.map(party =>
-        tx.auditLog.create({
-          data: {
-            tableName: "parties",
-            recordId: String(party.id),
-            action: "DELETE",
-            oldValue: JSON.stringify(party),
-            userId
-          }
-        })
-      )
-    );
-
-    return true;
-  });
-}
-
-/**
- * Global search parties across searchable fields
- * @param {string} searchStr
- * @returns {Array}
- */
-async function globalSearchParties(searchStr) {
-  if (!searchStr || typeof searchStr !== "string") return [];
-
-  const trimmedSearch = searchStr.trim();
-  if (trimmedSearch === "") return [];
-
-  const fields = ["name", "identifier", "phone", "gstNumber", "address", "remark"];
-
-  const where = {
-    isActive: true,
-    OR: fields.map(field => ({
-      [field]: { contains: trimmedSearch, mode: "insensitive" }
-    }))
-  };
-
-  const parties = await prisma.party.findMany({ where });
-  return parties;
-}
-
-/**
- * Suggest party names for dropdown (limit 10)
- * @param {string} query
- * @returns {Array<{id: number, name: string}>}
+ * Suggest party names
  */
 async function suggestPartyNames(query) {
   if (!query || typeof query !== "string") return [];
 
-  return await prisma.party.findMany({
+  return prisma.party.findMany({
     where: {
       isActive: true,
-      name: { contains: query.trim(), mode: "insensitive" }
+      name: {
+        contains: query.trim(),
+        mode: "insensitive"
+      }
     },
-    take: 5,
-    orderBy: { name: "asc" },
+    take: 5
   });
 }
 
-export {
-  listParties,
-  getPartyById,
-  createParty,
-  updateParty,
-  deleteParty,
-  bulkDeleteParties,
-  globalSearchParties,
-  suggestPartyNames
-};
+export { listParties, getPartyById, createParty, updateParty, deleteParty, suggestPartyNames };
+
 export default {
   listParties,
   getPartyById,
   createParty,
   updateParty,
   deleteParty,
-  bulkDeleteParties,
-  globalSearchParties,
   suggestPartyNames
 };

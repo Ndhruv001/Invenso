@@ -5,7 +5,6 @@ import {
   createParty,
   updateParty,
   deleteParty,
-  bulkDeleteParties,
   suggestParties
 } from "@/services/partyServices";
 
@@ -90,25 +89,12 @@ export const useDeleteParty = () => {
   });
 };
 
-export const useBulkDeleteParties = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationKey: ["bulk-delete-parties"],
-    mutationFn: bulkDeleteParties,
-    onSuccess: ids => {
-      queryClient.invalidateQueries({ queryKey: PARTY_KEYS.all });
-      ids?.forEach(id => queryClient.removeQueries({ queryKey: PARTY_KEYS.detail(id) }));
-    }
-  });
-};
-
 export const usePartySuggestions = query => {
   return useQuery({
     queryKey: ["party-suggestions", query],
     queryFn: () => suggestParties(query),
     enabled: !!query && query.length >= 2, // ⬅ important
-    staleTime: 60 * 1000,
+    staleTime: 60 * 1000
   });
 };
 
@@ -121,7 +107,5 @@ export default {
   useCreateParty,
   useUpdateParty,
   useDeleteParty,
-  useBulkDeleteParties,
-  usePartySuggestions,
-  PARTY_KEYS
+  usePartySuggestions
 };

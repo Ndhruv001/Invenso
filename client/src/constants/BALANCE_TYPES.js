@@ -1,4 +1,4 @@
-export const BALANCE_TYPES = ["RECEIVABLE", "PAYABLE"];
+export const BALANCE_TYPES = ["RECEIVABLE", "PAYABLE", "SETTLED"];
 
 export const BALANCE_TYPE_OPTIONS = BALANCE_TYPES.map(v => ({
   value: v,

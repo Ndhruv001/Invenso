@@ -9,7 +9,7 @@ import { usePartyFilterOptions } from "@/hooks/usePartyFilterOptions";
 
 import Columns from "./Columns";
 import PartyModal from "./PartyModal";
-import PartiesSummaryStats from "./PartySummaryStats";
+import PartiesSummaryStats from "./PartiesSummaryStats";
 import ActionRibbon from "@/components/common/ActionRibbon";
 import DataTable from "@/components/common/DataTable";
 import DataFilter from "@/components/common/DataFilter";
@@ -52,7 +52,6 @@ const Parties = () => {
 
   // Party data
   const { data: partiesData, refetch, ...queryStatus } = useParties(filters);
-  console.log("🚀 ~ Parties ~ partiesData:", partiesData)
   const parties = partiesData?.data ?? [];
   const totalRows = partiesData?.pagination?.totalRows ?? 0;
 

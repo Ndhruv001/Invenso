@@ -91,7 +91,7 @@ export const useDeleteProduct = () => {
 
   return useMutation({
     mutationKey: ["delete-product"],
-    mutationFn: (id) => deleteProduct(id),
+    mutationFn: id => deleteProduct(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.detail(id) });
@@ -99,13 +99,12 @@ export const useDeleteProduct = () => {
   });
 };
 
-
 export const useProductSuggestions = query => {
   return useQuery({
     queryKey: ["product-suggestions", query],
     queryFn: () => suggestProducts(query),
     enabled: !!query && query.length >= 2, // ⬅ important
-    staleTime: 60 * 1000,
+    staleTime: 60 * 1000
   });
 };
 
@@ -119,5 +118,4 @@ export default {
   useUpdateProduct,
   useDeleteProduct,
   useProductSuggestions,
-  PRODUCT_KEYS
 };

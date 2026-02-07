@@ -1,20 +1,22 @@
+// controllers/partyControllers.js
+
 /**
- * partyControllers.js
- * Controllers for Party resource.
- * Handles request/response, calls partyServices functions wrapped in asyncHandler.
- * Uses successResponse for consistent API success responses.
+ * @file Controllers for Party resource.
+ * Orchestrates requests/responses.
+ * Wraps service calls in asyncHandler and sends structured success responses.
  */
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as partyServices from "../services/partyServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /parties
- * List parties with pagination, filters, search, stats
+ * Query params: page, limit, sortBy, sortOrder, search, filters
+ * Returns paginated list of parties with filters and aggregates.
  */
 const listParties = asyncHandler(async (req, res) => {
- const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
   const query = {
     page: Number(page) || 1,
@@ -22,7 +24,7 @@ const listParties = asyncHandler(async (req, res) => {
     sortBy: sortBy || "createdAt",
     sortOrder: sortOrder || "desc",
     search: search || "",
-    filters: rest || {} 
+    filters: rest || {}
   };
 
   const result = await partyServices.listParties(query);
@@ -31,7 +33,7 @@ const listParties = asyncHandler(async (req, res) => {
 
 /**
  * GET /parties/:id
- * Get party by ID
+ * Fetch single party by ID.
  */
 const getParty = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -41,7 +43,8 @@ const getParty = asyncHandler(async (req, res) => {
 
 /**
  * POST /parties
- * Create a new party
+ * Create a new party.
+ * Expects party data in req.body.
  */
 const createParty = asyncHandler(async (req, res) => {
   const partyData = req.body;
@@ -52,10 +55,11 @@ const createParty = asyncHandler(async (req, res) => {
 
 /**
  * PUT /parties/:id
- * Update existing party by ID
+ * Update existing party by ID.
+ * Expects update data in req.body.
  */
 const updateParty = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number(req.params?.id);
   const updateData = req.body;
   const userId = req.user?.id || null;
   const updatedParty = await partyServices.updateParty(id, updateData, userId);
@@ -64,39 +68,18 @@ const updateParty = asyncHandler(async (req, res) => {
 
 /**
  * DELETE /parties/:id
- * Soft delete party by ID
+ * Soft delete party by ID.
  */
 const deleteParty = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number(req.params?.id);
   const userId = req.user?.id || null;
   const deleted = await partyServices.deleteParty(id, userId);
   return successResponse(res, "Party deleted successfully", deleted, 200);
 });
 
 /**
- * POST /parties/bulk-delete
- * Bulk soft delete parties by array of IDs
- */
-const bulkDeleteParties = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await partyServices.bulkDeleteParties(ids, userId);
-  return successResponse(res, "Parties deleted successfully", deleted, 200);
-});
-
-/**
- * GET /parties/search?q=
- * Global search parties on several fields
- */
-const globalSearchParties = asyncHandler(async (req, res) => {
-  const query = req.query?.q || "";
-  const results = await partyServices.globalSearchParties(query);
-  return successResponse(res, "Parties search results", results, 200);
-});
-
-/**
  * GET /parties/suggest?q=
- * Suggest party names (limit 10) for dropdown
+ * Suggest party names for dropdown
  */
 const suggestPartyNames = asyncHandler(async (req, res) => {
   const query = req.query.q || "";
@@ -110,17 +93,7 @@ export default {
   createParty,
   updateParty,
   deleteParty,
-  bulkDeleteParties,
-  globalSearchParties,
-  suggestPartyNames,
+  suggestPartyNames
 };
-export {
-  listParties,
-  getParty,
-  createParty,
-  updateParty,
-  deleteParty,
-  bulkDeleteParties,
-  globalSearchParties,
-  suggestPartyNames,
-};
+
+export { listParties, getParty, createParty, updateParty, deleteParty, suggestPartyNames };

@@ -1,5 +1,12 @@
 import axiosInstance from "@/lib/config/axiosInstance";
 
+/**
+ * Party Service Layer
+ * Handles all HTTP requests related to parties.
+ * Each function returns parsed data (not the full Axios response).
+ * Errors are rethrown for React Query or UI to handle.
+ */
+
 // --------------------------------------------------
 // Helpers
 // --------------------------------------------------
@@ -15,7 +22,7 @@ const handleAxiosError = (error, defaultMsg) => {
 // --------------------------------------------------
 
 /**
- * Fetches all parties with optional filters, pagination, and sorting.
+ * Fetches parties list with filters, pagination, and sorting.
  * @param {Object} filters - Filtering and pagination options.
  * @returns {Promise<Object>} Paginated { data, pagination, stats }
  */
@@ -29,10 +36,12 @@ export const getParties = async (filters = {}) => {
     if (filters.sortBy) params.append("sortBy", filters.sortBy);
     if (filters.sortOrder) params.append("sortOrder", filters.sortOrder);
 
-    // Flatten filterOptions object
+    // Flatten nested filterOptions to query params
     if (filters.filterOptions) {
       for (const [key, value] of Object.entries(filters.filterOptions)) {
-        if (value !== undefined && value !== null && value !== "") params.append(key, value);
+        if (value !== undefined && value !== null && value !== "") {
+          params.append(key, value);
+        }
       }
     }
 
@@ -62,8 +71,8 @@ export const getParty = async id => {
 
 /**
  * Creates a new party.
- * @param {Object} partyData - Party details
- * @returns {Promise<Object>}
+ * @param {Object} partyData - Party details to create
+ * @returns {Promise<Object>} Created party
  */
 export const createParty = async partyData => {
   try {
@@ -80,10 +89,10 @@ export const createParty = async partyData => {
 };
 
 /**
- * Updates an existing party.
+ * Updates an existing party by ID.
  * @param {number} id - Party ID
  * @param {Object} updateData - Fields to update
- * @returns {Promise<Object>}
+ * @returns {Promise<Object>} Updated party
  */
 export const updateParty = async (id, updateData) => {
   if (!id) throw new Error("Party ID is required");
@@ -93,8 +102,7 @@ export const updateParty = async (id, updateData) => {
     return data;
   } catch (error) {
     if (error.response?.status === 404) throw new Error("Party not found or already deleted");
-    if (error.response?.status === 409)
-      throw new Error("Party has been modified. Please refresh.");
+    if (error.response?.status === 409) throw new Error("Party has been modified. Please refresh.");
     handleAxiosError(error, `Failed to update party ${id}`);
   }
 };
@@ -113,44 +121,28 @@ export const deleteParty = async id => {
   } catch (error) {
     if (error.response?.status === 404) throw new Error("Party not found or already deleted");
     if (error.response?.status === 409)
-      throw new Error("Cannot delete party. It may be linked to purchases or sales.");
+      throw new Error("Cannot delete party. It may be used in transactions.");
     handleAxiosError(error, `Failed to delete party ${id}`);
   }
 };
 
 /**
- * Soft deletes multiple parties by IDs.
- * @param {number[]} ids - Array of party IDs
- * @returns {Promise<Object>}
+ * Suggest party names for dropdown
+ * @param {string} query
+ * @returns {Promise<Array>}
  */
-export const bulkDeleteParties = async ids => {
-  if (!Array.isArray(ids) || ids.length === 0)
-    throw new Error("IDs array is required for bulk delete");
-
-  try {
-    const { data } = await axiosInstance.delete(`/parties/bulk-delete`, {
-      data: { ids },
-    });
-    return data;
-  } catch (error) {
-    handleAxiosError(error, "Failed to bulk delete parties");
-  }
-};
-
 export const suggestParties = async query => {
   if (!query) return [];
 
   try {
     const { data } = await axiosInstance.get(`/parties/suggest`, {
-      params: { q: query },
+      params: { q: query }
     });
     return data;
   } catch (error) {
     handleAxiosError(error, "Failed to fetch party suggestions");
   }
 };
-
-
 
 // Named export group
 export const partiesApi = {
@@ -159,7 +151,7 @@ export const partiesApi = {
   createParty,
   updateParty,
   deleteParty,
-  bulkDeleteParties,
+  suggestParties
 };
 
 export default partiesApi;

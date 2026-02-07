@@ -178,7 +178,6 @@ async function getProductById(id) {
  */
 async function createProduct(data, userId = null) {
   return prisma.$transaction(async tx => {
-
     // Normalize numeric inputs (Decimal-safe)
     const openingStock = data.openingStock !== undefined ? Number(data.openingStock) : undefined;
     const threshold = data.threshold !== undefined ? Number(data.threshold) : undefined;
@@ -295,7 +294,7 @@ async function updateProduct(id, data, userId = null) {
     if (data.description !== undefined && data.description !== existing.description) {
       updateData.description = data.description;
     }
-    
+
     // 9. Date
     if (data.date !== undefined && data.date !== existing.date) {
       updateData.date = data.date;
@@ -398,8 +397,7 @@ async function suggestProductNames(query) {
       name: {
         contains: query.trim(),
         mode: "insensitive"
-      },
-
+      }
     },
     take: 5
   });

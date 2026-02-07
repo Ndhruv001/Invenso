@@ -10,7 +10,7 @@ import StatCard from "@/components/common/StatCard";
 /**
  * @typedef {Object} PartySummaryStatsProps
  * @property {Object} stats - API stats object.
- * @property {number} stats.totalParty
+ * @property {number} stats.totalParties
  * @property {number} stats.totalReceivable
  * @property {number} stats.totalPayable
  * @property {number} stats.totalOpeningBalance
@@ -26,7 +26,7 @@ const PartySummaryStats = ({ stats }) => {
   const items = [
     {
       title: "Total Parties",
-      value: stats?.totalParty ?? 0,
+      value: stats?.totalParties ?? 0,
       subtitle: "Active registered parties",
       icon: Users,
       color: "default",

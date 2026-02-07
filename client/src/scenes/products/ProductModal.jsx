@@ -1,17 +1,7 @@
 import React, { useMemo, useEffect, useState, useCallback, use } from "react";
-import {
-  Save,
-  X,
-  Package,
-  Hash,
-  Layers,
-  Scale,
-  Edit3,
-  Target,
-  FileText,
-} from "lucide-react";
+import { Save, X, Package, Hash, Layers, Scale, Edit3, Target, FileText } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
-import {productCreateSchema, productUpdateSchema} from "@/validations/productValidations";
+import { productCreateSchema, productUpdateSchema } from "@/validations/productValidations";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
@@ -26,15 +16,13 @@ const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
   const updatePayload = {};
 
   Object.keys(fieldsUserModified).forEach(fieldName => {
-    if(fieldsUserModified[fieldName]){
-
+    if (fieldsUserModified[fieldName]) {
       updatePayload[fieldName] = currentFormValues[fieldName];
     }
   });
 
   return updatePayload;
 };
-
 
 const ProductModal = ({
   onSubmit,
@@ -43,8 +31,6 @@ const ProductModal = ({
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-
-
   const { theme } = useTheme();
   const { data: productCategories } = useCategories("PRODUCT");
 
@@ -69,12 +55,11 @@ const ProductModal = ({
 
   // React Hook Form setup (maintains controlled form state)
   const {
-  register,
-  handleSubmit,
-  reset,
-  formState: { errors, isSubmitting, isDirty, dirtyFields }
-} = useForm({
-
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting, isDirty, dirtyFields }
+  } = useForm({
     defaultValues,
     resolver: initialData ? yupResolver(productUpdateSchema) : yupResolver(productCreateSchema),
     mode: "onSubmit",
@@ -88,44 +73,40 @@ const ProductModal = ({
   const isDisabled = !isEditMode || isSubmitting || isLoading;
 
   const submitHandler = handleSubmit(
-  currentFormValues => {
-    let updatePayload = currentFormValues;
+    currentFormValues => {
+      let updatePayload = currentFormValues;
 
-    // EDIT MODE → send only changed fields
-    if (initialData) {
-      updatePayload = extractModifiedFields(
-        currentFormValues,
-        dirtyFields
-      );
+      // EDIT MODE → send only changed fields
+      if (initialData) {
+        updatePayload = extractModifiedFields(currentFormValues, dirtyFields);
 
-      if (Object.keys(updatePayload).length === 0) {
-        toast.info("No changes detected");
-        return;
+        if (Object.keys(updatePayload).length === 0) {
+          toast.info("No changes detected");
+          return;
+        }
+      }
+
+      onSubmit(updatePayload);
+
+      // CREATE MODE → reset form
+      if (!initialData) {
+        reset(defaultValues);
+      }
+
+      // EDIT MODE → close modal
+      if (initialData && isEditMode) {
+        onCancel();
+        setIsEditMode(false);
+      }
+    },
+    formErrors => {
+      if (Object.keys(formErrors).length > 0) {
+        toast.error("Please fix validation errors before submitting.");
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
       }
     }
-
-    onSubmit(updatePayload);
-
-    // CREATE MODE → reset form
-    if (!initialData) {
-      reset(defaultValues);
-    }
-
-    // EDIT MODE → close modal
-    if (initialData && isEditMode) {
-      onCancel();
-      setIsEditMode(false);
-    }
-  },
-  formErrors => {
-    if (Object.keys(formErrors).length > 0) {
-      toast.error("Please fix validation errors before submitting.");
-    } else {
-      toast.error("An unexpected error occurred. Please try again.");
-    }
-  }
-);
-
+  );
 
   const handleCancel = useCallback(() => {
     if (initialData && isEditMode && isDirty) {

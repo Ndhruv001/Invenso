@@ -3,23 +3,6 @@ import { formatCurrency } from "@/lib/helpers/formatters";
 import { useTheme } from "@/hooks/useTheme";
 
 /**
- * Badge to display balance type with color coding.
- * Payable = Red | Receivable = Green
- */
-const BalanceTypeBadge = ({ type }) => {
-  const colors = {
-    RECEIVABLE: "text-green-600",
-    PAYABLE: "text-red-600",
-  };
-
-  return (
-    <span className={`font-semibold text-sm ${colors[type] || "text-gray-500"}`}>
-      {type.charAt(0) + type.slice(1).toLowerCase()}
-    </span>
-  );
-};
-
-/**
  * Badge to display party type.
  * Subtle color difference for visual variety.
  */
@@ -30,7 +13,7 @@ const PartyTypeBadge = ({ type }) => {
     BOTH: "text-teal-600",
     EMPLOYEE: "text-blue-600",
     DRIVER: "text-emerald-600",
-    OTHER: "text-gray-500",
+    OTHER: "text-gray-500"
   };
 
   return (
@@ -56,7 +39,7 @@ const PartyColumns = (showSelection = false) => {
           #{String(getValue()).padStart(4, "0")}
         </span>
       ),
-      size: 70,
+      size: 70
     },
     {
       accessorKey: "name",
@@ -70,7 +53,7 @@ const PartyColumns = (showSelection = false) => {
           {getValue()}
         </span>
       ),
-      minSize: 180,
+      minSize: 180
     },
     {
       accessorKey: "identifier",
@@ -83,13 +66,13 @@ const PartyColumns = (showSelection = false) => {
           {getValue() || "—"}
         </span>
       ),
-      size: 150,
+      size: 150
     },
     {
       accessorKey: "type",
       header: "Party Type",
       cell: ({ getValue }) => <PartyTypeBadge type={getValue()} />,
-      size: 120,
+      size: 120
     },
     {
       accessorKey: "phone",
@@ -99,42 +82,40 @@ const PartyColumns = (showSelection = false) => {
           {getValue() || "—"}
         </span>
       ),
-      size: 140,
+      size: 140
+    },
+    {
+      accessorKey: "gstNumber",
+      header: "GST Number",
+      cell: ({ getValue }) => (
+        <span className="text-sm font-medium" style={{ color: theme.text.primary }}>
+          {getValue() || "—"}
+        </span>
+      ),
+      size: 140
     },
     {
       accessorKey: "openingBalance",
       header: "Opening Balance",
       cell: ({ getValue }) => (
-        <span
-          className="font-semibold block text-right"
-          style={{ color: theme.text.primary }}
-        >
+        <span className="font-semibold block text-right" style={{ color: theme.text.primary }}>
           {formatCurrency(getValue())}
         </span>
       ),
       size: 140,
-      meta: { align: "right" },
+      meta: { align: "right" }
     },
     {
       accessorKey: "currentBalance",
       header: "Current Balance",
       cell: ({ getValue }) => (
-        <span
-          className="font-semibold block text-right"
-          style={{ color: theme.text.primary }}
-        >
+        <span className="font-semibold block text-right" style={{ color: theme.text.primary }}>
           {formatCurrency(getValue())}
         </span>
       ),
       size: 140,
-      meta: { align: "right" },
-    },
-    {
-      accessorKey: "balanceType",
-      header: "Balance Type",
-      cell: ({ getValue }) => <BalanceTypeBadge type={getValue()} />,
-      size: 130,
-    },
+      meta: { align: "right" }
+    }
   ];
 
   // ✅ Prepend checkbox column if selection is enabled
@@ -170,7 +151,7 @@ const PartyColumns = (showSelection = false) => {
       ),
       enableSorting: false,
       enableHiding: false,
-      size: 50,
+      size: 50
     });
   }
 
