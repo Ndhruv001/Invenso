@@ -1,67 +1,97 @@
-import * as yup from "yup";
+// src/validations/paymentValidations.js
+import * as Yup from "yup";
+import PAYMENT_MODES from "@/constants/PAYMENT_MODES"; // from your enum
+import PAYMENT_TYPES from "@/constants/PAYMENT_TYPES";
+import PAYMENT_REFERENCE from "@/constants/PAYMENT_REFERENCES";
 
 /**
- * Payment Validation Schema
- * -------------------------
- * Derived from Prisma model `Payment` and backend logic in listPayments service.
- * Fields: partyId, type, amount, paymentReference, remark, referenceType, referenceId, paymentMode, date
+ * ---------------------------
+ * CREATE PAYMENT
+ * ---------------------------
  */
+const paymentCreateSchema = Yup.object({
+  date: Yup.date().typeError("Invalid payment date").required("Payment date is required"),
 
-const paymentValidations = yup.object().shape({
-  partyId: yup
-    .number()
-    .typeError("Party is required")
-    .required("Party is required"),
+  partyId: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === "" || originalValue === null ? null : value
+    )
+    .integer("Party must be valid")
+    .positive("Party must be valid")
+    .nullable(),
 
-  type: yup
-    .string()
-    .required("Payment type is required")
-    .oneOf(["RECEIVED", "PAID"], "Invalid payment type"),
+  type: Yup.string()
+    .oneOf(PAYMENT_TYPES, "Invalid payment type")
+    .required("Payment type is required"),
 
-  amount: yup
-    .number()
+  amount: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === "" || originalValue === null ? 0 : value
+    )
     .typeError("Amount must be a number")
-    .positive("Amount must be greater than 0")
-    .max(999999999.99, "Amount is too large")
+    .positive("Amount must be greater than zero")
     .required("Amount is required"),
 
-  paymentReference: yup
-    .string()
+  paymentMode: Yup.string()
+    .oneOf(PAYMENT_MODES, "Invalid payment mode")
+    .required("Payment mode is required"),
+
+  paymentReference: Yup.string()
+    .trim()
     .nullable()
-    .transform(value => (value === "" ? null : value))
-    .max(50, "Payment reference must not exceed 50 characters"),
+    .max(100, "Payment reference must be less than 100 characters"),
 
-  remark: yup
-    .string()
+  remark: Yup.string().trim().nullable().max(500, "Remark must be less than 500 characters"),
+
+  referenceType: Yup.string()
+    .oneOf(PAYMENT_REFERENCE, "Invalid reference type")
+    .required("Reference type is required"),
+
+  // ---- Reference IDs (logic handled in backend) ----
+  purchaseId: Yup.number().integer().positive().nullable(),
+
+  saleId: Yup.number().integer().positive().nullable(),
+
+  purchaseReturnId: Yup.number().integer().positive().nullable(),
+
+  saleReturnId: Yup.number().integer().positive().nullable(),
+
+  transportId: Yup.number().integer().positive().nullable()
+}).noUnknown(true);
+
+/**
+ * ---------------------------
+ * UPDATE PAYMENT
+ * ---------------------------
+ */
+const paymentUpdateSchema = Yup.object({
+  date: Yup.date().typeError("Invalid payment date").notRequired(),
+
+  partyId: Yup.number()
+    .integer("Party must be valid")
+    .positive("Party must be valid")
     .nullable()
-    .transform(value => (value === "" ? null : value))
-    .max(300, "Remark must not exceed 300 characters"),
+    .notRequired(),
 
-  referenceType: yup
-    .string()
-    .required("Reference type is required")
-    .oneOf(
-      ["PURCHASE", "SALE", "PURCHASE_RETURN", "SALE_RETURN", "GENERAL", "TRANSPORT", "OTHER"],
-      "Invalid reference type"
-    ),
+  amount: Yup.number()
+    .typeError("Amount must be a number")
+    .positive("Amount must be greater than zero")
+    .notRequired(),
 
-  referenceId: yup
-    .number()
+  paymentMode: Yup.string().oneOf(PAYMENT_MODES, "Invalid payment mode").notRequired(),
+
+  paymentReference: Yup.string()
+    .trim()
     .nullable()
-    .transform(val => (val === "" ? null : val))
-    .typeError("Reference ID should be a number"),
+    .max(100, "Payment reference must be less than 100 characters")
+    .notRequired(),
 
-  paymentMode: yup
-    .string()
-    .required("Payment mode is required")
-    .oneOf(["NONE", "CASH", "BANK_TRANSFER", "CHEQUE", "UPI", "CARD", "CREDIT", "ONLINE"], "Invalid payment mode"),
+  remark: Yup.string()
+    .trim()
+    .nullable()
+    .max(500, "Remark must be less than 500 characters")
+    .notRequired()
+}).noUnknown(true);
 
-  date: yup
-    .date()
-    .typeError("Please select a valid date")
-    .required("Date is required")
-    .max(new Date(), "Date cannot be in the future"),
-});
-
-export default paymentValidations;
-export { paymentValidations };
+export { paymentCreateSchema, paymentUpdateSchema };
+export default { paymentCreateSchema, paymentUpdateSchema };

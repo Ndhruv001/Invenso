@@ -1,106 +1,115 @@
 /**
- * validations/paymentValidations.js
- * Validation rules for Payment resource using express-validator.
+ * @file express-validator middlewares for payment resource.
  */
 
 import { body, param, query } from "express-validator";
+import { PaymentType, PaymentMode, PaymentReferenceType } from "@prisma/client";
 
-const paymentTypes = ["RECEIVED", "PAID"];
-const paymentReferenceTypes = [
-  "PURCHASE",
-  "SALE",
-  "PURCHASE_RETURN",
-  "SALE_RETURN",
-  "GENERAL",
-  "TRANSPORT",
-  "OTHER",
-];
-const paymentModes = [
-  "NONE",
-  "CASH",
-  "BANK_TRANSFER",
-  "CHEQUE",
-  "UPI",
-  "CARD",
-  "CREDIT",
-  "ONLINE",
-];
+// Convert Prisma enums → arrays (IMPORTANT)
+const PAYMENT_TYPES = Object.values(PaymentType);
+const PAYMENT_MODES = Object.values(PaymentMode);
+const REFERENCE_TYPES = Object.values(PaymentReferenceType);
 
-// Validate payment fields for create/update
-const validatePayment = [
-  body("partyId")
-    .optional({ nullable: true })
+// --------------------
+// Validate payment ID param
+// --------------------
+const validatePaymentId = [
+  param("id")
+    .exists()
+    .withMessage("Payment ID is required")
     .isInt({ gt: 0 })
-    .withMessage("Party ID must be a positive integer if provided"),
+    .withMessage("Payment ID must be a positive integer")
+    .toInt()
+];
+
+// --------------------
+// Validate payment create body
+// --------------------
+const validateCreatePayment = [
+  body("date").optional().isISO8601().toDate(),
+
+  body("partyId").optional().isInt({ gt: 0 }).toInt(),
+
   body("type")
-    .notEmpty()
-    .isIn(paymentTypes)
-    .withMessage(`Type must be one of: ${paymentTypes.join(", ")}`),
-  body("referenceType")
-    .notEmpty()
-    .isIn(paymentReferenceTypes)
-    .withMessage(`ReferenceType must be one of: ${paymentReferenceTypes.join(", ")}`),
+    .exists()
+    .withMessage("Payment type is required")
+    .isIn(PAYMENT_TYPES)
+    .withMessage(`Payment type must be one of: ${PAYMENT_TYPES.join(", ")}`),
+
   body("amount")
-    .notEmpty()
+    .exists()
+    .withMessage("Amount is required")
     .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Amount must be a decimal up to 2 decimal places"),
+    .toFloat(),
+
   body("paymentMode")
     .optional()
-    .isIn(paymentModes)
-    .withMessage(`PaymentMode must be one of: ${paymentModes.join(", ")}`),
-  body("paymentReference").optional().isString(),
-  body("remark").optional().isString(),
+    .isIn(PAYMENT_MODES)
+    .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
+
+  body("referenceType")
+    .exists()
+    .withMessage("Reference type is required")
+    .isIn(REFERENCE_TYPES)
+    .withMessage(`Reference type must be one of: ${REFERENCE_TYPES.join(", ")}`),
+
+  body("paymentReference").optional().isString().trim(),
+
+  body("remark").optional().isString().trim(),
+
+  // --------------------
+  // Reference IDs (only validated as integers here)
+  // Business logic validation belongs in service/controller
+  // --------------------
+  body("purchaseId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("saleId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("purchaseReturnId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("saleReturnId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("transportId").optional().isInt({ gt: 0 }).toInt()
 ];
 
-// Validate payment ID param
-const validatePaymentId = [
-  param("id").isInt({ gt: 0 }).withMessage("Valid payment ID is required"),
+// --------------------
+// Validate payment update body
+// --------------------
+const validateUpdatePayment = [
+  body("date").optional().isISO8601().toDate(),
+
+  body("partyId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("type").optional().isIn(PAYMENT_TYPES),
+
+  body("amount").optional().isDecimal({ decimal_digits: "0,2" }).toFloat(),
+
+  body("paymentMode").optional().isIn(PAYMENT_MODES),
+
+  body("referenceType").optional().isIn(REFERENCE_TYPES),
+
+  body("paymentReference").optional().isString().trim(),
+
+  body("remark").optional().isString().trim(),
+
+  body("purchaseId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("saleId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("purchaseReturnId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("saleReturnId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("transportId").optional().isInt({ gt: 0 }).toInt()
 ];
 
-// Validate query params for list (pagination, filters, search, sorting)
-const validatePaymentQuery = [
-  query("page").optional().isInt({ min: 1 }).toInt(),
-  query("limit").optional().isInt({ min: 1 }).toInt(),
-  query("sortBy")
-    .optional()
-    .isIn(["date", "createdAt", "updatedAt", "amount"])
-    .withMessage("Invalid sortBy field"),
-  query("sortOrder")
-    .optional()
-    .isIn(["asc", "desc"])
-    .withMessage("Invalid sortOrder value"),
-  query("filters").optional().custom((value) => {
-    if (typeof value === "string") {
-      try {
-        JSON.parse(value);
-        return true;
-      } catch {
-        throw new Error("Invalid JSON for filters");
-      }
-    }
-    return true;
-  }),
-];
+// --------------------
+// Exports
+// --------------------
+export { validateCreatePayment, validateUpdatePayment, validatePaymentId };
 
-// Validate bulk delete request body
-const validateBulkDelete = [
-  body("ids")
-    .isArray({ min: 1 })
-    .withMessage("Array of payment IDs is required"),
-  body("ids.*")
-    .isInt({ gt: 0 })
-    .withMessage("Each payment ID must be a positive integer"),
-];
-
-export {
-  validatePayment,
-  validatePaymentId,
-  validatePaymentQuery,
-  validateBulkDelete,
-};
 export default {
-  validatePayment,
-  validatePaymentId,
-  validatePaymentQuery,
-  validateBulkDelete,
+  validateCreatePayment,
+  validateUpdatePayment,
+  validatePaymentId
 };

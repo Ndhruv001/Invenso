@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { useCategories } from "@/hooks/useCategories";
 import { useHsnCodes } from "@/hooks/useProducts";
-import STOCK_STATUSES from "@/constants/STOCK_STATUSES";
+import {STOCK_STATUSES} from "@/constants/STOCK_STATUSES";
 
 function useProductFilterOptions() {
   const { data: categoryData, isLoading } = useCategories("PRODUCT");

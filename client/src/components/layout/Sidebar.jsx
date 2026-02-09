@@ -78,7 +78,7 @@ const sidebarItems = [
   {
     icon: Truck,
     label: "Transport",
-    path: "/transport"
+    path: "/transports"
   },
   {
     icon: FileText,

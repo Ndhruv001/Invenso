@@ -77,6 +77,14 @@ async function listParties({
 
   const skip = (page - 1) * limit;
 
+  /* -------------------- Safe Sorting -------------------- */
+
+  const allowedSortFields = ["date", "name", "type", "openingBalance", "currentBalance", "createdAt"];
+
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
+
+  const orderBy = { [safeSortBy]: sortOrder };
+
   /* -------------------- DB Transaction -------------------- */
 
   const [parties, totalRows, balanceRows] = await prisma.$transaction([
@@ -84,7 +92,7 @@ async function listParties({
       where,
       skip,
       take: limit,
-      orderBy: { [sortBy]: sortOrder }
+      orderBy,
     }),
 
     prisma.party.count({ where }),

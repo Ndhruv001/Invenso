@@ -11,8 +11,12 @@ async function listAuditLogs({ page = 1, limit = 20, sortBy = "createdAt", sortO
   const totalRows = await prisma.auditLog.count({});
   const totalPages = Math.ceil(totalRows / limit);
 
+  const allowedSortFields = ["tableName", "id", "recordId", "createdAt"];
+
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
+
   const data = await prisma.auditLog.findMany({
-    orderBy: { [sortBy]: sortOrder },
+    orderBy: { [safeSortBy]: sortOrder },
     skip,
     take,
     include: { user: true } // so you can display user details if required
@@ -24,10 +28,7 @@ async function listAuditLogs({ page = 1, limit = 20, sortBy = "createdAt", sortO
   };
 }
 
-
-export {
-  listAuditLogs,
-};
+export { listAuditLogs };
 export default {
-  listAuditLogs,
+  listAuditLogs
 };

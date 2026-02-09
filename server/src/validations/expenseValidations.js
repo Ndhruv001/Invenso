@@ -1,91 +1,98 @@
 /**
- * validations/expenseValidations.js
- * Validation rules for Expense resource using express-validator.
+ * @file express-validator middlewares for expense resource.
  */
 
-import { body, param, query } from "express-validator";
+import { body, param } from "express-validator";
+import { PaymentMode } from "@prisma/client";
 
-const paymentModes = [
-  "NONE",
-  "CASH",
-  "BANK_TRANSFER",
-  "CHEQUE",
-  "UPI",
-  "CARD",
-  "CREDIT",
-  "ONLINE",
+// Convert Prisma enums → arrays (IMPORTANT)
+const PAYMENT_MODES = Object.values(PaymentMode);
+
+// --------------------
+// Validate expense ID param
+// --------------------
+const validateExpenseId = [
+  param("id")
+    .exists()
+    .withMessage("Expense ID is required")
+    .isInt({ gt: 0 })
+    .withMessage("Expense ID must be a positive integer")
+    .toInt()
 ];
 
-// Validate expense fields for create/update
-const validateExpense = [
+// --------------------
+// Validate expense create body
+// --------------------
+const validateCreateExpense = [
+  body("date").optional().isISO8601().withMessage("Date must be a valid ISO8601 date").toDate(),
+
   body("categoryId")
-    .notEmpty()
+    .exists()
     .withMessage("Category ID is required")
     .isInt({ gt: 0 })
-    .withMessage("Category ID must be a positive integer"),
-  body("date").optional().isISO8601().withMessage("Date must be ISO8601 format"),
+    .withMessage("Category ID must be a positive integer")
+    .toInt(),
+
   body("amount")
-    .notEmpty()
+    .exists()
     .withMessage("Amount is required")
     .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Amount must be a decimal with up to 2 decimals"),
+    .withMessage("Amount must be a valid decimal with up to 2 digits")
+    .toFloat(),
+
   body("paymentMode")
     .optional()
-    .isIn(paymentModes)
-    .withMessage(`PaymentMode must be one of: ${paymentModes.join(", ")}`),
-  body("paymentReference").optional().isString(),
-  body("remark").optional().isString(),
-];
+    .isIn(PAYMENT_MODES)
+    .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
 
-// Validate expense ID param
-const validateExpenseId = [
-  param("id").isInt({ gt: 0 }).withMessage("Valid expense ID is required"),
-];
-
-// Validate query params for list (pagination, filters, sorting)
-const validateExpenseQuery = [
-  query("page").optional().isInt({ min: 1 }).toInt(),
-  query("limit").optional().isInt({ min: 1 }).toInt(),
-  query("sortBy")
+  body("paymentReference")
     .optional()
-    .isIn(["date", "createdAt", "updatedAt", "amount"])
-    .withMessage("Invalid sortBy field"),
-  query("sortOrder")
-    .optional()
-    .isIn(["asc", "desc"])
-    .withMessage("Invalid sortOrder value"),
-  query("filters").optional().custom((value) => {
-    if (typeof value === "string") {
-      try {
-        JSON.parse(value);
-        return true;
-      } catch {
-        throw new Error("Invalid JSON for filters");
-      }
-    }
-    return true;
-  }),
+    .isString()
+    .withMessage("Payment reference must be a string")
+    .trim(),
+
+  body("remark").optional().isString().withMessage("Remark must be a string").trim()
 ];
 
-// Validate bulk delete request body
-const validateBulkDelete = [
-  body("ids")
-    .isArray({ min: 1 })
-    .withMessage("Array of expense IDs is required"),
-  body("ids.*")
+// --------------------
+// Validate expense update body
+// --------------------
+const validateUpdateExpense = [
+  body("date").optional().isISO8601().withMessage("Date must be a valid ISO8601 date").toDate(),
+
+  body("categoryId")
+    .optional()
     .isInt({ gt: 0 })
-    .withMessage("Each expense ID must be a positive integer"),
+    .withMessage("Category ID must be a positive integer")
+    .toInt(),
+
+  body("amount")
+    .optional()
+    .isDecimal({ decimal_digits: "0,2" })
+    .withMessage("Amount must be a valid decimal with up to 2 digits")
+    .toFloat(),
+
+  body("paymentMode")
+    .optional()
+    .isIn(PAYMENT_MODES)
+    .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
+
+  body("paymentReference")
+    .optional()
+    .isString()
+    .withMessage("Payment reference must be a string")
+    .trim(),
+
+  body("remark").optional().isString().withMessage("Remark must be a string").trim()
 ];
 
-export {
-  validateExpense,
-  validateExpenseId,
-  validateExpenseQuery,
-  validateBulkDelete,
-};
+// --------------------
+// Exports
+// --------------------
+export { validateCreateExpense, validateUpdateExpense, validateExpenseId };
+
 export default {
-  validateExpense,
-  validateExpenseId,
-  validateExpenseQuery,
-  validateBulkDelete,
+  validateCreateExpense,
+  validateUpdateExpense,
+  validateExpenseId
 };

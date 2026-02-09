@@ -1,36 +1,29 @@
 /**
- * transportControllers.js
- * Controllers for Transport resource.
- * Handles HTTP requests and responses, calls transportServices methods.
- * Uses asyncHandler for catching async errors.
- * Uses successResponse for consistent API success responses.
+ * @file Controllers for Transport resource.
+ * Orchestrates requests/responses for logistics and transport entries.
+ * Wraps service calls in asyncHandler and sends structured success responses.
  */
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as transportServices from "../services/transportServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /transports
- * List transports with filters, pagination, sorting, stats
+ * Query params: page, limit, sortBy, sortOrder, search, filters
+ * Returns paginated list of transports with integrated search for Party, Driver, and Amounts.
  */
 const listTransports = asyncHandler(async (req, res) => {
-  const query = {
-    page: Number(req.query.page) || 1,
-    limit: Number(req.query.limit) || 10,
-    sortBy: req.query.sortBy || "date",
-    sortOrder: req.query.sortOrder || "desc",
-    search: req.query.search || "",
-    filters: req.query.filters || {},
-  };
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
-  if (typeof query.filters === "string") {
-    try {
-      query.filters = JSON.parse(query.filters);
-    } catch {
-      query.filters = {};
-    }
-  }
+  const query = {
+    page: Number(page) || 1,
+    limit: Number(limit) || 10,
+    sortBy: sortBy || "createdAt",
+    sortOrder: sortOrder || "desc",
+    search: search || "",
+    filters: rest || {} // Captures remaining query params as filters
+  };
 
   const result = await transportServices.listTransports(query);
   return successResponse(res, "Transports fetched successfully", result, 200);
@@ -38,72 +31,64 @@ const listTransports = asyncHandler(async (req, res) => {
 
 /**
  * GET /transports/:id
- * Get single transport by ID
+ * Fetch single transport entry by ID.
  */
 const getTransport = asyncHandler(async (req, res) => {
-  const id = Number(req.params?.id);
+  const id = Number(req.params.id);
   const transport = await transportServices.getTransportById(id);
   return successResponse(res, "Transport fetched successfully", transport, 200);
 });
 
 /**
  * POST /transports
- * Create new transport with payment and party balance handling
+ * Create a new transport entry.
+ * Automatically handles party balance (Receivable) and initial payment records.
  */
 const createTransport = asyncHandler(async (req, res) => {
   const transportData = req.body;
   const userId = req.user?.id || null;
+
   const createdTransport = await transportServices.createTransport(transportData, userId);
   return successResponse(res, "Transport created successfully", createdTransport, 201);
 });
 
 /**
  * PUT /transports/:id
- * Update transport by ID with careful payment and party balance updates
+ * Update existing transport by ID.
+ * Manages complex logic for party changes and balance re-calculation.
  */
 const updateTransport = asyncHandler(async (req, res) => {
   const id = Number(req.params?.id);
   const updateData = req.body;
   const userId = req.user?.id || null;
+
   const updatedTransport = await transportServices.updateTransport(id, updateData, userId);
   return successResponse(res, "Transport updated successfully", updatedTransport, 200);
 });
 
 /**
  * DELETE /transports/:id
- * Delete transport by ID, revert party balances, delete payments
+ * Delete transport entry.
+ * Reverts party balances and removes associated payment records.
  */
 const deleteTransport = asyncHandler(async (req, res) => {
   const id = Number(req.params?.id);
   const userId = req.user?.id || null;
+
   const deleted = await transportServices.deleteTransport(id, userId);
   return successResponse(res, "Transport deleted successfully", deleted, 200);
 });
 
-/**
- * POST /transports/bulk-delete
- * Bulk delete transports by IDs, handle balances/payment, audit log
- */
-const bulkDeleteTransports = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await transportServices.bulkDeleteTransports(ids, userId);
-  return successResponse(res, "Transports deleted successfully", deleted, 200);
-});
+/* -------------------------------------------------------------------------- */
+/* Exports                                  */
+/* -------------------------------------------------------------------------- */
 
 export default {
   listTransports,
   getTransport,
   createTransport,
   updateTransport,
-  deleteTransport,
-  bulkDeleteTransports,
+  deleteTransport
 };
-export {
-  listTransports,
-  getTransport,
-  createTransport,
-  updateTransport,
-  deleteTransport,
-  bulkDeleteTransports,
-};
+
+export { listTransports, getTransport, createTransport, updateTransport, deleteTransport };

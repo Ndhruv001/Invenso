@@ -3,6 +3,7 @@ import { formatDate } from "@/lib/helpers/formatters";
 import { useTheme } from "@/hooks/useTheme";
 
 const JsonModal = ({ value, label, isOpen, onClose }) => {
+  const { theme } = useTheme();
   if (!isOpen) return null;
   let formatted;
   try {
@@ -11,8 +12,10 @@ const JsonModal = ({ value, label, isOpen, onClose }) => {
     formatted = String(value);
   }
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-      <div className="bg-white shadow-2xl rounded-lg max-w-2xl w-full p-6 relative">
+    <div className={`fixed inset-0 flex items-center justify-center z-50 bg-black/50 ${theme.bg}`}>
+      <div
+        className={`bg-white shadow-2xl rounded-lg max-w-2xl w-full p-6 relative ${theme.text.primary}`}
+      >
         <button
           onClick={onClose}
           className="absolute top-2 right-2 px-2 py-1 rounded hover:bg-gray-100 text-gray-500 font-bold"
@@ -20,7 +23,9 @@ const JsonModal = ({ value, label, isOpen, onClose }) => {
           ×
         </button>
         <div className="mb-2 font-semibold">{label}</div>
-        <pre className="text-xs whitespace-pre-wrap bg-gray-100 rounded p-3 max-h-[60vh] overflow-auto">
+        <pre
+          className={`text-xs whitespace-pre-wrap ${theme.bg} ${theme.text.primary} rounded p-3 max-h-[60vh] overflow-auto`}
+        >
           {formatted}
         </pre>
       </div>
@@ -45,8 +50,6 @@ const ViewButton = ({ value, label }) => {
 };
 
 const Columns = () => {
-  const { theme } = useTheme();
-
   return [
     {
       accessorKey: "id",

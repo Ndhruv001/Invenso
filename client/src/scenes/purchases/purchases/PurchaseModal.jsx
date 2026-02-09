@@ -435,8 +435,8 @@ const PurchaseModal = ({
 
                         if (selectedParty) {
                           setSelectedParty(null);
-                          setValue("partyId", null);
-                          setValue("party", null);
+                          setValue("partyId", null, { shouldDirty: true });
+                          
                         }
 
                         setPartyInputValue(value);
@@ -460,8 +460,8 @@ const PurchaseModal = ({
                             onClick={() => {
                               setSelectedParty(party);
                               setPartyInputValue(party.name);
-                              setValue("party", party);
-                              setValue("partyId", party.id);
+                              
+                              setValue("partyId", null, { shouldDirty: true });
                               setShowPartySuggestions(false);
                             }}
                           >

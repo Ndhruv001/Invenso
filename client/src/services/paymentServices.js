@@ -8,10 +8,7 @@ import axiosInstance from "@/lib/config/axiosInstance";
 
 const handleAxiosError = (error, defaultMsg) => {
   const message =
-    error.response?.data?.message ||
-    error.response?.data?.error ||
-    error.message ||
-    defaultMsg;
+    error.response?.data?.message || error.response?.data?.error || error.message || defaultMsg;
   console.error(defaultMsg, error);
   throw new Error(message);
 };
@@ -33,8 +30,7 @@ export const getPayments = async (filters = {}) => {
 
     if (filters.filterOptions) {
       for (const [key, value] of Object.entries(filters.filterOptions)) {
-        if (value !== undefined && value !== null && value !== "")
-          params.append(key, value);
+        if (value !== undefined && value !== null && value !== "") params.append(key, value);
       }
     }
 
@@ -48,14 +44,13 @@ export const getPayments = async (filters = {}) => {
 /**
  * Fetch a single payment by ID
  */
-export const getPayment = async (id) => {
+export const getPayment = async id => {
   if (!id) throw new Error("Payment ID is required");
   try {
     const { data } = await axiosInstance.get(`/payments/${id}`);
     return data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error(`Payment with ID ${id} not found`);
+    if (error.response?.status === 404) throw new Error(`Payment with ID ${id} not found`);
     handleAxiosError(error, `Failed to fetch payment ${id}`);
   }
 };
@@ -63,7 +58,7 @@ export const getPayment = async (id) => {
 /**
  * Create a new payment
  */
-export const createPayment = async (paymentData) => {
+export const createPayment = async paymentData => {
   try {
     const { data } = await axiosInstance.post("/payments", paymentData);
     return data;
@@ -86,8 +81,7 @@ export const updatePayment = async (id, updateData) => {
     const { data } = await axiosInstance.put(`/payments/${id}`, updateData);
     return data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error("Payment not found or already deleted");
+    if (error.response?.status === 404) throw new Error("Payment not found or already deleted");
     if (error.response?.status === 409)
       throw new Error("Payment has been modified. Please refresh.");
     handleAxiosError(error, `Failed to update payment ${id}`);
@@ -97,31 +91,14 @@ export const updatePayment = async (id, updateData) => {
 /**
  * Delete a payment by ID
  */
-export const deletePayment = async (id) => {
+export const deletePayment = async id => {
   if (!id) throw new Error("Payment ID is required");
   try {
     const { data } = await axiosInstance.delete(`/payments/${id}`);
     return data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error("Payment not found or already deleted");
+    if (error.response?.status === 404) throw new Error("Payment not found or already deleted");
     handleAxiosError(error, `Failed to delete payment ${id}`);
-  }
-};
-
-/**
- * Bulk delete multiple payments
- */
-export const bulkDeletePayments = async (ids) => {
-  if (!Array.isArray(ids) || ids.length === 0)
-    throw new Error("IDs array is required for bulk delete");
-  try {
-    const { data } = await axiosInstance.delete(`/payments/bulk-delete`, {
-      data: { ids },
-    });
-    return data;
-  } catch (error) {
-    handleAxiosError(error, "Failed to bulk delete payments");
   }
 };
 
@@ -130,8 +107,7 @@ export const paymentsApi = {
   getPayment,
   createPayment,
   updatePayment,
-  deletePayment,
-  bulkDeletePayments,
+  deletePayment
 };
 
 export default paymentsApi;

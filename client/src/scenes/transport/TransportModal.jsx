@@ -2,15 +2,18 @@ import React, { useMemo, useEffect, useState, useCallback } from "react";
 import {
   Save,
   X,
-  Wallet,
+  Truck,
   Calendar,
   CreditCard,
-  BookOpen,
   Hash,
   FileText,
   Edit3,
   ArrowLeftRight,
-  Type
+  MapPin,
+  Users,
+  UserCircle,
+  Clock,
+  DollarSign
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useForm } from "react-hook-form";
@@ -21,10 +24,9 @@ import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { TextField, TextAreaField, SelectField } from "@/components/common/FormFields";
 import { usePartySuggestions } from "@/hooks/useParties";
 import { debounce } from "@/lib/helpers/debounce";
-import PAYMENT_MODES from "@/constants/PAYMENT_MODES"; // from your enum
-import PAYMENT_TYPES from "@/constants/PAYMENT_TYPES";
-import PAYMENT_REFERENCES from "@/constants/PAYMENT_REFERENCES";
-import { paymentCreateSchema, paymentUpdateSchema } from "@/validations/paymentValidations";
+import { PAYMENT_MODE_OPTIONS } from "@/constants/PAYMENT_MODES";
+import { DRIVER_SHIFT_OPTIONS } from "@/constants/DRIVER_SHIFTS";
+import { transportCreateSchema, transportUpdateSchema } from "@/validations/transportValidations";
 
 // From all form values, keep only what the user actually changed.
 const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
@@ -38,15 +40,15 @@ const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
   return updatePayload;
 };
 
-const PaymentModal = ({
+const TransportModal = ({
   onSubmit,
   onCancel,
   isLoading = false,
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-   
-  console.log("🚀 ~ PaymentModal ~ initialData:", initialData);
+
+  console.log("🚀 ~ TransportModal ~ initialData:", initialData);
   const { theme } = useTheme();
   const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
@@ -57,21 +59,31 @@ const PaymentModal = ({
   const [showPartySuggestions, setShowPartySuggestions] = useState(false);
   const [selectedParty, setSelectedParty] = useState(initialData?.party || null);
 
+  /* ----------------------- DRIVER INPUT ------------------------ */
+  const [driverInputValue, setDriverInputValue] = useState(initialData?.driver?.name || "");
+  const [driverSearchQuery, setDriverSearchQuery] = useState("");
+  const [driverSuggestions, setDriverSuggestions] = useState([]);
+  const [showDriverSuggestions, setShowDriverSuggestions] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState(initialData?.driver || null);
+
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
 
   // Default Values
   const defaultValues = useMemo(
     () => ({
       partyId: initialData?.partyId || "",
-      type: initialData?.type || "",
+      driverId: initialData?.driverId || "",
       date: initialData?.date
         ? initialData.date.split("T")[0]
         : new Date().toISOString().split("T")[0],
+      shift: initialData?.shift || "",
+      fromLocation: initialData?.fromLocation || "",
+      toLocation: initialData?.toLocation || "",
       amount: initialData?.amount ?? "",
-      paymentReference: initialData?.paymentReference || "",
-      remark: initialData?.remark || "",
+      receivedAmount: initialData?.receivedAmount ?? "",
       paymentMode: initialData?.paymentMode || "",
-      referenceType: initialData?.referenceType || ""
+      paymentReference: initialData?.paymentReference || "",
+      remark: initialData?.remark || ""
     }),
     [initialData]
   );
@@ -84,7 +96,7 @@ const PaymentModal = ({
     formState: { errors, isSubmitting, isDirty, dirtyFields }
   } = useForm({
     defaultValues,
-    resolver: initialData ? yupResolver(paymentUpdateSchema) : yupResolver(paymentCreateSchema),
+    resolver: initialData ? yupResolver(transportUpdateSchema) : yupResolver(transportCreateSchema),
     mode: "onSubmit",
     reValidateMode: "onBlur"
   });
@@ -117,6 +129,30 @@ const PaymentModal = ({
     }
   }, [partySuggestionsData]);
 
+  /* --------------------- DRIVER SUGGESTIONS ---------------------- */
+  const { data: driverSuggestionsData } = usePartySuggestions(driverSearchQuery);
+
+  const debouncedDriverSearch = useMemo(
+    () =>
+      debounce(value => {
+        if (!value) {
+          setDriverSuggestions([]);
+          setShowDriverSuggestions(false);
+          return;
+        }
+
+        setDriverSearchQuery(value);
+        setShowDriverSuggestions(true);
+      }, 800),
+    []
+  );
+
+  useEffect(() => {
+    if (driverSuggestionsData) {
+      setDriverSuggestions(driverSuggestionsData);
+    }
+  }, [driverSuggestionsData]);
+
   const isDisabled = !isEditMode || isSubmitting || isLoading;
 
   const submitHandler = handleSubmit(
@@ -126,7 +162,7 @@ const PaymentModal = ({
         payload = extractModifiedFields(values, dirtyFields);
       }
       onSubmit(payload);
-      console.log("🚀 ~ PaymentModal ~ payload:", payload);
+      console.log("🚀 ~ TransportModal ~ payload:", payload);
       if (!initialData) reset(defaultValues);
       if (initialData && isEditMode) {
         onCancel();
@@ -187,16 +223,20 @@ const PaymentModal = ({
           <div className={`flex items-center justify-between p-6 border-b ${theme.border}`}>
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg bg-gradient-to-r ${theme.accent}`}>
-                <Wallet className={`w-5 h-5 ${theme.text.primary}`} />
+                <Truck className={`w-5 h-5 ${theme.text.primary}`} />
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Payment" : "View Payment") : "Add Payment"}
+                  {initialData
+                    ? isEditMode
+                      ? "Edit Transport"
+                      : "View Transport"
+                    : "Add Transport"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
                   {!isEditMode && initialData
-                    ? "Payment details (read-only)"
-                    : "Fill in the payment details below"}
+                    ? "Transport details (read-only)"
+                    : "Fill in the transport details below"}
                 </p>
               </div>
             </div>
@@ -231,9 +271,13 @@ const PaymentModal = ({
           >
             <div className="p-6 space-y-6 flex-1 overflow-y-auto">
               <div className="space-y-4">
+                {/* Party Name */}
                 <div className="relative">
                   <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                    Party Name <span className="text-red-500">*</span>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Party Name <span className="text-red-500">*</span>
+                    </div>
                   </label>
 
                   <input
@@ -258,7 +302,6 @@ const PaymentModal = ({
 
                   {errors.partyName && (
                     <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
                       {errors.partyName.message}
                     </p>
                   )}
@@ -283,6 +326,61 @@ const PaymentModal = ({
                   )}
                 </div>
 
+                {/* Driver Name */}
+                <div className="relative">
+                  <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
+                    <div className="flex items-center gap-2">
+                      <UserCircle className="w-4 h-4" />
+                      Driver Name <span className="text-red-500">*</span>
+                    </div>
+                  </label>
+
+                  <input
+                    type="text"
+                    value={driverInputValue}
+                    disabled={isDisabled}
+                    {...register("driverName", { required: "Driver Name is required" })}
+                    onChange={e => {
+                      const value = e.target.value;
+
+                      // Clear selected driver if user types
+                      if (selectedDriver) {
+                        setSelectedDriver(null);
+                        setValue("driverId", null, { shouldDirty: true });
+                      }
+
+                      setDriverInputValue(value);
+                      debouncedDriverSearch(value);
+                    }}
+                    className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
+                  />
+
+                  {errors.driverName && (
+                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                      {errors.driverName.message}
+                    </p>
+                  )}
+
+                  {showDriverSuggestions && driverSuggestions.length > 0 && (
+                    <ul className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow">
+                      {driverSuggestions.map(driver => (
+                        <li
+                          key={driver.id}
+                          className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100"
+                          onClick={() => {
+                            setSelectedDriver(driver);
+                            setDriverInputValue(driver.name);
+                            setValue("driverId", driver.id, { shouldDirty: true });
+                            setShowDriverSuggestions(false);
+                          }}
+                        >
+                          {driver.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextField
                     name="date"
@@ -297,11 +395,65 @@ const PaymentModal = ({
                     theme={theme}
                   />
                   <SelectField
-                    name="type"
-                    label="Payment Type"
-                    icon={Type}
-                    options={PAYMENT_TYPES}
+                    name="shift"
+                    label="Shift"
+                    icon={Clock}
+                    options={DRIVER_SHIFT_OPTIONS}
+                    register={register}
+                    errors={errors}
+                    isEditMode={isEditMode}
+                    isDisabled={isDisabled}
+                    theme={theme}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <TextField
+                    name="fromLocation"
+                    label="From Location"
+                    placeholder="Starting point"
+                    icon={MapPin}
                     required
+                    register={register}
+                    errors={errors}
+                    isEditMode={isEditMode}
+                    isDisabled={isDisabled}
+                    theme={theme}
+                  />
+                  <TextField
+                    name="toLocation"
+                    label="To Location"
+                    placeholder="Destination"
+                    icon={MapPin}
+                    required
+                    register={register}
+                    errors={errors}
+                    isEditMode={isEditMode}
+                    isDisabled={isDisabled}
+                    theme={theme}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <TextField
+                    name="amount"
+                    label="Amount"
+                    type="number"
+                    placeholder="0.00"
+                    icon={DollarSign}
+                    required
+                    register={register}
+                    errors={errors}
+                    isEditMode={isEditMode}
+                    isDisabled={isDisabled}
+                    theme={theme}
+                  />
+                  <TextField
+                    name="receivedAmount"
+                    label="Received Amount"
+                    type="number"
+                    placeholder="0.00"
+                    icon={ArrowLeftRight}
                     register={register}
                     errors={errors}
                     isEditMode={isEditMode}
@@ -315,20 +467,18 @@ const PaymentModal = ({
                     name="paymentMode"
                     label="Payment Mode"
                     icon={CreditCard}
-                    options={PAYMENT_MODES}
-                    required
+                    options={PAYMENT_MODE_OPTIONS}
                     register={register}
                     errors={errors}
                     isEditMode={isEditMode}
                     isDisabled={isDisabled}
                     theme={theme}
                   />
-                  <SelectField
-                    name="referenceType"
-                    label="Reference Type"
-                    icon={BookOpen}
-                    options={PAYMENT_REFERENCES}
-                    required
+                  <TextField
+                    name="paymentReference"
+                    label="Payment Reference"
+                    placeholder="Transaction ID / Cheque No"
+                    icon={Hash}
                     register={register}
                     errors={errors}
                     isEditMode={isEditMode}
@@ -336,32 +486,6 @@ const PaymentModal = ({
                     theme={theme}
                   />
                 </div>
-
-                <TextField
-                  name="paymentReference"
-                  label="Payment Reference"
-                  placeholder="Transaction ID / Cheque No"
-                  icon={Hash}
-                  register={register}
-                  errors={errors}
-                  isEditMode={isEditMode}
-                  isDisabled={isDisabled}
-                  theme={theme}
-                />
-
-                <TextField
-                  name="amount"
-                  label="Amount"
-                  type="number"
-                  placeholder="0.00"
-                  icon={ArrowLeftRight}
-                  required
-                  register={register}
-                  errors={errors}
-                  isEditMode={isEditMode}
-                  isDisabled={isDisabled}
-                  theme={theme}
-                />
 
                 <TextAreaField
                   name="remark"
@@ -402,7 +526,7 @@ const PaymentModal = ({
                       : "Adding..."
                     : initialData
                       ? "Save Changes"
-                      : "Add Payment"}
+                      : "Add Transport"}
                 </button>
               )}
             </div>
@@ -424,4 +548,4 @@ const PaymentModal = ({
   );
 };
 
-export default PaymentModal;
+export default TransportModal;

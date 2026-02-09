@@ -5,51 +5,32 @@
  * Supports:
  * - List with filters, pagination, sorting, stats
  * - Get by ID
- * - Create transport with complex party & payment balance handling and audit log
- * - Update transport with careful party/payment balance diff handling and audit log
- * - Delete transport with balance revert, payment deletion, and audit log
- * - Bulk soft delete with audit logs and balance/payment handling
+ * - Create transport with clear balance & payment handling
+ * - Update transport with diff-based balance logic
+ * - Delete transport with full balance revert
+ * - Bulk delete with audit logs
  */
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
-/**
- * Helper: Build date filter for Prisma where
- * @param {Object} dateFilter { from, to }
- */
-function buildDateFilter(dateFilter) {
-  if (!dateFilter) return undefined;
+/* -------------------------------------------------------------------------- */
+/* Helpers */
+/* -------------------------------------------------------------------------- */
+
+function buildDateFilter({ from, to }) {
   const cond = {};
-  if (dateFilter.from) cond.gte = new Date(dateFilter.from);
-  if (dateFilter.to) cond.lte = new Date(dateFilter.to);
+
+  if (from) cond.gte = new Date(from);
+  if (to) cond.lte = new Date(to);
+
   return Object.keys(cond).length ? cond : undefined;
 }
 
-/**
- * Helper: Update party balance based on payment type, amount, operation
- * @param {Prisma.TransactionClient} tx
- * @param {number} partyId
- * @param {string} paymentType "RECEIVED" or "PAID"
- * @param {number} amount
- * @param {"add"|"subtract"} operation
- */
-async function updatePartyBalance(tx, partyId, amount, operation) {
-  if (!partyId || amount === 0) return;
+/* -------------------------------------------------------------------------- */
+/* List Transports */
+/* -------------------------------------------------------------------------- */
 
-  const adjustedAmount = operation === "add" ? Number(amount) : -Number(amount);
-
-  await tx.party.update({
-    where: { id: partyId },
-    data: {
-      currentBalance: { increment: adjustedAmount }
-    }
-  });
-}
-
-/**
- * List transports with filters, pagination, sorting, stats
- */
 async function listTransports({
   page = 1,
   limit = 10,
@@ -60,103 +41,120 @@ async function listTransports({
 }) {
   const where = {};
 
-  if (filters.date) {
-    const dateFilter = buildDateFilter(filters.date);
-    if (dateFilter) where.date = dateFilter;
+  if (filters.partyId) where.partyId = Number(filters.partyId);
+  if (filters.driverId) where.driverId = Number(filters.driverId);
+  if (filters.paymentMode) where.paymentMode = filters.paymentMode;
+
+  if (filters.dateFrom || filters.dateTo) {
+    const dateFilter = buildDateFilter({
+      from: filters.dateFrom,
+      to: filters.dateTo
+    });
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
   }
-  if (filters.partyId) where.partyId = filters.partyId;
-  if (filters.driverId) where.driverId = filters.driverId;
 
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
+  if (search.trim()) {
+    const q = search.trim();
+    const isNumeric = !isNaN(Number(q));
 
-    // Search party and driver names matching search string
-    const matchingParties = await prisma.party.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true }
-    });
-    const partyIds = matchingParties.map(p => p.id);
+    const orConditions = [
+      // --- String Fields (Direct) ---
+      { shift: { contains: q, mode: "insensitive" } },
+      { fromLocation: { contains: q, mode: "insensitive" } },
+      { toLocation: { contains: q, mode: "insensitive" } },
+      { remark: { contains: q, mode: "insensitive" } },
 
-    const matchingDrivers = await prisma.party.findMany({
-      where: { name: { contains: trimmedSearch, mode: "insensitive" } },
-      select: { id: true }
-    });
-    const driverIds = matchingDrivers.map(d => d.id);
+      // --- Relation Fields (Searching by Names) ---
+      {
+        party: {
+          name: { contains: q, mode: "insensitive" }
+        }
+      },
+      {
+        driver: {
+          name: { contains: q, mode: "insensitive" }
+        }
+      },
 
-    where.AND = {
-      OR: [
-        { partyId: { in: partyIds.length ? partyIds : [0] } },
-        { driverId: { in: driverIds.length ? driverIds : [0] } },
-        { shift: { contains: trimmedSearch, mode: "insensitive" } }
-      ]
-    };
+      // --- Numeric Fields (Conditional) ---
+      ...(isNumeric ? [{ amount: Number(q) }, { receivedAmount: Number(q) }] : [])
+    ];
+
+    where.OR = orConditions;
   }
 
   const skip = (page - 1) * limit;
   const take = limit;
 
-  const [data, totalRows, stats] = await Promise.all([
+  /* -------------------- Safe Sorting -------------------- */
+
+  const allowedSortFields = [
+    "date",
+    "party",
+    "fromLocation",
+    "toLocation",
+    "amount",
+    "receivedAmount"
+  ];
+
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
+
+  const orderBy =
+    safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
+
+  const [data, totalRows, partyGroups, driverGroups, sums] = await prisma.$transaction([
     prisma.transport.findMany({
       where,
-      orderBy: { [sortBy]: sortOrder },
       skip,
       take,
+      orderBy,
       include: { party: true, driver: true }
     }),
     prisma.transport.count({ where }),
-    Promise.all([
-      prisma.transport
-        .aggregate({
-          where,
-          _count: { distinct: "partyId" }
-        })
-        .then(r => r._count.distinct || 0),
-      prisma.transport
-        .aggregate({
-          where,
-          _count: { distinct: "driverId" }
-        })
-        .then(r => r._count.distinct || 0),
-      prisma.transport
-        .aggregate({
-          where,
-          _sum: { amount: true }
-        })
-        .then(r => Number(r._sum.amount) || 0),
-      prisma.transport
-        .aggregate({
-          where,
-          _sum: { receivedAmount: true }
-        })
-        .then(r => Number(r._sum.receivedAmount) || 0)
-    ])
+    prisma.transport.groupBy({ by: ["partyId"], where }),
+    prisma.transport.groupBy({ by: ["driverId"], where }),
+    prisma.transport.aggregate({
+      where,
+      _sum: {
+        amount: true,
+        receivedAmount: true
+      }
+    })
   ]);
-
-  const [totalDistinctParty, totalDistinctDriver, totalAmount, totalReceived] = stats;
-
-  const totalPages = Math.ceil(totalRows / limit);
 
   return {
     data,
-    pagination: { page, limit, totalRows, totalPages },
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
     stats: {
-      totalDistinctParty,
-      totalDistinctDriver,
-      totalAmount,
-      totalReceived
+      totalDistinctParty: partyGroups.length,
+      totalDistinctDriver: driverGroups.length,
+      totalAmount: Number(sums._sum.amount) || 0,
+      totalReceived: Number(sums._sum.receivedAmount) || 0
     }
   };
 }
 
-/**
- * Get transport by ID
- */
+/* -------------------------------------------------------------------------- */
+/* Get Transport By ID */
+/* -------------------------------------------------------------------------- */
+
 async function getTransportById(id) {
   if (!id) throw new AppError("Transport ID is required", 400);
 
   const transport = await prisma.transport.findUnique({
     where: { id },
-    include: { party: true, driver: true }
+    include: {
+      party: true,
+      driver: true,
+      payments: true
+    }
   });
 
   if (!transport) throw new AppError("Transport not found", 404);
@@ -164,63 +162,62 @@ async function getTransportById(id) {
   return transport;
 }
 
-/**
- * Create transport with payment and party balance handling, audit log
- * Wrap in transaction
- */
+/* -------------------------------------------------------------------------- */
+/* Create Transport */
+/* -------------------------------------------------------------------------- */
+
 async function createTransport(data, userId = null) {
-  const amount = Number(data.amount) || 0;
-  const receivedAmount = Number(data.receivedAmount) || 0;
-  const partyId = data.partyId;
-  const driverId = data.driverId;
+  return prisma.$transaction(async tx => {
+    const amount = Number(data.amount) || 0;
+    const receivedAmount = Number(data.receivedAmount) || 0;
 
-  return await prisma.$transaction(async tx => {
-    // Create transport
-    const transport = await tx.transport.create({ data });
+    // Net impact on party:
+    // payable (+) or receivable (-)
+    const netBalanceImpact = amount - receivedAmount;
 
-    // Determine payment status: full, partial, none
-    const paymentStatus =
-      receivedAmount >= amount && amount > 0
-        ? "FULL"
-        : receivedAmount > 0 && receivedAmount < amount
-          ? "PARTIAL"
-          : "NONE";
+    const transport = await tx.transport.create({
+      data
+    });
 
-    // Update party balance accordingly, create/update payment entry if amount > 0
-    if (amount > 0 && partyId) {
-      if (paymentStatus === "NONE") {
-        // Only update party currentBalance (assume payable)
-        await updatePartyBalance(tx, partyId, amount, "add");
-      } else {
-        await updatePartyBalance(tx, partyId, amount - receivedAmount, "add");
-
-        // Create payment record linked to transport
-        const payment = await tx.payment.create({
-          data: {
-            partyId,
-            type: RECEIVED,
-            amount: receivedAmount,
-            referenceType: "TRANSPORT",
-            referenceId: String(transport.id),
-            paymentMode: data.paymentMode || "NONE",
-            paymentReference: data.paymentReference || null,
-            remark: data.remark || null
+    /* -------------------- Party Balance -------------------- */
+    if (netBalanceImpact !== 0) {
+      await tx.party.update({
+        where: { id: data.partyId },
+        data: {
+          currentBalance: {
+            increment: -netBalanceImpact
           }
-        });
-
-        await tx.auditLog.create({
-          data: {
-            tableName: "payments",
-            recordId: String(payment.id),
-            action: "CREATE",
-            newValue: JSON.stringify(payment),
-            userId
-          }
-        });
-      }
+        }
+      });
     }
 
-    // Audit log
+    /* -------------------- Payment -------------------- */
+    if (receivedAmount > 0) {
+      const payment = await tx.payment.create({
+        data: {
+          partyId: data.partyId,
+          type: "RECEIVED",
+          amount: receivedAmount,
+          referenceType: "TRANSPORT",
+          transportId: parseInt(transport.id),
+          paymentMode: data.paymentMode ?? "NONE",
+          paymentReference: data.paymentReference ?? null,
+          remark: data.remark ?? null
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tableName: "payments",
+          recordId: String(payment.id),
+          action: "CREATE",
+          newValue: JSON.stringify(payment),
+          userId
+        }
+      });
+    }
+
+    /* -------------------- Audit -------------------- */
     await tx.auditLog.create({
       data: {
         tableName: "transports",
@@ -235,131 +232,149 @@ async function createTransport(data, userId = null) {
   });
 }
 
-/**
- * Update transport with payment & balance diffs, party changes, audit log
- * Wrap in transaction
- */
+/* -------------------------------------------------------------------------- */
+/* Update Transport (Product-style diff logic) */
+/* -------------------------------------------------------------------------- */
+
 async function updateTransport(id, data, userId = null) {
   if (!id) throw new AppError("Transport ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
-    // 1. Fetch existing transport
+  return prisma.$transaction(async tx => {
     const existing = await tx.transport.findUnique({ where: { id } });
     if (!existing) throw new AppError("Transport not found", 404);
 
     const prevPartyId = existing.partyId;
-    const prevAmount = Number(existing.amount);
-    const prevReceivedAmount = Number(existing.receivedAmount);
+    const prevNet = Number(existing.amount) - Number(existing.receivedAmount);
 
     const newPartyId = data.partyId !== undefined ? data.partyId : prevPartyId;
-    const newAmount = data.amount !== undefined ? Number(data.amount) : prevAmount;
-    const newReceivedAmount =
-      data.receivedAmount !== undefined ? Number(data.receivedAmount) : prevReceivedAmount;
+    const newAmount = data.amount !== undefined ? Number(data.amount) : Number(existing.amount);
+    const newReceived =
+      data.receivedAmount !== undefined
+        ? Number(data.receivedAmount)
+        : Number(existing.receivedAmount);
+    const newNet = newAmount - newReceived;
 
-    // 2. Adjust balances when partyId or amounts change
-    if (prevPartyId !== newPartyId) {
-      // Undo effect on old party
-      await updatePartyBalance(tx, prevPartyId, prevAmount - prevReceivedAmount, "subtract");
-
-      // Apply balance to new party
-      await updatePartyBalance(tx, newPartyId, newAmount - newReceivedAmount, "add");
+    /* -------------------- Refined Balance Logic -------------------- */
+    if (prevPartyId === newPartyId) {
+      // Scenario A: Same Party - Calculate the delta
+      // If balance was 100 (debt) and now it's 150 (debt), we need to subtract 50 more.
+      const balanceDiff = newNet - prevNet;
+      if (balanceDiff !== 0) {
+        await tx.party.update({
+          where: { id: newPartyId },
+          data: { currentBalance: { increment: -balanceDiff } }
+        });
+      }
     } else {
-      // Adjust balance if amounts change but party is same
-      const diffAmount = newAmount - prevAmount;
-      if (diffAmount !== 0) {
-        await updatePartyBalance(tx, newPartyId, diffAmount, "add");
+      // Scenario B: Party Changed - Full Revert and Full Apply
+      if (prevNet !== 0) {
+        await tx.party.update({
+          where: { id: prevPartyId },
+          data: { currentBalance: { increment: prevNet } }
+        });
       }
-
-      const diffReceived = newReceivedAmount - prevReceivedAmount;
-      if (diffReceived !== 0) {
-        await updatePartyBalance(tx, newPartyId, diffReceived, "add");
+      if (newNet !== 0) {
+        await tx.party.update({
+          where: { id: newPartyId },
+          data: { currentBalance: { increment: -newNet } }
+        });
       }
     }
 
-    // 3. Handle payment record
+    /* -------------------- Payment Handling -------------------- */
     const existingPayment = await tx.payment.findFirst({
-      where: { referenceType: "TRANSPORT", referenceId: String(id) }
+      where: { referenceType: "TRANSPORT", transportId: parseInt(id) }
     });
 
-    if (existingPayment) {
-      await tx.payment.update({
-        where: { id: existingPayment.id },
-        data: {
-          partyId: newPartyId,
-          amount: newReceivedAmount,
-          paymentMode: data.paymentMode ?? existingPayment.paymentMode,
-          paymentReference: data.paymentReference ?? existingPayment.paymentReference,
-          remark: data.remark ?? existingPayment.remark
-        }
-      });
-    } else if (newReceivedAmount > 0) {
-      await tx.payment.create({
-        data: {
-          partyId: newPartyId,
-          type: "RECEIVED",
-          amount: newReceivedAmount,
-          referenceType: "TRANSPORT",
-          referenceId: String(id),
-          paymentMode: data.paymentMode || "NONE",
-          paymentReference: data.paymentReference || null,
-          remark: data.remark || null
-        }
-      });
+    if (newReceived > 0) {
+      const paymentData = {
+        partyId: newPartyId, // Ensures payment follows the new party
+        amount: newReceived,
+        paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
+        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
+        remark: data.remark ?? existingPayment?.remark ?? null
+      };
+
+      if (existingPayment) {
+        await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: paymentData
+        });
+      } else {
+        await tx.payment.create({
+          data: {
+            ...paymentData,
+            type: "RECEIVED",
+            referenceType: "TRANSPORT",
+            transportId: parseInt(id)
+          }
+        });
+      }
+    } else if (existingPayment) {
+      await tx.payment.delete({ where: { id: existingPayment.id } });
     }
 
-    // 4. Update transport itself
-    const updatedTransport = await tx.transport.update({
+    /* -------------------- Update Transport -------------------- */
+    const updated = await tx.transport.update({
       where: { id },
-      data
+      data: {
+        ...data,
+        // Ensure numeric consistency
+        amount: newAmount,
+        receivedAmount: newReceived,
+        partyId: newPartyId
+      }
     });
 
-    // 5. Audit log
+    /* -------------------- Audit -------------------- */
     await tx.auditLog.create({
       data: {
         tableName: "transports",
         recordId: String(id),
         action: "UPDATE",
         oldValue: JSON.stringify(existing),
-        newValue: JSON.stringify(updatedTransport),
+        newValue: JSON.stringify(updated),
         userId
       }
     });
 
-    return updatedTransport;
+    return updated;
   });
 }
 
-/**
- * Delete transport with reverting party balance, deleting payment, audit log
- */
+/* -------------------------------------------------------------------------- */
+/* Delete Transport */
+/* -------------------------------------------------------------------------- */
+
 async function deleteTransport(id, userId = null) {
   if (!id) throw new AppError("Transport ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
     const existing = await tx.transport.findUnique({ where: { id } });
     if (!existing) throw new AppError("Transport not found", 404);
 
-    const partyId = existing.partyId;
-    const amount = Number(existing.amount);
-    const receivedAmount = Number(existing.receivedAmount);
+    const netImpact = Number(existing.amount) - Number(existing.receivedAmount);
 
-    // Revert party balance
-    if (partyId) {
-      await updatePartyBalance(tx, partyId, amount - receivedAmount, "subtract");
+    if (netImpact !== 0) {
+      await tx.party.update({
+        where: { id: existing.partyId },
+        data: {
+          currentBalance: {
+            increment: netImpact
+          }
+        }
+      });
     }
 
-    // Delete payment record
-    const payment = await tx.payment.findFirst({
-      where: { referenceType: "TRANSPORT", referenceId: String(id) }
+    await tx.payment.deleteMany({
+      where: {
+        referenceType: "TRANSPORT",
+        transportId: parseInt(id)
+      }
     });
-    if (payment) {
-      await tx.payment.delete({ where: { id: payment.id } });
-    }
 
-    // Delete transport record
     await tx.transport.delete({ where: { id } });
 
-    // Audit log
     await tx.auditLog.create({
       data: {
         tableName: "transports",
@@ -374,73 +389,14 @@ async function deleteTransport(id, userId = null) {
   });
 }
 
-/**
- * Bulk soft delete transports
- * Undo balances, delete payments, audit logs in transaction
- */
-async function bulkDeleteTransports(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError("Array of transport IDs is required", 400);
-  }
+/* -------------------------------------------------------------------------- */
 
-  return await prisma.$transaction(async tx => {
-    const existingTransports = await tx.transport.findMany({
-      where: { id: { in: ids } }
-    });
+export { listTransports, getTransportById, createTransport, updateTransport, deleteTransport };
 
-    if (existingTransports.length !== ids.length) {
-      throw new AppError("Some transports not found", 404);
-    }
-
-    for (const transport of existingTransports) {
-      const partyId = transport.partyId;
-      const amount = Number(transport.amount);
-      const receivedAmount = Number(transport.receivedAmount);
-
-      if (partyId) {
-        await updatePartyBalance(tx, partyId, amount - receivedAmount, "subtract");
-      }
-
-      // Delete payment record if exists
-      const payment = await tx.payment.findFirst({
-        where: { referenceType: "TRANSPORT", referenceId: String(transport.id) }
-      });
-      if (payment) {
-        await tx.payment.delete({ where: { id: payment.id } });
-      }
-
-      // Delete transport record
-      await tx.transport.delete({ where: { id: transport.id } });
-
-      // Audit log
-      await tx.auditLog.create({
-        data: {
-          tableName: "transports",
-          recordId: String(transport.id),
-          action: "DELETE",
-          oldValue: JSON.stringify(transport),
-          userId
-        }
-      });
-    }
-
-    return true;
-  });
-}
-
-export {
-  listTransports,
-  getTransportById,
-  createTransport,
-  updateTransport,
-  deleteTransport,
-  bulkDeleteTransports
-};
 export default {
   listTransports,
   getTransportById,
   createTransport,
   updateTransport,
-  deleteTransport,
-  bulkDeleteTransports
+  deleteTransport
 };

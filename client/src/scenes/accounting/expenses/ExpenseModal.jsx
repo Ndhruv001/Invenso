@@ -13,13 +13,25 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import expenseValidations from "@/validations/expenseValidations";
+import { expenseCreateSchema, expenseUpdateSchema } from "@/validations/expenseValidations";
 import { useCategories } from "@/hooks/useCategories";
 import { toast } from "react-toastify";
 import PaymentModeOptions from "@/constants/PAYMENT_MODES";
 import { SelectField, TextField, TextAreaField } from "@/components/common/FormFields";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
+
+// From all form values, keep only what the user actually changed.
+const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
+  const updatePayload = {};
+
+  Object.keys(fieldsUserModified).forEach(fieldName => {
+    if (fieldsUserModified[fieldName]) {
+      updatePayload[fieldName] = currentFormValues[fieldName];
+    }
+  });
+  return updatePayload;
+};
 
 const ExpenseModal = ({
   onSubmit,
@@ -52,10 +64,10 @@ const ExpenseModal = ({
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isSubmitting, isDirty, dirtyFields }
   } = useForm({
     defaultValues,
-    resolver: yupResolver(expenseValidations),
+    resolver: initialData ? yupResolver(expenseUpdateSchema) : yupResolver(expenseCreateSchema),
     mode: "onSubmit",
     reValidateMode: "onBlur"
   });
@@ -106,7 +118,12 @@ const ExpenseModal = ({
 
   const submitHandler = handleSubmit(
     values => {
-      onSubmit(values);
+      let payload = values;
+      if (initialData) {
+        payload = extractModifiedFields(values, dirtyFields);
+      }
+      onSubmit(payload);
+      console.log("🚀 ~ ExpenseModal ~ payload:", payload);
       if (!initialData) reset(defaultValues);
       if (initialData && isEditMode) {
         onCancel();

@@ -44,6 +44,7 @@ const DateFilter = React.memo(({ theme, option, value, onChange }) => (
 
     <input
       type="date"
+      max={new Date().toISOString().split("T")[0]}//` Prevent future dates
       placeholder={option.placeholder || "Select date"}
       value={value || ""} // Changed from value[option.key]
       onChange={e => onChange(option.key, e.target.value)}

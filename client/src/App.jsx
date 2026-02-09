@@ -20,7 +20,7 @@ import Payments from "@/scenes/accounting/payments/Payments.jsx";
 import Expenses from "@/scenes/accounting/expenses/Expenses.jsx";
 
 // Other Components
-import Transport from "@/scenes/transport/Transport.jsx";
+import Transports from "@/scenes/transport/Transports.jsx";
 import Reports from "@/scenes/reports/Reports.jsx";
 import Notifications from "@/scenes/notifications/Notifications.jsx";
 import Products from "@/scenes/products/Products.jsx";
@@ -44,7 +44,7 @@ import AddCategory from "@/scenes/categories/AddCategory";
 import AddParty from "./scenes/accounting/parties/PartyModal";
 import AddPaymentIn from "./scenes/accounting/payments/PaymentModal";
 import AddExpense from "./scenes/accounting/expenses/ExpenseModal";
-import AddTransport from "./scenes/transport/AddTransport";
+import AddTransport from "./scenes/transport/TransportModal";
 import ComingSoon from "./components/common/ComingSoon";
 import AddSale from "./scenes/sales/sales/SaleModal";
 import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
@@ -94,7 +94,7 @@ function App() {
 
         {/* Single Routes */}
         <Route path="products" element={<Products />} />
-        <Route path="transports" element={<Transport />} />
+        <Route path="transports" element={<Transports />} />
         <Route path="reports" element={<Reports />} />
         <Route path="notifications" element={<ComingSoon />} />
 

@@ -440,6 +440,7 @@ model InventoryLog {
   balanceBefore    Decimal?
   balanceAfter     Decimal?
   referenceType    InventoryReferenceType  @default(SALE)
+  createdAt       DateTime          @default(now())
 
   purchaseId       Int?
   saleId           Int?

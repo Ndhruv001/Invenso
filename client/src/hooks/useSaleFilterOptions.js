@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { format } from "date-fns";
 import { useParties } from "@/hooks/useParties";
 
 /**
@@ -17,6 +18,8 @@ function useSaleFilterOptions() {
     [partyData]
   );
 
+  const currentDate = format(new Date(), "yyyy-MM-dd");
+
   return [
     {
       key: "partyId",
@@ -31,12 +34,14 @@ function useSaleFilterOptions() {
       type: "date",
       label: "Date From",
       placeholder: "Select Start Date",
+      max: currentDate, // prevent future dates
     },
     {
       key: "dateTo",
       type: "date",
       label: "Date To",
       placeholder: "Select End Date",
+      max: currentDate,
     },
   ];
 }

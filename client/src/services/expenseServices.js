@@ -123,33 +123,13 @@ export const deleteExpense = async id => {
   }
 };
 
-/**
- * Soft deletes multiple expenses by IDs.
- * @param {number[]} ids - Array of expense IDs
- * @returns {Promise<Object>}
- */
-export const bulkDeleteExpenses = async ids => {
-  if (!Array.isArray(ids) || ids.length === 0)
-    throw new Error("IDs array is required for bulk delete");
-
-  try {
-    const { data } = await axiosInstance.delete(`/expenses/bulk-delete`, {
-      data: { ids }
-    });
-    return data;
-  } catch (error) {
-    handleAxiosError(error, "Failed to bulk delete expenses");
-  }
-};
-
 // Named export group
 export const expensesApi = {
   getExpenses,
   getExpense,
   createExpense,
   updateExpense,
-  deleteExpense,
-  bulkDeleteExpenses
+  deleteExpense
 };
 
 export default expensesApi;

@@ -13,20 +13,16 @@ const FILTER_KEYS = []; // None
 const InventoryLogs = () => {
   const { theme } = useTheme();
   // Table controls (pagination/sorting only)
-  const { tableState, handlers } = useTableControls({
+  const { tableState, handlers, filters } = useTableControls({
     FILTER_KEYS,
-    resourceName: "InventoryLog",
+    resourceName: "InventoryLog"
   });
   const { pagination, sorting } = tableState;
   const { handlePaginationChange, handleSortingChange } = handlers;
 
   // Query inventory logs with current table state as params
-  const { data: logsData, ...queryStatus } = useInventoryLogs({
-    page: pagination.page,
-    limit: pagination.limit,
-    sortBy: sorting.sortBy,
-    sortOrder: sorting.sortOrder,
-  });
+  const { data: logsData, ...queryStatus } = useInventoryLogs(filters);
+  console.log("🚀 ~ InventoryLogs ~ logsData:", logsData)
 
   const logs = logsData?.data ?? [];
   const totalRows = logsData?.pagination?.totalRows ?? 0;

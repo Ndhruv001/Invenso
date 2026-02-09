@@ -24,7 +24,7 @@ const ExpensesSummaryStats = ({ stats }) => {
   const items = [
     {
       title: "Total Expenses",
-      value: stats?.totalExpenses?.toLocaleString() ?? 0,
+      value: stats?.totalAmount ?? 0,
       subtitle: "Sum of all expenses",
       icon: DollarSign,
       color: "danger",

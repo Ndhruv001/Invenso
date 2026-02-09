@@ -44,9 +44,6 @@ const PartyModal = ({
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-  initialData = null;
-  const createPartyMutation = useCreateParty();
-  onSubmit = createPartyMutation.mutateAsync;
 
   const { theme } = useTheme();
   const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));

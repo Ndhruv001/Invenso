@@ -2,38 +2,33 @@
  * paymentServices.js
  * Prisma-based services for Payment resource.
  *
- * Supports:
- * - List with filters (type, referenceType, paymentMode, date range), pagination, search, sorting, stats
- * - Get by ID
- * - Create payment, update party currentBalance, audit log in transaction
- * - Update payment, handle amount and partyId changes with corresponding balance corrections, audit log in transaction
- * - Delete payment, revert party balance, audit log in transaction
- * - Bulk delete with balance revert and audit logs
- * - Global search on payment remarks and references
- * - Name suggestions for payment references for dropdowns (optional)
+ * Style intentionally mirrors productServices.js:
+ * - Clear sections
+ * - Explicit logic
+ * - Minimal abstraction
+ * - Easy to debug & reason about
  */
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
-/**
- * Convert date range filter to Prisma where clause
- * @param {Object} dateFilter { from: string, to: string }
- * @returns {Object} Prisma date filter
- */
-function buildDateFilter(dateFilter) {
-  if (!dateFilter) return undefined;
-  const whereDate = {};
-  if (dateFilter.from) whereDate.gte = new Date(dateFilter.from);
-  if (dateFilter.to) whereDate.lte = new Date(dateFilter.to);
-  return Object.keys(whereDate).length ? whereDate : undefined;
+/* -------------------------------------------------------------------------- */
+/*                               Date Filter                                  */
+/* -------------------------------------------------------------------------- */
+
+function buildDateFilter({ from, to }) {
+  const cond = {};
+
+  if (from) cond.gte = new Date(from);
+  if (to) cond.lte = new Date(to);
+
+  return Object.keys(cond).length ? cond : undefined;
 }
 
-/**
- * List payments with pagination, filters, search, and stats
- * @param {Object} params
- * @returns {Object} { data, pagination, stats }
- */
+/* -------------------------------------------------------------------------- */
+/*                               List Payments                                */
+/* -------------------------------------------------------------------------- */
+
 async function listPayments({
   page = 1,
   limit = 10,
@@ -44,92 +39,116 @@ async function listPayments({
 }) {
   const where = {};
 
-  // Filters
+  /* -------------------- Filters -------------------- */
+
   if (filters.type) where.type = filters.type;
   if (filters.referenceType) where.referenceType = filters.referenceType;
   if (filters.paymentMode) where.paymentMode = filters.paymentMode;
 
-  if (filters.date) {
-    const dateFilter = buildDateFilter(filters.date);
-    if (dateFilter) where.date = dateFilter;
+   if (filters.dateFrom || filters.dateTo) {
+    const dateFilter = buildDateFilter({
+      from: filters.dateFrom,
+      to: filters.dateTo
+    });
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
   }
 
-  if (search && search.trim() !== "") {
-    const trimmedSearch = search.trim();
+  /* -------------------- Search (Simple like Product) -------------------- */
 
-    // Prepare party name filter: find party ids matching the name search
-    const matchingParties = await prisma.party.findMany({
+  if (search.trim()) {
+    const q = search.trim();
+
+    // Numeric search (amount)
+    const amount = Number(q);
+    const isNumber = !isNaN(amount);
+
+    // Find matching parties by name
+    const parties = await prisma.party.findMany({
       where: {
-        name: { contains: trimmedSearch, mode: "insensitive" }
+        name: { contains: q, mode: "insensitive" }
       },
       select: { id: true }
     });
 
-    const partyIds = matchingParties?.map(p => p.id) || [];
-
-    // Build search filter with OR on payment fields + partyId in matching parties
     where.OR = [
-      { remark: { contains: trimmedSearch, mode: "insensitive" } },
-      { paymentReference: { contains: trimmedSearch, mode: "insensitive" } },
-      { partyId: { in: partyIds } }
+      { paymentReference: { contains: q, mode: "insensitive" } },
+      { remark: { contains: q, mode: "insensitive" } },
+      ...(isNumber ? [{ amount: amount }] : []),
+      ...(parties.length ? [{ partyId: { in: parties.map(p => p.id) } }] : [])
     ];
   }
 
-  // Pagination
+  /* -------------------- Pagination -------------------- */
+
   const skip = (page - 1) * limit;
-  const take = limit;
 
-  // Total count
-  const totalRows = await prisma.payment.count({ where });
-  const totalPages = Math.ceil(totalRows / limit);
+  /* -------------------- Safe Sorting -------------------- */
 
-  // Fetch payments with relations
-  const data = await prisma.payment.findMany({
-    where,
-    orderBy: { [sortBy]: sortOrder },
-    skip,
-    take,
-    include: { party: true }
-  });
+  const allowedSortFields = ["date", "party", "type", "amount", "paymentMode", "createdAt"];
 
-  // Stats calculation (all filtered payments)
-  const [totalAmount, totalCredit, totalDebit] = await Promise.all([
-    prisma.payment
-      .aggregate({
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
+
+  const orderBy =
+    safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
+
+  /* -------------------- DB Transaction -------------------- */
+
+  const [payments, totalRows, groupedParties, totalPaidAgg, totalReceivedAgg] =
+    await prisma.$transaction([
+      prisma.payment.findMany({
         where,
+        skip,
+        take: limit,
+        orderBy,
+        include: { party: true }
+      }),
+
+      prisma.payment.count({ where }),
+
+      prisma.payment.groupBy({
+        by: ["partyId"],
+        where
+      }),
+
+      prisma.payment.aggregate({
+        where: { ...where, type: "PAID" },
         _sum: { amount: true }
-      })
-      .then(res => Number(res._sum.amount) || 0),
-    prisma.payment
-      .aggregate({
+      }),
+
+      prisma.payment.aggregate({
         where: { ...where, type: "RECEIVED" },
         _sum: { amount: true }
       })
-      .then(res => Number(res._sum.amount) || 0),
-    prisma.payment
-      .aggregate({
-        where: { ...where, type: "PAID" },
-        _sum: { amount: true }
-      })
-      .then(res => Number(res._sum.amount) || 0)
-  ]);
+    ]);
+
+  /* -------------------- Derived Stats (Like Product) -------------------- */
+
+  const totalPaid = Number(totalPaidAgg._sum.amount || 0);
+  const totalReceived = Number(totalReceivedAgg._sum.amount || 0);
 
   return {
-    data,
-    pagination: { page, limit, totalRows, totalPages },
+    data: payments,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
     stats: {
-      totalAmount,
-      totalCredit,
-      totalDebit
+      totalPayments: totalRows,
+      totalPaid,
+      totalReceived,
+      totalParties: groupedParties.length
     }
   };
 }
 
-/**
- * Get payment by ID
- * @param {number} id
- * @returns payment object
- */
+/* -------------------------------------------------------------------------- */
+/*                               Get Payment                                  */
+/* -------------------------------------------------------------------------- */
+
 async function getPaymentById(id) {
   if (!id) throw new AppError("Payment ID is required", 400);
 
@@ -143,58 +162,61 @@ async function getPaymentById(id) {
   return payment;
 }
 
-/**
- * Helper to update party currentBalance according to payment type and amount change
- * @param {import(".prisma/client").Prisma.TransactionClient} tx Prisma transaction client
- * @param {number} partyId
- * @param {"RECEIVED" | "PAID"} type
- * @param {number} amount
- * @param {"add" | "subtract"} operation
- */
-async function updatePartyBalance(tx, partyId, type, amount, operation) {
-  if (!partyId || amount === 0) return;
+/* -------------------------------------------------------------------------- */
+/*                               Create Payment                               */
+/* -------------------------------------------------------------------------- */
 
-  // Adjust amount sign based on payment type and operation (add or subtract)
-  let adjustedAmount = Number(amount);
-  if (type === "RECEIVED") {
-    adjustedAmount = operation === "add" ? adjustedAmount : -adjustedAmount;
-  } else if (type === "PAID") {
-    adjustedAmount = operation === "add" ? -adjustedAmount : adjustedAmount;
-  }
-
-  await tx.party.update({
-    where: { id: partyId },
-    data: {
-      currentBalance: {
-        increment: adjustedAmount
-      }
-    }
-  });
-}
-
-/**
- * Create payment with updating party currentBalance and audit log
- * Wrap in transaction
- * @param {Object} data payment data
- * @param {number|null} userId audit user id
- * @returns created payment
- */
 async function createPayment(data, userId = null) {
   if (!data) throw new AppError("Payment data is required", 400);
-  const amount = Number(data.amount);
-  const partyId = data.partyId || null;
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
+    const amount = Number(data.amount);
+
+    /* -------------------- Build Data (like Product) -------------------- */
+
+    const paymentData = {
+      date: data.date ?? undefined,
+      type: data.type,
+      amount,
+      referenceType: data.referenceType,
+      paymentMode: data.paymentMode ?? undefined,
+
+      ...(data.partyId && { partyId: data.partyId }),
+      ...(data.paymentReference && { paymentReference: data.paymentReference }),
+      ...(data.remark && { remark: data.remark }),
+
+      ...(data.purchaseId && { purchaseId: data.purchaseId }),
+      ...(data.saleId && { saleId: data.saleId }),
+      ...(data.purchaseReturnId && { purchaseReturnId: data.purchaseReturnId }),
+      ...(data.saleReturnId && { saleReturnId: data.saleReturnId }),
+      ...(data.transportId && { transportId: data.transportId })
+    };
+
+    /* -------------------- Create Payment -------------------- */
+
     const payment = await tx.payment.create({
-      data
+      data: paymentData
     });
 
-    // Update party currentBalance if party assigned
-    if (partyId) {
-      await updatePartyBalance(tx, partyId, data.type, amount, "add");
+    /* -------------------- Party Balance Update -------------------- */
+    // RECEIVED → increase balance
+    // PAID     → decrease balance
+
+    if (data.partyId) {
+      const balanceChange = data.type === "RECEIVED" ? amount : -amount;
+
+      await tx.party.update({
+        where: { id: data.partyId },
+        data: {
+          currentBalance: {
+            increment: balanceChange
+          }
+        }
+      });
     }
 
-    // Audit log
+    /* -------------------- Audit Log -------------------- */
+
     await tx.auditLog.create({
       data: {
         tableName: "payments",
@@ -209,46 +231,73 @@ async function createPayment(data, userId = null) {
   });
 }
 
-/**
- * Update payment, handle amount and partyId changes with balance updates and audit
- * Wrap in transaction
- * @param {number} id
- * @param {Object} data update data
- * @param {number|null} userId
- * @returns updated payment
- */
+/* -------------------------------------------------------------------------- */
+/*                               Update Payment                               */
+/* -------------------------------------------------------------------------- */
+
 async function updatePayment(id, data, userId = null) {
   if (!id) throw new AppError("Payment ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
     const existing = await tx.payment.findUnique({ where: { id } });
     if (!existing) throw new AppError("Payment not found", 404);
 
-    const prevAmount = Number(existing.amount);
-    const prevPartyId = existing.partyId;
-    const prevType = existing.type;
+    const oldAmount = Number(existing.amount);
+    const newAmount = data.amount !== undefined ? Number(data.amount) : oldAmount;
 
-    const newAmount = data.amount !== undefined ? Number(data.amount) : prevAmount;
-    const newPartyId = data.partyId !== undefined ? data.partyId : prevPartyId;
-    const newType = data.type !== undefined ? data.type : prevType;
+    const oldPartyId = existing.partyId;
+    const newPartyId = data.partyId !== undefined ? data.partyId : oldPartyId;
 
-    // Undo previous party balance adjustment if party changed or amount/type changed
-    if (prevPartyId) {
-      await updatePartyBalance(tx, prevPartyId, prevType, prevAmount, "subtract");
+    const oldType = existing.type;
+    const newType = data.type ?? oldType;
+
+    /* -------------------- Revert Old Balance -------------------- */
+
+    if (oldPartyId) {
+      const revertAmount = oldType === "RECEIVED" ? -oldAmount : oldAmount;
+
+      await tx.party.update({
+        where: { id: oldPartyId },
+        data: {
+          currentBalance: { increment: revertAmount }
+        }
+      });
     }
 
-    // Apply new balance adjustment if applicable
+    /* -------------------- Apply New Balance -------------------- */
+
     if (newPartyId) {
-      await updatePartyBalance(tx, newPartyId, newType, newAmount, "add");
+      const applyAmount = newType === "RECEIVED" ? newAmount : -newAmount;
+
+      await tx.party.update({
+        where: { id: newPartyId },
+        data: {
+          currentBalance: { increment: applyAmount }
+        }
+      });
     }
 
-    // Update payment
+    /* -------------------- Build Update Data -------------------- */
+
+    const updateData = {
+      ...(data.date !== undefined && { date: data.date }),
+      ...(data.type !== undefined && { type: data.type }),
+      ...(data.amount !== undefined && { amount: newAmount }),
+      ...(data.partyId !== undefined && { partyId: data.partyId }),
+      ...(data.paymentMode !== undefined && { paymentMode: data.paymentMode }),
+      ...(data.paymentReference !== undefined && {
+        paymentReference: data.paymentReference
+      }),
+      ...(data.remark !== undefined && { remark: data.remark })
+    };
+
     const updatedPayment = await tx.payment.update({
       where: { id },
-      data
+      data: updateData
     });
 
-    // Audit log
+    /* -------------------- Audit Log -------------------- */
+
     await tx.auditLog.create({
       data: {
         tableName: "payments",
@@ -264,33 +313,35 @@ async function updatePayment(id, data, userId = null) {
   });
 }
 
-/**
- * Delete payment, revert party balance, create audit log
- * Wrap in transaction
- * @param {number} id
- * @param {number|null} userId
- * @returns boolean success
- */
+/* -------------------------------------------------------------------------- */
+/*                               Delete Payment                               */
+/* -------------------------------------------------------------------------- */
+
 async function deletePayment(id, userId = null) {
   if (!id) throw new AppError("Payment ID is required", 400);
 
-  return await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
     const existing = await tx.payment.findUnique({ where: { id } });
     if (!existing) throw new AppError("Payment not found", 404);
 
-    const partyId = existing.partyId;
-    const amount = Number(existing.amount);
-    const type = existing.type;
+    /* -------------------- Revert Party Balance -------------------- */
 
-    // Revert party balance
-    if (partyId) {
-      await updatePartyBalance(tx, partyId, type, amount, "subtract");
+    if (existing.partyId) {
+      const revertAmount =
+        existing.type === "RECEIVED" ? -Number(existing.amount) : Number(existing.amount);
+
+      await tx.party.update({
+        where: { id: existing.partyId },
+        data: {
+          currentBalance: { increment: revertAmount }
+        }
+      });
     }
 
-    // Delete payment record
     await tx.payment.delete({ where: { id } });
 
-    // Audit log
+    /* -------------------- Audit Log -------------------- */
+
     await tx.auditLog.create({
       data: {
         tableName: "payments",
@@ -305,58 +356,16 @@ async function deletePayment(id, userId = null) {
   });
 }
 
-/**
- * Bulk soft delete payments by IDs (delete permanently here to keep consistency),
- * revert party balances and create audit logs within transaction
- * @param {number[]} ids
- * @param {number|null} userId
- */
-async function bulkDeletePayments(ids, userId = null) {
-  if (!Array.isArray(ids) || ids.length === 0)
-    throw new AppError("Array of payment IDs is required", 400);
+/* -------------------------------------------------------------------------- */
+/*                                   Exports                                  */
+/* -------------------------------------------------------------------------- */
 
-  return await prisma.$transaction(async tx => {
-    const existingPayments = await tx.payment.findMany({
-      where: { id: { in: ids } }
-    });
+export { listPayments, getPaymentById, createPayment, updatePayment, deletePayment };
 
-    if (existingPayments.length !== ids.length) throw new AppError("Some payments not found", 404);
-
-    for (const payment of existingPayments) {
-      const { partyId, amount, type, id: payId } = payment;
-      if (partyId) {
-        await updatePartyBalance(tx, partyId, type, Number(amount), "subtract");
-      }
-      await tx.payment.delete({ where: { id: payId } });
-
-      await tx.auditLog.create({
-        data: {
-          tableName: "payments",
-          recordId: String(payId),
-          action: "DELETE",
-          oldValue: JSON.stringify(payment),
-          userId
-        }
-      });
-    }
-
-    return true;
-  });
-}
-
-export {
-  listPayments,
-  getPaymentById,
-  createPayment,
-  updatePayment,
-  deletePayment,
-  bulkDeletePayments,
-};
 export default {
   listPayments,
   getPaymentById,
   createPayment,
   updatePayment,
-  deletePayment,
-  bulkDeletePayments,
+  deletePayment
 };

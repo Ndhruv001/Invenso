@@ -1,32 +1,55 @@
 /**
- * routes/transportRoutes.js
- * Routes for Transport resource.
+ * @file Routes for Transport resource.
  * Sets up RESTful endpoints with validation and authentication middleware.
  */
 
 import express from "express";
 const router = express.Router();
 
+import authMiddleware from "../middlewares/authMiddleware.js";
+import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import transportController from "../controllers/transportControllers.js";
 import {
-  validateTransport,
+  validateCreateTransport,
   validateTransportId,
-  validateTransportQuery,
-  validateBulkDelete
+  validateUpdateTransport
 } from "../validations/transportValidations.js";
-import validateRequest from "../middlewares/validateRequestMiddleware.js";
-import authMiddleware from "../middlewares/authMiddleware.js";
 
-// List transports with filters, pagination, sorting, stats
-router.get(
+/**
+ * ---------------------------
+ * STATIC & FEATURE ROUTES
+ * ---------------------------
+ */
+
+/**
+ * (Reserved for future features like /transports/stats or /transports/bulk-delete)
+ */
+
+/**
+ * ---------------------------
+ * COLLECTION ROUTES
+ * ---------------------------
+ */
+
+// List transports with filters, pagination, sorting
+router.get("/", authMiddleware, transportController.listTransports);
+
+// Create new transport
+router.post(
   "/",
   authMiddleware,
-  validateTransportQuery,
+  validateCreateTransport,
   validateRequest,
-  transportController.listTransports
+  transportController.createTransport
 );
 
-// Get single transport by ID
+/**
+ * ---------------------------
+ * PARAMETERIZED ROUTES
+ * ---------------------------
+ */
+
+// Get single transport
 router.get(
   "/:id",
   authMiddleware,
@@ -35,26 +58,17 @@ router.get(
   transportController.getTransport
 );
 
-// Create new transport
-router.post(
-  "/",
-  authMiddleware,
-  validateTransport,
-  validateRequest,
-  transportController.createTransport
-);
-
-// Update transport by ID
+// Update transport
 router.put(
   "/:id",
   authMiddleware,
   validateTransportId,
-  validateTransport,
+  validateUpdateTransport,
   validateRequest,
   transportController.updateTransport
 );
 
-// Delete transport by ID
+// Delete transport
 router.delete(
   "/:id",
   authMiddleware,
@@ -63,14 +77,9 @@ router.delete(
   transportController.deleteTransport
 );
 
-// Bulk delete transports
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  transportController.bulkDeleteTransports
-);
+/* -------------------------------------------------------------------------- */
+/* Exports                                  */
+/* -------------------------------------------------------------------------- */
 
 export default router;
-export { router };
+export { router as transportRouter };

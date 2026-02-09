@@ -4,42 +4,29 @@
  */
 
 import React from "react";
-import { Wallet, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, User } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 
-/**
- * @typedef {Object} PaymentsSummaryStatsProps
- * @property {Object} stats - API stats object.
- * @property {number} stats.totalAmount - Sum of all filtered payments.
- * @property {number} stats.totalCredit - Total credits (RECEIVED).
- * @property {number} stats.totalDebit - Total debits (PAID).
- */
 
-/**
- * PaymentsSummaryStats - Renders a responsive grid of StatCards.
- *
- * @param {PaymentsSummaryStatsProps} props
- * @returns {JSX.Element}
- */
 const PaymentsSummaryStats = ({ stats }) => {
   const items = [
     {
-      title: "Total Amount",
-      value: stats?.totalAmount?.toLocaleString() ?? 0,
-      subtitle: "All filtered payments",
-      icon: Wallet,
+      title: "Total Parties",
+      value: stats?.totalParties ?? 0,
+      subtitle: "All filtered parties",
+      icon: User,
       color: "default"
     },
     {
-      title: "Total Credit",
-      value: stats?.totalCredit?.toLocaleString() ?? 0,
+      title: "Total Received",
+      value: stats?.totalReceived ?? 0,
       subtitle: "Received payments (IN)",
       icon: ArrowDownCircle,
       color: "success"
     },
     {
-      title: "Total Debit",
-      value: stats?.totalDebit?.toLocaleString() ?? 0,
+      title: "Total Paid",
+      value: stats?.totalPaid ?? 0,
       subtitle: "Paid payments (OUT)",
       icon: ArrowUpCircle,
       color: "danger"

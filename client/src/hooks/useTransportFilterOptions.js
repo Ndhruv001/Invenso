@@ -1,11 +1,11 @@
 import { format } from "date-fns";
-import { PAYMENT_TYPE_OPTIONS } from "@/constants/PAYMENT_TYPES";
+import { PAYMENT_MODE_OPTIONS } from "@/constants/PAYMENT_MODES";
 
 /**
- * Hook for Payment Filter Options
+ * Hook for Transport Filter Options
  * Based on backend filters: type, dateFrom, dateTo.
  */
-function usePaymentFilterOptions() {
+function useTransportFilterOptions() {
 
   // Static date placeholder options for UI components that handle date pickers
   // The actual value bindings (dateFrom, dateTo) will be managed by form state in the page component
@@ -13,11 +13,11 @@ function usePaymentFilterOptions() {
 
   return [
     {
-      key: "type",
+      key: "paymentMode",
       type: "select",
-      label: "Payment Type",
+      label: "Payment Mode",
       placeholder: "All Types",
-      options: PAYMENT_TYPE_OPTIONS,
+      options: PAYMENT_MODE_OPTIONS
     },
     {
       key: "dateFrom",
@@ -38,5 +38,5 @@ function usePaymentFilterOptions() {
   ];
 }
 
-export default usePaymentFilterOptions;
-export { usePaymentFilterOptions };
+export default useTransportFilterOptions;
+export { useTransportFilterOptions };

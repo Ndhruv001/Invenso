@@ -5,7 +5,6 @@ import {
   createPayment,
   updatePayment,
   deletePayment,
-  bulkDeletePayments,
 } from "@/services/paymentServices";
 
 /**
@@ -73,20 +72,6 @@ export const useDeletePayment = () => {
   });
 };
 
-export const useBulkDeletePayments = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationKey: ["bulk-delete-payments"],
-    mutationFn: bulkDeletePayments,
-    onSuccess: (ids) => {
-      queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.all });
-      ids?.forEach((id) =>
-        queryClient.removeQueries({ queryKey: PAYMENT_KEYS.detail(id) })
-      );
-    },
-  });
-};
-
 // Default export
 export default {
   usePayments,
@@ -94,6 +79,4 @@ export default {
   useCreatePayment,
   useUpdatePayment,
   useDeletePayment,
-  useBulkDeletePayments,
-  PAYMENT_KEYS,
 };

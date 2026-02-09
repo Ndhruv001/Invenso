@@ -1,108 +1,105 @@
 /**
- * validations/transportValidations.js
- * Validation rules for Transport resource using express-validator.
+ * @file express-validator middlewares for transport resource.
  */
 
-import { body, param, query } from "express-validator";
+import { body, param } from "express-validator";
+import { PaymentMode } from "@prisma/client";
 
-const paymentModes = [
-  "NONE",
-  "CASH",
-  "BANK_TRANSFER",
-  "CHEQUE",
-  "UPI",
-  "CARD",
-  "CREDIT",
-  "ONLINE",
+// Convert Prisma enums → arrays
+const PAYMENT_MODES = Object.values(PaymentMode);
+
+// --------------------
+// Validate transport ID param
+// --------------------
+const validateTransportId = [
+  param("id")
+    .exists()
+    .withMessage("Transport ID is required")
+    .isInt({ gt: 0 })
+    .withMessage("Transport ID must be a positive integer")
+    .toInt()
 ];
 
-// Validate fields for create/update transport
-const validateTransport = [
-  body("partyId")
-    .notEmpty()
-    .withMessage("Party ID is required")
-    .isInt({ gt: 0 })
-    .withMessage("Party ID must be a positive integer"),
-  body("driverId")
-    .notEmpty()
-    .withMessage("Driver ID is required")
-    .isInt({ gt: 0 })
-    .withMessage("Driver ID must be a positive integer"),
-  body("date").optional().isISO8601().withMessage("Date must be ISO8601 format"),
-  body("shift").optional().isString(),
+// --------------------
+// Validate transport create body
+// --------------------
+const validateCreateTransport = [
+  body("date").optional().isISO8601().toDate(),
+
+  body("partyId").exists().withMessage("Party ID is required").isInt({ gt: 0 }).toInt(),
+
+  body("driverId").exists().withMessage("Driver ID is required").isInt({ gt: 0 }).toInt(),
+
+  body("shift").optional().isString().trim(),
+
   body("fromLocation")
-    .notEmpty()
+    .exists()
     .withMessage("From Location is required")
-    .isString(),
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage("From Location cannot be empty"),
+
   body("toLocation")
-    .notEmpty()
+    .exists()
     .withMessage("To Location is required")
-    .isString(),
-  body("amount")
+    .isString()
+    .trim()
     .notEmpty()
+    .withMessage("To Location cannot be empty"),
+
+  body("amount")
+    .exists()
     .withMessage("Amount is required")
     .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Amount must be a decimal with up to 2 decimals"),
-  body("receivedAmount")
-    .optional()
-    .isDecimal({ decimal_digits: "0,2" })
-    .withMessage("Received Amount must be a decimal with up to 2 decimals"),
+    .toFloat(),
+
+  body("receivedAmount").optional().isDecimal({ decimal_digits: "0,2" }).toFloat(),
+
   body("paymentMode")
     .optional()
-    .isIn(paymentModes)
-    .withMessage(`Payment Mode must be one of: ${paymentModes.join(", ")}`),
-  body("paymentReference").optional().isString(),
-  body("remark").optional().isString(),
+    .isIn(PAYMENT_MODES)
+    .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
+
+  body("paymentReference").optional().isString().trim(),
+
+  body("remark").optional().isString().trim()
 ];
 
-// Validate transport ID param
-const validateTransportId = [
-  param("id").isInt({ gt: 0 }).withMessage("Valid Transport ID is required"),
+// --------------------
+// Validate transport update body
+// --------------------
+const validateUpdateTransport = [
+  body("date").optional().isISO8601().toDate(),
+
+  body("partyId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("driverId").optional().isInt({ gt: 0 }).toInt(),
+
+  body("shift").optional().isString().trim(),
+
+  body("fromLocation").optional().isString().trim().notEmpty(),
+
+  body("toLocation").optional().isString().trim().notEmpty(),
+
+  body("amount").optional().isDecimal({ decimal_digits: "0,2" }).toFloat(),
+
+  body("receivedAmount").optional().isDecimal({ decimal_digits: "0,2" }).toFloat(),
+
+  body("paymentMode").optional().isIn(PAYMENT_MODES),
+
+  body("paymentReference").optional().isString().trim(),
+
+  body("remark").optional().isString().trim()
 ];
 
-// Validate query params for listing transports
-const validateTransportQuery = [
-  query("page").optional().isInt({ min: 1 }).toInt(),
-  query("limit").optional().isInt({ min: 1 }).toInt(),
-  query("sortBy")
-    .optional()
-    .isIn(["date", "createdAt", "updatedAt", "amount", "receivedAmount"])
-    .withMessage("Invalid sortBy value"),
-  query("sortOrder")
-    .optional()
-    .isIn(["asc", "desc"])
-    .withMessage("Invalid sortOrder value"),
-  query("filters").optional().custom((value) => {
-    if (typeof value === "string") {
-      try {
-        JSON.parse(value);
-      } catch {
-        throw new Error("Invalid JSON for filters");
-      }
-    }
-    return true;
-  }),
-];
+// --------------------
+// Exports
+// --------------------
+export { validateCreateTransport, validateUpdateTransport, validateTransportId };
 
-// Validate bulk delete body
-const validateBulkDelete = [
-  body("ids")
-    .isArray({ min: 1 })
-    .withMessage("Array of transport IDs is required"),
-  body("ids.*")
-    .isInt({ gt: 0 })
-    .withMessage("Each transport ID must be a positive integer"),
-];
-
-export {
-  validateTransport,
-  validateTransportId,
-  validateTransportQuery,
-  validateBulkDelete,
-};
 export default {
-  validateTransport,
-  validateTransportId,
-  validateTransportQuery,
-  validateBulkDelete,
+  validateCreateTransport,
+  validateUpdateTransport,
+  validateTransportId
 };

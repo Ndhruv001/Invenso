@@ -193,7 +193,7 @@ export const SelectField = React.memo(
               }`}
           >
             <option value="">{!isEditMode && initialData ? "Not Specified" : placeholder}</option>
-            {options.map(opt =>
+            {options?.map(opt =>
               typeof opt === "string" ? (
                 <option key={opt} value={opt}>
                   {opt}

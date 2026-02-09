@@ -477,7 +477,7 @@ const SaleReturnModal = ({
 
                         if (selectedParty) {
                           setSelectedParty(null);
-                          setValue("partyId", null);
+                          setValue("partyId", null, { shouldDirty: true });
                           resetPurchaseContext();
                         }
 

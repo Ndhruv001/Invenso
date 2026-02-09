@@ -1,5 +1,4 @@
 import React from "react";
-import { Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers/formatters";
 import { useTheme } from "@/hooks/useTheme";
 

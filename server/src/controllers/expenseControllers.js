@@ -1,35 +1,31 @@
+// controllers/expenseControllers.js
+
 /**
- * expenseControllers.js
- * Controllers for Expense resource.
- * Handles HTTP requests, calls expenseServices,
- * wrapped in asyncHandler for async error catching,
- * uses successResponse for consistent API responses.
+ * @file Controllers for Expense resource.
+ * Orchestrates requests/responses.
+ * Wraps service calls in asyncHandler and sends structured success responses.
  */
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as expenseServices from "../services/expenseServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /expenses
- * List expenses with filters, pagination, sorting, stats
+ * Query params: page, limit, sortBy, sortOrder, search, filters
+ * Returns paginated list of expenses with filters and stats.
  */
 const listExpenses = asyncHandler(async (req, res) => {
-  const query = {
-    page: Number(req.query.page) || 1,
-    limit: Number(req.query.limit) || 10,
-    sortBy: req.query.sortBy || "date",
-    sortOrder: req.query.sortOrder || "desc",
-    filters: req.query.filters || {},
-  };
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
-  if (typeof query.filters === "string") {
-    try {
-      query.filters = JSON.parse(query.filters);
-    } catch {
-      query.filters = {};
-    }
-  }
+  const query = {
+    page: Number(page) || 1,
+    limit: Number(limit) || 10,
+    sortBy: sortBy || "date",
+    sortOrder: sortOrder || "desc",
+    search: search || "",
+    filters: rest || {} // everything else goes into filters
+  };
 
   const result = await expenseServices.listExpenses(query);
   return successResponse(res, "Expenses fetched successfully", result, 200);
@@ -37,7 +33,7 @@ const listExpenses = asyncHandler(async (req, res) => {
 
 /**
  * GET /expenses/:id
- * Get single expense by ID
+ * Fetch single expense by ID.
  */
 const getExpense = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -47,62 +43,53 @@ const getExpense = asyncHandler(async (req, res) => {
 
 /**
  * POST /expenses
- * Create new expense
+ * Create a new expense.
+ * Expects expense data in req.body.
  */
 const createExpense = asyncHandler(async (req, res) => {
   const expenseData = req.body;
   const userId = req.user?.id || null;
+
   const createdExpense = await expenseServices.createExpense(expenseData, userId);
   return successResponse(res, "Expense created successfully", createdExpense, 201);
 });
 
 /**
  * PUT /expenses/:id
- * Update expense by ID
+ * Update existing expense by ID.
+ * Expects update data in req.body.
  */
 const updateExpense = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number(req.params?.id);
   const updateData = req.body;
   const userId = req.user?.id || null;
+
   const updatedExpense = await expenseServices.updateExpense(id, updateData, userId);
   return successResponse(res, "Expense updated successfully", updatedExpense, 200);
 });
 
 /**
  * DELETE /expenses/:id
- * Soft delete expense by ID
+ * Delete expense by ID.
  */
 const deleteExpense = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number(req.params?.id);
   const userId = req.user?.id || null;
+
   const deleted = await expenseServices.deleteExpense(id, userId);
   return successResponse(res, "Expense deleted successfully", deleted, 200);
 });
 
-/**
- * POST /expenses/bulk-delete
- * Bulk soft delete expenses by IDs
- */
-const bulkDeleteExpenses = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await expenseServices.bulkDeleteExpenses(ids, userId);
-  return successResponse(res, "Expenses deleted successfully", deleted, 200);
-});
+/* -------------------------------------------------------------------------- */
+/*                                   Exports                                  */
+/* -------------------------------------------------------------------------- */
 
 export default {
   listExpenses,
   getExpense,
   createExpense,
   updateExpense,
-  deleteExpense,
-  bulkDeleteExpenses,
+  deleteExpense
 };
-export {
-  listExpenses,
-  getExpense,
-  createExpense,
-  updateExpense,
-  deleteExpense,
-  bulkDeleteExpenses,
-};
+
+export { listExpenses, getExpense, createExpense, updateExpense, deleteExpense };

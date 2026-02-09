@@ -33,7 +33,7 @@ function useTableControls({
       sortBy: searchParams.get("sortBy") || defaultSortBy,
       sortOrder: searchParams.get("sortOrder") || "desc",
       page: Number(searchParams.get("page")) || 1,
-      limit: Number(searchParams.get("limit")) || 10
+      limit: Number(searchParams.get("limit")) || 20
     };
   });
 

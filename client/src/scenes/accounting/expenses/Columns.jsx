@@ -1,14 +1,4 @@
 import React from "react";
-import {
-  Eye,
-  Edit,
-  Trash2,
-  MoreHorizontal,
-  Calendar,
-  CreditCard,
-  Layers,
-  Hash
-} from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers/formatters";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -57,25 +47,26 @@ const Columns = (showSelection = false) => {
       accessorKey: "amount",
       header: "Amount",
       cell: ({ getValue }) => (
-        <span className="font-semibold block text-right" style={{ color: theme.text.primary }}>
+        <span className="font-semibold block text-center" style={{ color: theme.text.primary }}>
           {formatCurrency(getValue())}
         </span>
       ),
       size: 120,
-      meta: { align: "right" }
+      meta: { align: "center" }
     },
     {
       accessorKey: "paymentMode",
       header: "Payment Mode",
       cell: ({ getValue }) => {
-        
-        return <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-          {getValue()
-            ? String(getValue())
-                .replace(/_/g, " ")
-                .replace(/\b(\w)/g, c => c.toUpperCase())
-            : ""}
-        </span>;
+        return (
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+            {getValue()
+              ? String(getValue())
+                  .replace(/_/g, " ")
+                  .replace(/\b(\w)/g, c => c.toUpperCase())
+              : ""}
+          </span>
+        );
       },
       size: 110
     },
@@ -84,9 +75,9 @@ const Columns = (showSelection = false) => {
       header: "Reference",
       cell: ({ getValue }) => {
         return getValue ? (
-          <span className="font-mono text-xs bg-white px-2 py-0.5 rounded">{getValue()}</span>
+          <span className={`font-mono text-sm ${theme.text.secondary}`}>{getValue()}</span>
         ) : (
-          <span className="text-xs text-gray-400">N/A</span>
+          <span className="text-xs text-gray-500">N/A</span>
         );
       },
       size: 120
@@ -103,7 +94,7 @@ const Columns = (showSelection = false) => {
           <span className="text-xs text-gray-400">N/A</span>
         ),
       size: 180
-    },
+    }
   ];
 
   if (showSelection) {

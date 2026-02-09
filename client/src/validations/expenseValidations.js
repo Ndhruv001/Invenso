@@ -1,45 +1,76 @@
-import * as yup from "yup";
-import { PAYMENT_MODES } from "@/constants/PAYMENT_MODES";
+// src/validations/expenseValidations.js
+import * as Yup from "yup";
+import PAYMENT_MODES from "@/constants/PAYMENT_MODES";
 
 /**
- * Expense validation schema derived from the Expense Prisma model.
+ * ---------------------------
+ * CREATE EXPENSE
+ * ---------------------------
  */
-const expenseValidations = yup.object().shape({
-  categoryId: yup
-    .number()
-    .typeError("Category is required")
+const expenseCreateSchema = Yup.object({
+  categoryId: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === "" || originalValue === null ? null : value
+    )
+    .integer("Category must be valid")
+    .positive("Category must be valid")
     .required("Category is required"),
 
-  date: yup
-    .date()
-    .typeError("Please select a valid date")
-    .required("Date is required")
-    .max(new Date(), "Date cannot be in the future"),
+  date: Yup.date().typeError("Invalid expense date").required("Expense date is required"),
 
-  amount: yup
-    .number()
+  amount: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === "" || originalValue === null ? 0 : value
+    )
     .typeError("Amount must be a number")
-    .positive("Amount must be greater than 0")
-    .max(999999999.99, "Amount is too large")
+    .positive("Amount must be greater than zero")
     .required("Amount is required"),
 
-  paymentMode: yup
-    .string()
-    .required("Payment mode is required")
-    .oneOf(Object.values(PAYMENT_MODES), "Invalid payment mode"),
+  paymentMode: Yup.string()
+    .oneOf(PAYMENT_MODES, "Invalid payment mode")
+    .required("Payment mode is required"),
 
-  paymentReference: yup
-    .string()
+  paymentReference: Yup.string()
+    .trim()
     .nullable()
-    .transform(val => (val === "" ? null : val))
-    .max(50, "Payment reference must not exceed 50 characters"),
+    .max(100, "Payment reference must be less than 100 characters"),
 
-  remark: yup
-    .string()
+  remark: Yup.string().trim().nullable().max(500, "Remark must be less than 500 characters")
+}).noUnknown(true);
+
+/**
+ * ---------------------------
+ * UPDATE EXPENSE
+ * ---------------------------
+ */
+const expenseUpdateSchema = Yup.object({
+  categoryId: Yup.number()
+    .integer("Category must be valid")
+    .positive("Category must be valid")
     .nullable()
-    .transform(val => (val === "" ? null : val))
-    .max(300, "Remark must not exceed 300 characters"),
-});
+    .notRequired(),
 
-export default expenseValidations;
-export { expenseValidations };
+  date: Yup.date().typeError("Invalid expense date").notRequired(),
+
+  amount: Yup.number()
+    .typeError("Amount must be a number")
+    .positive("Amount must be greater than zero")
+    .notRequired(),
+
+  paymentMode: Yup.string().oneOf(PAYMENT_MODES, "Invalid payment mode").notRequired(),
+
+  paymentReference: Yup.string()
+    .trim()
+    .nullable()
+    .max(100, "Payment reference must be less than 100 characters")
+    .notRequired(),
+
+  remark: Yup.string()
+    .trim()
+    .nullable()
+    .max(500, "Remark must be less than 500 characters")
+    .notRequired()
+}).noUnknown(true);
+
+export { expenseCreateSchema, expenseUpdateSchema };
+export default { expenseCreateSchema, expenseUpdateSchema };

@@ -11,9 +11,10 @@ import { useTableControls } from "@/hooks/useTableControls";
 const FILTER_KEYS = []; // None
 
 const AuditLogs = () => {
+
   const { theme } = useTheme();
   // Table controls (pagination/sorting only)
-  const { tableState, handlers } = useTableControls({
+  const { tableState, handlers, filters } = useTableControls({
     FILTER_KEYS,
     resourceName: "AuditLog",
   });
@@ -21,12 +22,7 @@ const AuditLogs = () => {
   const { handlePaginationChange, handleSortingChange } = handlers;
 
   // Query audit logs with current table state as params
-  const { data: logsData, ...queryStatus } = useAuditLogs({
-    page: pagination.page,
-    limit: pagination.limit,
-    sortBy: sorting.sortBy,
-    sortOrder: sorting.sortOrder,
-  });
+  const { data: logsData, ...queryStatus } = useAuditLogs(filters);
 
   const logs = logsData?.data ?? [];
   const totalRows = logsData?.pagination?.totalRows ?? 0;

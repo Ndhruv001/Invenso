@@ -5,7 +5,6 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
-  bulkDeleteExpenses
 } from "@/services/expenseServices";
 
 /**
@@ -89,19 +88,6 @@ export const useDeleteExpense = () => {
   });
 };
 
-export const useBulkDeleteExpenses = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationKey: ["bulk-delete-expenses"],
-    mutationFn: bulkDeleteExpenses,
-    onSuccess: ids => {
-      queryClient.invalidateQueries({ queryKey: EXPENSE_KEYS.all });
-      ids?.forEach(id => queryClient.removeQueries({ queryKey: EXPENSE_KEYS.detail(id) }));
-    }
-  });
-};
-
 // --------------------------------------------------
 // DEFAULT EXPORT
 // --------------------------------------------------
@@ -111,6 +97,4 @@ export default {
   useCreateExpense,
   useUpdateExpense,
   useDeleteExpense,
-  useBulkDeleteExpenses,
-  EXPENSE_KEYS
 };

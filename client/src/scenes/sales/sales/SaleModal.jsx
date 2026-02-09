@@ -69,7 +69,6 @@ const SaleModal = ({
   initialData = null,
   isViewOnly: isViewOnlyProp = false
 }) => {
-  console.log("🚀 ~ SaleModal ~ initialData:", initialData);
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */
@@ -435,8 +434,8 @@ const SaleModal = ({
 
                         if (selectedParty) {
                           setSelectedParty(null);
-                          setValue("partyId", null);
-                          setValue("party", null);
+                          setValue("partyId", null, { shouldDirty: true });
+                          
                         }
 
                         setPartyInputValue(value);
@@ -460,8 +459,8 @@ const SaleModal = ({
                             onClick={() => {
                               setSelectedParty(party);
                               setPartyInputValue(party.name);
-                              setValue("party", party);
-                              setValue("partyId", party.id);
+                              
+                              setValue("partyId", party.id, { shouldDirty: true });
                               setShowPartySuggestions(false);
                             }}
                           >

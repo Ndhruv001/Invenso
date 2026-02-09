@@ -1,32 +1,53 @@
-/**
- * routes/paymentRoutes.js
- * Routes for Payment resource.
- * Sets up RESTful endpoints with auth and validations.
- */
+// routes/paymentRoutes.js
 
 import express from "express";
 const router = express.Router();
 
-import paymentController from "../controllers/paymentControllers.js";
+import authMiddleware from "../middlewares/authMiddleware.js";
 import {
-  validatePayment,
-  validatePaymentId,
-  validatePaymentQuery,
-  validateBulkDelete,
+  validateCreatePayment,
+  validateUpdatePayment,
+  validatePaymentId
 } from "../validations/paymentValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
-import authMiddleware from "../middlewares/authMiddleware.js";
+import paymentController from "../controllers/paymentControllers.js";
 
-// List payments with filters, pagination, sorting
-router.get(
+/**
+ * ---------------------------
+ * STATIC & FEATURE ROUTES
+ * ---------------------------
+ */
+
+/**
+ * (No static feature routes for payments for now)
+ * Keep this section for future extensions
+ */
+
+/**
+ * ---------------------------
+ * COLLECTION ROUTES
+ * ---------------------------
+ */
+
+// List payments
+router.get("/", authMiddleware, paymentController.listPayments);
+
+// Create new payment
+router.post(
   "/",
   authMiddleware,
-  validatePaymentQuery,
+  validateCreatePayment,
   validateRequest,
-  paymentController.listPayments
+  paymentController.createPayment
 );
 
-// Get payment by ID
+/**
+ * ---------------------------
+ * PARAMETERIZED ROUTES
+ * ---------------------------
+ */
+
+// Get single payment
 router.get(
   "/:id",
   authMiddleware,
@@ -35,26 +56,17 @@ router.get(
   paymentController.getPayment
 );
 
-// Create new payment
-router.post(
-  "/",
-  authMiddleware,
-  validatePayment,
-  validateRequest,
-  paymentController.createPayment
-);
-
-// Update payment by ID
+// Update payment
 router.put(
   "/:id",
   authMiddleware,
   validatePaymentId,
-  validatePayment,
+  validateUpdatePayment,
   validateRequest,
   paymentController.updatePayment
 );
 
-// Delete payment by ID
+// Delete payment
 router.delete(
   "/:id",
   authMiddleware,
@@ -63,14 +75,5 @@ router.delete(
   paymentController.deletePayment
 );
 
-// Bulk delete payments
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  paymentController.bulkDeletePayments
-);
-
 export default router;
-export { router };
+export { router as paymentRouter };

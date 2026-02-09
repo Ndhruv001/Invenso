@@ -1,35 +1,31 @@
+// controllers/paymentControllers.js
+
 /**
- * paymentControllers.js
- * Controllers for Payment resource.
- * Handles requests/responses by calling paymentServices.
- * Uses asyncHandler for error handling and successResponse for responses.
+ * @file Controllers for Payment resource.
+ * Orchestrates requests/responses.
+ * Wraps service calls in asyncHandler and sends structured success responses.
  */
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as paymentServices from "../services/paymentServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * GET /payments
- * List payments with filters, pagination, sorting, and stats
+ * Query params: page, limit, sortBy, sortOrder, search, filters
+ * Returns paginated list of payments with filters and stats.
  */
 const listPayments = asyncHandler(async (req, res) => {
-  const query = {
-    page: Number(req.query.page) || 1,
-    limit: Number(req.query.limit) || 10,
-    sortBy: req.query.sortBy || "createdAt",
-    sortOrder: req.query.sortOrder || "desc",
-    search: req.query.search || "",
-    filters: req.query.filters || {},
-  };
+  const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
-  if (typeof query.filters === "string") {
-    try {
-      query.filters = JSON.parse(query.filters);
-    } catch {
-      query.filters = {};
-    }
-  }
+  const query = {
+    page: Number(page) || 1,
+    limit: Number(limit) || 10,
+    sortBy: sortBy || "createdAt",
+    sortOrder: sortOrder || "desc",
+    search: search || "",
+    filters: rest || {} // everything else goes into filters
+  };
 
   const result = await paymentServices.listPayments(query);
   return successResponse(res, "Payments fetched successfully", result, 200);
@@ -37,7 +33,7 @@ const listPayments = asyncHandler(async (req, res) => {
 
 /**
  * GET /payments/:id
- * Get payment by ID
+ * Fetch single payment by ID.
  */
 const getPayment = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -47,62 +43,54 @@ const getPayment = asyncHandler(async (req, res) => {
 
 /**
  * POST /payments
- * Create new payment
+ * Create a new payment.
+ * Expects payment data in req.body.
  */
 const createPayment = asyncHandler(async (req, res) => {
   const paymentData = req.body;
   const userId = req.user?.id || null;
+
   const createdPayment = await paymentServices.createPayment(paymentData, userId);
   return successResponse(res, "Payment created successfully", createdPayment, 201);
 });
 
 /**
  * PUT /payments/:id
- * Update payment by ID
+ * Update existing payment by ID.
+ * Expects update data in req.body.
  */
 const updatePayment = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number(req.params?.id);
   const updateData = req.body;
   const userId = req.user?.id || null;
+
   const updatedPayment = await paymentServices.updatePayment(id, updateData, userId);
+
   return successResponse(res, "Payment updated successfully", updatedPayment, 200);
 });
 
 /**
  * DELETE /payments/:id
- * Delete payment by ID and revert balances
+ * Delete payment by ID and revert party balance.
  */
 const deletePayment = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number(req.params?.id);
   const userId = req.user?.id || null;
+
   const deleted = await paymentServices.deletePayment(id, userId);
   return successResponse(res, "Payment deleted successfully", deleted, 200);
 });
 
-/**
- * POST /payments/bulk-delete
- * Bulk delete payments by IDs
- */
-const bulkDeletePayments = asyncHandler(async (req, res) => {
-  const ids = req.body?.ids;
-  const userId = req.user?.id || null;
-  const deleted = await paymentServices.bulkDeletePayments(ids, userId);
-  return successResponse(res, "Payments deleted successfully", deleted, 200);
-});
+/* -------------------------------------------------------------------------- */
+/*                                   Exports                                  */
+/* -------------------------------------------------------------------------- */
 
 export default {
   listPayments,
   getPayment,
   createPayment,
   updatePayment,
-  deletePayment,
-  bulkDeletePayments,
+  deletePayment
 };
-export {
-  listPayments,
-  getPayment,
-  createPayment,
-  updatePayment,
-  deletePayment,
-  bulkDeletePayments,
-};
+
+export { listPayments, getPayment, createPayment, updatePayment, deletePayment };

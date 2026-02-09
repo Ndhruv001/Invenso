@@ -12,8 +12,12 @@ async function listInventoryLogs({ page = 1, limit = 20, sortBy = "createdAt", s
   const totalRows = await prisma.inventoryLog.count({});
   const totalPages = Math.ceil(totalRows / limit);
 
+  const allowedSortFields = ["id", "type", "quantity", "remark", "referenceType"];
+
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
+
   const data = await prisma.inventoryLog.findMany({
-    orderBy: { [sortBy]: sortOrder },
+    orderBy: { [safeSortBy]: sortOrder },
     skip,
     take,
     include: { product: true } // for showing product.name

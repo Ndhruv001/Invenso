@@ -17,7 +17,7 @@ import DataFilter from "@/components/common/DataFilter";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 
 // Filters synced with URL state
-const FILTER_KEYS = ["categoryId", "hsnCode", "currentStock", "size"];
+const FILTER_KEYS = ["categoryId", "hsnCode", "currentStock"];
 
 /**
  * Normalize a product for modal use.

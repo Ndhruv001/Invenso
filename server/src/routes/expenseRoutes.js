@@ -1,32 +1,53 @@
-/**
- * routes/expenseRoutes.js
- * Routes for Expense resource.
- * Sets up RESTful endpoints with auth and validations.
- */
+// routes/expenseRoutes.js
 
 import express from "express";
 const router = express.Router();
 
-import expenseController from "../controllers/expenseControllers.js";
+import authMiddleware from "../middlewares/authMiddleware.js";
 import {
-  validateExpense,
-  validateExpenseId,
-  validateExpenseQuery,
-  validateBulkDelete,
+  validateCreateExpense,
+  validateUpdateExpense,
+  validateExpenseId
 } from "../validations/expenseValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
-import authMiddleware from "../middlewares/authMiddleware.js";
+import expenseController from "../controllers/expenseControllers.js";
 
-// List expenses with filters, pagination, sorting
-router.get(
+/**
+ * ---------------------------
+ * STATIC & FEATURE ROUTES
+ * ---------------------------
+ */
+
+/**
+ * (No static feature routes for expenses for now)
+ * Keep this section for future extensions
+ */
+
+/**
+ * ---------------------------
+ * COLLECTION ROUTES
+ * ---------------------------
+ */
+
+// List expenses
+router.get("/", authMiddleware, expenseController.listExpenses);
+
+// Create new expense
+router.post(
   "/",
   authMiddleware,
-  validateExpenseQuery,
+  validateCreateExpense,
   validateRequest,
-  expenseController.listExpenses
+  expenseController.createExpense
 );
 
-// Get expense by ID
+/**
+ * ---------------------------
+ * PARAMETERIZED ROUTES
+ * ---------------------------
+ */
+
+// Get single expense
 router.get(
   "/:id",
   authMiddleware,
@@ -35,26 +56,17 @@ router.get(
   expenseController.getExpense
 );
 
-// Create new expense
-router.post(
-  "/",
-  authMiddleware,
-  validateExpense,
-  validateRequest,
-  expenseController.createExpense
-);
-
-// Update expense by ID
+// Update expense
 router.put(
   "/:id",
   authMiddleware,
   validateExpenseId,
-  validateExpense,
+  validateUpdateExpense,
   validateRequest,
   expenseController.updateExpense
 );
 
-// Soft delete expense by ID
+// Delete expense
 router.delete(
   "/:id",
   authMiddleware,
@@ -63,14 +75,5 @@ router.delete(
   expenseController.deleteExpense
 );
 
-// Bulk soft delete expenses
-router.post(
-  "/bulk-delete",
-  authMiddleware,
-  validateBulkDelete,
-  validateRequest,
-  expenseController.bulkDeleteExpenses
-);
-
 export default router;
-export { router };
+export { router as expenseRouter };
