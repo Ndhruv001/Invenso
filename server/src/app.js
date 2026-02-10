@@ -72,6 +72,7 @@ import  purchaseReturnRoutes  from "./routes/purchaseReturnRoutes.js";
 
 import  inventoryRoutes  from "./routes/inventoryRoutes.js";
 import  auditRoutes  from "./routes/auditRoutes.js";
+import  dashboardRoutes  from "./routes/dashboardRoutes.js";
 
 app.use(`${BASE}/auth`, authRoutes);
 app.use(`${BASE}/products`, productRoutes);
@@ -88,6 +89,7 @@ app.use(`${BASE}/purchases`, purchaseRoutes);
 app.use(`${BASE}/purchase-returns`, purchaseReturnRoutes);
 app.use(`${BASE}/inventories`, inventoryRoutes);
 app.use(`${BASE}/audits`, auditRoutes);
+app.use(`${BASE}/dashboards`, dashboardRoutes);
 
 
 // ── Health Check (uses successResponse)
