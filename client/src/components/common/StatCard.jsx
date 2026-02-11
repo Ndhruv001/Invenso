@@ -1,5 +1,5 @@
 /**
- * @file ProductsSummaryStats.jsx
+ * @file StatCard.jsx
  * @description Provides a reusable StatCard component for displaying individual statistics and a container component (ProductsSummaryStats) to render a collection of these cards.
  */
 
@@ -28,9 +28,11 @@ import useTheme from "@/hooks/useTheme";
  * @typedef {Object} StatCardProps
  * @property {string} title - The title of the statistic.
  * @property {string|number} value - The main value of the statistic.
+ * @property {string|number} [secondaryValue] - Optional secondary value (e.g., monthly value when primary is today).
+ * @property {string} [secondaryLabel] - Label for secondary value (e.g., "This Month").
  * @property {string} [subtitle] - Optional subtitle or descriptive text.
  * @property {React.ElementType} [icon] - Lucide icon component to display.
- * @property {'default' | 'success' | 'warning' | 'danger'} [color='default'] - Color variant for the card's text and icon.
+ * @property {'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'blue' | 'green' | 'orange' | 'red'} [color='default'] - Color variant for the card's text and icon.
  * @property {number} [trend] - A numerical value indicating a trend (positive for up, negative for down). If undefined, trend is not shown.
  * @property {() => void} [onClick] - Callback function when the card is clicked for drill-down.
  * @property {boolean} [loading=false] - If true, displays a loading placeholder.
@@ -44,11 +46,23 @@ import useTheme from "@/hooks/useTheme";
  * @returns {JSX.Element} The StatCard component.
  */
 const StatCard = React.memo(
-  ({ title, value, subtitle, icon: Icon, trend, color = "default", onClick, loading = false }) => {
+  ({
+    title,
+    value,
+    secondaryValue,
+    secondaryLabel = "This Month",
+    subtitle,
+    icon: Icon,
+    trend,
+    color = "default",
+    onClick,
+    loading = false
+  }) => {
     const { theme } = useTheme();
 
     const colorClasses = useMemo(() => {
       const colors = {
+        // Existing colors - DO NOT MODIFY
         default: {
           value: theme?.text?.primary || "text-gray-900",
           subtitle: theme?.text?.secondary || "text-gray-600",
@@ -68,10 +82,42 @@ const StatCard = React.memo(
           value: "text-red-600",
           subtitle: "text-red-500",
           icon: "text-red-500"
+        },
+
+        // New color variants for dashboard metrics
+        info: {
+          value: "text-cyan-600",
+          subtitle: "text-cyan-500",
+          icon: "text-cyan-500"
+        },
+        purple: {
+          value: "text-purple-600",
+          subtitle: "text-purple-500",
+          icon: "text-purple-500"
+        },
+        blue: {
+          value: "text-blue-600",
+          subtitle: "text-blue-500",
+          icon: "text-blue-500"
+        },
+        green: {
+          value: "text-emerald-600",
+          subtitle: "text-emerald-500",
+          icon: "text-emerald-500"
+        },
+        orange: {
+          value: "text-orange-600",
+          subtitle: "text-orange-500",
+          icon: "text-orange-500"
+        },
+        red: {
+          value: "text-rose-600",
+          subtitle: "text-rose-500",
+          icon: "text-rose-500"
         }
       };
       return colors[color] || colors.default;
-    }, [color, theme]); // Depend on theme as well
+    }, [color, theme]);
 
     return (
       <div
@@ -90,11 +136,21 @@ const StatCard = React.memo(
             </h3>
 
             <div className="mt-1 flex items-baseline">
-              <p className={`text-2xl font-bold ${colorClasses.value}`}>
-                {loading ? "---" : value}
-              </p>
+              <div className="flex flex-col">
+                {/* Primary Value (Today) */}
+                <p className={`text-2xl font-bold ${colorClasses.value}`}>
+                  {loading ? "---" : value}
+                </p>
 
-              {trend !== undefined && ( // Only show trend if it's explicitly provided
+                {/* Secondary Value (This Month) - Only show if provided */}
+                {secondaryValue !== undefined && secondaryValue !== null && (
+                  <p className={`text-sm font-medium ${colorClasses.subtitle} mt-1`}>
+                    {secondaryLabel}: {secondaryValue}
+                  </p>
+                )}
+              </div>
+
+              {trend !== undefined && (
                 <div
                   className={`ml-2 flex items-center ${
                     trend > 0 ? "text-green-500" : trend < 0 ? "text-red-500" : "text-gray-500"

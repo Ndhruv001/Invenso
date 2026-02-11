@@ -17,6 +17,15 @@ enum PartyType {
   OTHER
 }
 
+enum DriverShift {
+  MORNING
+  EVENING
+  NIGHT
+  SUNDAY
+  HOLIDAY
+  OTHER
+}
+
 enum UnitType {
   PCS
   METER
@@ -413,7 +422,7 @@ model Transport {
   partyId         Int
   date            DateTime          @default(now())
   driverId        Int
-  shift           String?
+  shift           DriverShift       @default(MORNING)
   fromLocation    String
   toLocation      String
   amount          Decimal           @db.Decimal(15, 2)

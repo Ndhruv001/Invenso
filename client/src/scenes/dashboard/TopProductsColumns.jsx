@@ -1,34 +1,47 @@
 // Top Products Table
 import React from "react";
 import { useTheme } from "@/hooks/useTheme";
-import { formatCurrency } from "@/lib/helpers/formatters";``
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 const TopProductsColumns = () => {
   const { theme } = useTheme();
   const baseColumns = [
     {
-        header: "Product Name",
-        accessorKey: "productName",
-        cell: ({ value }) => <span className={`font-medium ${theme.text.primary}`}>{value}</span>
-      },
-      {
-        header: "Quantity Sold",
-        accessorKey: "quantity",
-        cell: ({ value }) => (
-          <span className={`font-semibold ${theme.text.secondary}`}>{value}</span>
-        )
-      },
-      {
-        header: "Total Amount",
-        accessorKey: "totalAmount",
-        cell: ({ value }) => (
-          <span
-            className={`font-bold bg-gradient-to-r ${theme.accent} bg-clip-text text-transparent`}
-          >
-            {formatCurrency(value)}
-          </span>
-        )
-      }
+      header: "Product Name",
+      accessorKey: "productName",
+      cell: ({ getValue }) => (
+        <span className="font-medium" style={{ color: theme.text.primary }}>
+          {getValue()}
+        </span>
+      )
+    },
+    {
+      header: "Quantity Sold",
+      accessorKey: "quantity",
+      cell: ({ getValue }) => (
+        <span className="font-semibold" style={{ color: theme.text.secondary }}>
+          {getValue()}
+        </span>
+      )
+    },
+    {
+      header: "Unit",
+      accessorKey: "unit",
+      cell: ({ getValue }) => (
+        <span className="font-medium text-xs uppercase" style={{ color: theme.text.muted }}>
+          {getValue()}
+        </span>
+      )
+    },
+    {
+      header: "Total Amount",
+      accessorKey: "totalAmount",
+      cell: ({ getValue }) => (
+        <span className="font-bold" style={{ color: theme.text.primary }}>
+          {formatCurrency(getValue())}
+        </span>
+      )
+    }
   ];
 
   return baseColumns;

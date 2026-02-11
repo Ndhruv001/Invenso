@@ -1,11 +1,20 @@
-// /**
-//  * DashboardSummaryStats.jsx
-//  * Displays key summary statistics for the dashboard in a card format.
-//  * Each card shows a specific metric with an icon, value, and description.
-//  */
+/**
+ * DashboardSummaryStats.jsx
+ * Displays key summary statistics for the dashboard in a card format.
+ * Each card shows a specific metric with an icon, primary value (today), and secondary value (this month).
+ */
 
 import React from "react";
-import { ArrowUpRight, ArrowDownRight, CreditCard, TrendingUp, DollarSign } from "lucide-react";
+import {
+  DollarSign,
+  ShoppingCart,
+  TrendingUp,
+  CreditCard,
+  ArrowUpRight,
+  ArrowDownRight,
+  Wallet,
+  Receipt
+} from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/helpers/formatters";
 
@@ -13,44 +22,74 @@ const DashboardSummaryStats = ({ stats }) => {
   const items = [
     {
       title: "Total Sales",
-      value: formatCurrency(stats?.sales?.thisMonth ?? 0),
-      subtitle: "Total revenue from sales",
+      value: formatCurrency(stats?.sales?.today ?? 0),
+      secondaryValue: formatCurrency(stats?.sales?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Revenue from sales",
       icon: DollarSign,
-      color: "default"
+      color: "purple"
     },
     {
       title: "Total Purchases",
       value: formatCurrency(stats?.purchases?.today ?? 0),
-      subtitle: "Total amount spent on purchases",
-      icon: DollarSign,
-      color: "default"
+      secondaryValue: formatCurrency(stats?.purchases?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Amount spent on purchases",
+      icon: ShoppingCart,
+      color: "blue"
     },
     {
-      title: "Total Profit",
-      value: formatCurrency(stats?.profit?.net ?? 0),
-      subtitle: "Total profit/loss from sales and other transactions",
+      title: "Net Profit",
+      value: formatCurrency(stats?.netProfit?.today ?? 0),
+      secondaryValue: formatCurrency(stats?.netProfit?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Profit after expenses",
       icon: TrendingUp,
-      color: "success"
+      color: "green"
     },
     {
       title: "Total Expenses",
-      value: formatCurrency(stats?.cash?.paid ?? 0),
-      subtitle: "Total expenses incurred",
-      icon: CreditCard,
-      color: "danger"
+      value: formatCurrency(stats?.expenses?.today ?? 0),
+      secondaryValue: formatCurrency(stats?.expenses?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Operating expenses",
+      icon: Receipt,
+      color: "orange"
     },
     {
-      title: "Total Receivables",
-      value: formatCurrency(stats?.outstanding?.receivables ?? 0),
-      subtitle: "Total amount to be received",
+      title: "Cash Received",
+      value: formatCurrency(stats?.received?.today ?? 0),
+      secondaryValue: formatCurrency(stats?.received?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Payments received",
+      icon: ArrowDownRight,
+      color: "info"
+    },
+    {
+      title: "Cash Paid",
+      value: formatCurrency(stats?.paid?.today ?? 0),
+      secondaryValue: formatCurrency(stats?.paid?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Payments made",
       icon: ArrowUpRight,
+      color: "red"
+    },
+    {
+      title: "Receivables",
+      value: formatCurrency(stats?.receivables?.allTime ?? 0),
+      secondaryValue: formatCurrency(stats?.receivables?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Amount to be received",
+      icon: Wallet,
       color: "success"
     },
     {
-      title: "Total Payables",
-      value: formatCurrency(stats?.outstanding?.payables ?? 0),
-      subtitle: "Total amount to be paid",
-      icon: ArrowDownRight,
+      title: "Payables",
+      value: formatCurrency(stats?.payables?.allTime ?? 0),
+      secondaryValue: formatCurrency(stats?.payables?.thisMonth ?? 0),
+      secondaryLabel: "This Month",
+      subtitle: "Amount to be paid",
+      icon: CreditCard,
       color: "danger"
     }
   ];

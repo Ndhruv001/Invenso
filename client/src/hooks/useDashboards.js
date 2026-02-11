@@ -50,7 +50,7 @@ export const useDashboardSummary = () => {
 /**
  * Sales Trend (7 / 30 days)
  */
-export const useSalesTrend = (params = { range: 7 }) => {
+export const useSalesTrend = (params = { period: "week" }) => {
   return useQuery({
     queryKey: DASHBOARD_KEYS.salesTrend(params),
     queryFn: () => getSalesTrend(params),

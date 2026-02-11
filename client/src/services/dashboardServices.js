@@ -39,14 +39,14 @@ export const getDashboardSummary = async () => {
 
 /**
  * Fetches sales trend data.
- * @param {Object} params - { range: '7d' | '30d' }
+ * @param {Object} params - { period: 'week' | 'month' }
  * @returns {Promise<Array>} Sales trend points
  */
 export const getSalesTrend = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams();
 
-    if (params.range) queryParams.append("range", params.range);
+    if (params.period) queryParams.append("period", params.period);
 
     const { data } = await axiosInstance.get("/dashboards/sales-trend", {
       params: queryParams

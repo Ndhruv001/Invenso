@@ -9,36 +9,61 @@ const LowStockColumns = () => {
     {
       header: "Product Name",
       accessorKey: "name",
-      cell: ({ value }) => (
+      cell: ({ getValue }) => (
         <div className="flex items-center gap-2">
-          <Package className="w-4 h-4 text-gray-400" />
-          <span className={`font-medium ${theme.text.primary}`}>{value}</span>
+          <Package className="w-4 h-4" style={{ color: theme.text.muted }} />
+          <span className="font-medium" style={{ color: theme.text.primary }}>
+            {getValue()}
+          </span>
         </div>
       )
     },
     {
       header: "Current Stock",
       accessorKey: "currentStock",
-      cell: ({ value }) => <span className={`font-semibold ${theme.text.secondary}`}>{value}</span>
+      cell: ({ getValue }) => (
+        <span className="font-semibold" style={{ color: theme.text.secondary }}>
+          {getValue()}
+        </span>
+      )
+    },
+    {
+      header: "Unit",
+      accessorKey: "unit",
+      cell: ({ getValue }) => (
+        <span className="font-medium text-xs uppercase" style={{ color: theme.text.muted }}>
+          {getValue()}
+        </span>
+      )
     },
     {
       header: "Threshold",
       accessorKey: "threshold",
-      cell: ({ value }) => <span className={theme.text.muted}>{value}</span>
+      cell: ({ getValue }) => <span style={{ color: theme.text.muted }}>{getValue()}</span>
     },
     {
       header: "Status",
       accessorKey: "status",
       cell: ({ row }) => {
-        const isLow = row.original.currentStock < row.original.threshold;
+        const status = row.original.status;
+        const isOutOfStock = status === "Out of Stock";
+        const isCritical = status === "Critical";
+        const isLow = status === "Low";
+
         return (
           <span
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
-              isLow ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+              isOutOfStock
+                ? "bg-red-100 text-red-800"
+                : isCritical
+                  ? "bg-orange-100 text-orange-800"
+                  : isLow
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-green-100 text-green-800"
             }`}
           >
-            {isLow && <AlertTriangle className="w-3 h-3" />}
-            {isLow ? "Low Stock" : "Good"}
+            {(isOutOfStock || isCritical || isLow) && <AlertTriangle className="w-3 h-3" />}
+            {status}
           </span>
         );
       }

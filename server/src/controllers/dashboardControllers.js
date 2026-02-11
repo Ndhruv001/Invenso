@@ -14,7 +14,6 @@ import { successResponse } from "../utils/responseUtils.js";
  */
 const getDashboardSummary = asyncHandler(async (req, res) => {
   const result = await dashboardServices.getDashboardSummary();
-  console.log("🚀 ~ result:   DASHBOARD SUMMMARY", result)
 
   return successResponse(res, "Dashboard summary fetched successfully", result, 200);
 });
@@ -24,10 +23,9 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
  * Returns sales trend data for charts.
  */
 const getSalesTrend = asyncHandler(async (req, res) => {
-  const { range } = req.query || { range: 7 };
+  const period = req.query.period || "week"; // Default to weekly summary
 
-  const result = await dashboardServices.getSalesTrend(Number(range));
-  console.log("🚀 ~ result:   GET SALES TREND", result)
+  const result = await dashboardServices.getSalesTrend(period);
 
   return successResponse(res, "Sales trend fetched successfully", result, 200);
 });
@@ -38,7 +36,6 @@ const getSalesTrend = asyncHandler(async (req, res) => {
  */
 const getLowStockProducts = asyncHandler(async (req, res) => {
   const result = await dashboardServices.getLowStockProducts();
-  console.log("🚀 ~ result:  GET LOW STOCK PRODUCTS", result)
 
   return successResponse(res, "Low stock products fetched successfully", result, 200);
 });
@@ -48,11 +45,9 @@ const getLowStockProducts = asyncHandler(async (req, res) => {
  * Returns top selling products.
  */
 const getTopSellingProducts = asyncHandler(async (req, res) => {
-  const { limit } = req.query;
+  const { limit = 5 } = req.query;
 
   const result = await dashboardServices.getTopSellingProducts(Number(limit));
-  console.log("🚀 ~ result:  GET TOP SELLING PRODUCTS", result)
-
   return successResponse(res, "Top selling products fetched successfully", result, 200);
 });
 
@@ -61,10 +56,9 @@ const getTopSellingProducts = asyncHandler(async (req, res) => {
  * Returns recent payments.
  */
 const getRecentPayments = asyncHandler(async (req, res) => {
-  const { limit } = req.query;
+  const { limit = 10 } = req.query;
 
   const result = await dashboardServices.getRecentPayments(Number(limit));
-  console.log("🚀 ~ result:  GET RECENT PAYMENTS", result)
 
   return successResponse(res, "Recent payments fetched successfully", result, 200);
 });

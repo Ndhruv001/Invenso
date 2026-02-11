@@ -27,9 +27,9 @@ import DashboardSummaryStats from "./DashboardSummaryStats";
 
 const Dashboard = () => {
   const { theme } = useTheme();
-  const [salesRange, setSalesRange] = useState("7d");
-  const [topProductsLimit, setTopProductsLimit] = useState(5);
-  const [paymentsLimit, setPaymentsLimit] = useState(5);
+  const [salesPeriod, setSalesPeriod] = useState({ period: "week" });
+  const [topProductsLimit, setTopProductsLimit] = useState({ limit: 5 });
+  const [paymentsLimit, setPaymentsLimit] = useState({ limit: 5 });
 
   // Fetch all dashboard data
   const {
@@ -41,21 +41,21 @@ const Dashboard = () => {
     data: salesTrend,
     isLoading: trendLoading,
     isError: trendError
-  } = useSalesTrend(salesRange);
-    console.log("🚀 ~ Dashboard ~ salesTrend:", salesTrend)
+  } = useSalesTrend(salesPeriod);
+
   const { data: lowStock, isLoading: stockLoading, isError: stockError } = useLowStockProducts();
+
   const {
     data: topProducts,
     isLoading: topLoading,
     isError: topError
   } = useTopSellingProducts(topProductsLimit);
-    console.log("🚀 ~ Dashboard ~ topProducts:", topProducts)
+
   const {
     data: recentPayments,
     isLoading: paymentsLoading,
     isError: paymentsError
   } = useRecentPayments(paymentsLimit);
-    console.log("🚀 ~ Dashboard ~ recentPayments:", recentPayments)
 
   // Memoized column definitions
   const lowStockColumns = useMemo(() => LowStockColumns(), []);
@@ -126,15 +126,15 @@ const Dashboard = () => {
 
   // Table Renderer Component
   const TableRenderer = ({ table, isLoading, isError, isEmpty, emptyIcon, emptyMessage }) => {
-    console.log("🚀 ~ TableRenderer ~ isEmpty:", isEmpty)
     if (isLoading) return <SkeletonTable />;
     if (isError) return <ErrorDisplay message="Failed to load data" />;
     if (isEmpty) return <EmptyState icon={emptyIcon} message={emptyMessage} />;
 
     return (
-      <div className="overflow-x-auto">
+      // Add fixed height and overflow
+      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
         <table className="w-full">
-          <thead>
+          <thead className={`sticky top-0 bg-inherit z-10 ${theme.bg} ${theme.border} border-b`}>
             {table?.getHeaderGroups()?.map(headerGroup => (
               <tr key={headerGroup.id} className={`${theme.border} border-b`}>
                 {headerGroup.headers.map(header => (
@@ -190,9 +190,9 @@ const Dashboard = () => {
           </h2>
           <div className="flex gap-2">
             <button
-              onClick={() => setSalesRange("7d")}
+              onClick={() => setSalesPeriod({ period: "week" })}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                salesRange === "7d"
+                salesPeriod.period === "week"
                   ? `bg-gradient-to-r ${theme.accent} text-white shadow-md`
                   : `${theme.text.secondary} ${theme.hover}`
               }`}
@@ -200,9 +200,9 @@ const Dashboard = () => {
               7 Days
             </button>
             <button
-              onClick={() => setSalesRange("30d")}
+              onClick={() => setSalesPeriod({ period: "month" })}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                salesRange === "30d"
+                salesPeriod.period === "month"
                   ? `bg-gradient-to-r ${theme.accent} text-white shadow-md`
                   : `${theme.text.secondary} ${theme.hover}`
               }`}
@@ -217,61 +217,62 @@ const Dashboard = () => {
         ) : trendError ? (
           <ErrorDisplay message="Failed to load sales trend data" />
         ) : (
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={salesTrend || []}>
-              <defs>
-                <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.8} />
-                </linearGradient>
-                <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.8} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: theme.name === "Dark" ? "#fff" : "#6b7280" }}
-                tickFormatter={date =>
-                  new Date(date).toLocaleDateString("en-IN", { month: "short", day: "numeric" })
-                }
-              />
-              <YAxis
-                tick={{ fill: theme.name === "Dark" ? "#fff" : "#6b7280" }}
-                tickFormatter={value => `₹${(value / 1000).toFixed(0)}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: theme.name === "Dark" ? "#1f2937" : "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "8px",
-                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)"
-                }}
-                labelFormatter={date => formatDate(date)}
-                formatter={value => [formatCurrency(value), ""]}
-              />
-              <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" />
-              <Line
-                type="monotone"
-                dataKey="salesAmount"
-                stroke="url(#salesGradient)"
-                strokeWidth={3}
-                dot={{ fill: "#8b5cf6", r: 4 }}
-                activeDot={{ r: 6 }}
-                name="Sales Amount"
-              />
-              <Line
-                type="monotone"
-                dataKey="profit"
-                stroke="url(#profitGradient)"
-                strokeWidth={3}
-                dot={{ fill: "#10b981", r: 4 }}
-                activeDot={{ r: 6 }}
-                name="Profit"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: "600px" }}>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={salesTrend || []}>
+                  <defs>
+                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.8} />
+                    </linearGradient>
+                    <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.8} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: theme.name === "Dark" ? "#fff" : "#6b7280" }}
+                    tickFormatter={date =>
+                      new Date(date).toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+                    }
+                  />
+                  <YAxis tick={{ fill: theme.name === "Dark" ? "#fff" : "#6b7280" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: theme.name === "Dark" ? "#1f2937" : "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)"
+                    }}
+                    labelFormatter={date => formatDate(date)}
+                    formatter={value => [formatCurrency(value), ""]}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" />
+                  <Line
+                    type="monotone"
+                    dataKey="salesAmount"
+                    stroke="url(#salesGradient)"
+                    strokeWidth={3}
+                    dot={{ fill: "#8b5cf6", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Sales Amount"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="url(#profitGradient)"
+                    strokeWidth={3}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Profit"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         )}
       </div>
 
@@ -285,8 +286,8 @@ const Dashboard = () => {
               Top Selling Products
             </h2>
             <select
-              value={topProductsLimit}
-              onChange={e => setTopProductsLimit(Number(e.target.value))}
+              value={topProductsLimit.limit}
+              onChange={e => setTopProductsLimit({ limit: Number(e.target.value) })}
               className={`px-3 py-1 rounded-lg text-sm ${theme.card} ${theme.border} border ${theme.text.secondary} focus:outline-none focus:ring-2 focus:ring-purple-500`}
             >
               <option value={5}>Top 5</option>
@@ -312,8 +313,8 @@ const Dashboard = () => {
               Recent Payments
             </h2>
             <select
-              value={paymentsLimit}
-              onChange={e => setPaymentsLimit(Number(e.target.value))}
+              value={paymentsLimit.limit}
+              onChange={e => setPaymentsLimit({ limit: Number(e.target.value) })}
               className={`px-3 py-1 rounded-lg text-sm ${theme.card} ${theme.border} border ${theme.text.secondary} focus:outline-none focus:ring-2 focus:ring-purple-500`}
             >
               <option value={5}>Last 5</option>

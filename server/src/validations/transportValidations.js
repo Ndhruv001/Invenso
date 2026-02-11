@@ -3,11 +3,11 @@
  */
 
 import { body, param } from "express-validator";
-import { PaymentMode } from "@prisma/client";
+import { PaymentMode, DriverShift } from "@prisma/client";
 
 // Convert Prisma enums → arrays
 const PAYMENT_MODES = Object.values(PaymentMode);
-
+const DRIVER_SHIFTS = Object.values(DriverShift);
 // --------------------
 // Validate transport ID param
 // --------------------
@@ -30,7 +30,10 @@ const validateCreateTransport = [
 
   body("driverId").exists().withMessage("Driver ID is required").isInt({ gt: 0 }).toInt(),
 
-  body("shift").optional().isString().trim(),
+  body("shift")
+    .optional()
+    .isIn(DRIVER_SHIFTS)
+    .withMessage(`Driver shift must be one of: ${DRIVER_SHIFTS.join(", ")}`),
 
   body("fromLocation")
     .exists()
@@ -76,7 +79,7 @@ const validateUpdateTransport = [
 
   body("driverId").optional().isInt({ gt: 0 }).toInt(),
 
-  body("shift").optional().isString().trim(),
+  body("shift").optional().isIn(DRIVER_SHIFTS),
 
   body("fromLocation").optional().isString().trim().notEmpty(),
 
