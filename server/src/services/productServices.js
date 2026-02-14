@@ -388,10 +388,10 @@ async function deleteProduct(id, userId = null) {
  * @param {string} query
  * @returns [{id, name}]
  */
-async function suggestProductNames(query) {
+async function suggestProductNames(query, partyId, type = "sale") {
   if (!query || typeof query !== "string") return [];
 
-  return await prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where: {
       isActive: true,
       name: {
@@ -399,8 +399,63 @@ async function suggestProductNames(query) {
         mode: "insensitive"
       }
     },
-    take: 5
+    take: 5,
+    select: {
+      id: true,
+      name: true,
+      unit: true
+    }
   });
+
+  if (!partyId || products.length === 0) {
+    return products.map(p => ({
+      ...p,
+      lastPrice: null
+    }));
+  }
+
+  // Fetch last prices in parallel
+  const productsWithLastPrice = await Promise.all(
+    products.map(async (product) => {
+      const lastItem =
+        type === "sale"
+          ? await prisma.saleItem.findFirst({
+              where: {
+                productId: Number(product.id),
+                sale: {
+                  partyId: Number(partyId)
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              },
+              select: {
+                pricePerUnit: true
+              }
+            })
+          : await prisma.purchaseItem.findFirst({
+              where: {
+                productId: Number(product.id),
+                purchase: {
+                  partyId: Number(partyId)
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              },
+              select: {
+                pricePerUnit: true
+              }
+            });
+
+      return {
+        ...product,
+        lastPrice: lastItem?.pricePerUnit ?? null
+      };
+    })
+  );
+
+  return productsWithLastPrice;
 }
 
 export {

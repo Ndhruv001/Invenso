@@ -22,6 +22,7 @@ import {
 import useTheme from "@/hooks/useTheme";
 import getPageTitle from "@/lib/helpers/getPageTitle";
 import getActionButtons from "@/lib/helpers/getActionButtons";
+import { useUIAction } from "@/context/UIActionContext"; // ✅ NEW
 
 // Mapping of icon names to Lucide icon components
 const iconMap = {
@@ -40,25 +41,29 @@ const iconMap = {
   UserCheck
 };
 
-/**
- * Navbar Component
- *
- * Displays the page title and context-aware action buttons based on the route.
- * Integrates theming, icons, and responsive styles for mobile and desktop.
- *
- * @param {Function} setIsSidebarOpen - Handler to toggle sidebar visibility (mobile)
- */
 const Navbar = ({ setIsSidebarOpen }) => {
   const { theme } = useTheme();
   const location = useLocation();
+  const { fireAction } = useUIAction(); // ✅ NEW
 
-  // Get page-specific config
   const title = getPageTitle(location.pathname);
+  console.log("🚀 ~ Navbar ~ title:", title)
   const actionButtons = getActionButtons(location.pathname);
+  console.log("🚀 ~ Navbar ~ actionButtons:", actionButtons)
 
-  // Get icons from iconMap with fallbacks
   const PrimaryIcon = iconMap[actionButtons?.primary?.icon] || Plus;
   const SecondaryIcon = iconMap[actionButtons?.secondary?.icon] || ShoppingCart;
+
+  // ✅ NEW CLICK HANDLER
+  const handleActionClick = button => {
+    console.log("🚀 ~ handleActionClick ~ button:", button)
+    if (!button?.resource) return;
+
+    fireAction({
+      type: "CREATE",
+      resource: button.resource
+    });
+  };
 
   return (
     <header
@@ -74,9 +79,7 @@ const Navbar = ({ setIsSidebarOpen }) => {
           >
             <Menu className={`w-5 h-5 ${theme.text.secondary}`} />
           </button>
-          <h1 className={`text-lg lg:text-xl font-bold ${theme.text.primary} truncate`}>
-            {title}
-          </h1>
+          <h1 className={`text-lg lg:text-xl font-bold ${theme.text.primary} truncate`}>{title}</h1>
         </div>
 
         {/* Right-side Actions */}
@@ -97,32 +100,34 @@ const Navbar = ({ setIsSidebarOpen }) => {
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
           </NavLink>
 
-          {/* 🟡 Secondary Action Button (optional) */}
+          {/* 🟡 Secondary Action Button */}
           {actionButtons?.secondary && (
-            <NavLink
-              to={actionButtons.secondary.path}
+            <button
+              onClick={() => handleActionClick(actionButtons.secondary)}
               className={`hidden sm:flex items-center gap-2 px-3 lg:px-4 py-2 ${theme.card} ${theme.hover} ${theme.border} border rounded-lg transition-all duration-200 hover:shadow-md group flex-shrink-0`}
             >
               <SecondaryIcon
                 className={`${theme.text.primary} w-4 h-4 group-hover:scale-110 transition-transform duration-200 flex-shrink-0`}
               />
-              <span className={`${theme.text.primary} text-sm font-medium hidden lg:inline whitespace-nowrap`}>
+              <span
+                className={`${theme.text.primary} text-sm font-medium hidden lg:inline whitespace-nowrap`}
+              >
                 {actionButtons.secondary.label}
               </span>
-            </NavLink>
+            </button>
           )}
 
           {/* 🟢 Primary Action Button */}
           {actionButtons?.primary && (
-            <NavLink
-              to={actionButtons.primary.path}
+            <button
+              onClick={() => handleActionClick(actionButtons.primary)}
               className={`flex items-center gap-2 px-3 lg:px-4 py-2 bg-gradient-to-r ${theme.accent} text-white rounded-lg hover:${theme.accentFrom} hover:${theme.accentTo} transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 group flex-shrink-0`}
             >
               <PrimaryIcon className="w-4 h-4 group-hover:scale-110 transition-transform duration-200 flex-shrink-0" />
               <span className="text-sm font-medium hidden sm:inline whitespace-nowrap">
                 {actionButtons.primary.label}
               </span>
-            </NavLink>
+            </button>
           )}
         </div>
       </div>

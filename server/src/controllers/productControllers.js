@@ -92,8 +92,8 @@ const deleteProduct = asyncHandler(async (req, res) => {
  * Suggest product names for dropdown, max 10
  */
 const suggestProductNames = asyncHandler(async (req, res) => {
-  const query = req.query.q || "";
-  const results = await productServices.suggestProductNames(query);
+  const {q: query, partyId, type = "sale"} = req.query || {};
+  const results = await productServices.suggestProductNames(query, partyId, type);
   return successResponse(res, "Product name suggestions", results, 200);
 });
 

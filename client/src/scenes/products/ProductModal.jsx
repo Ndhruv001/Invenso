@@ -1,10 +1,11 @@
-import React, { useMemo, useEffect, useState, useCallback, use } from "react";
+import React, { useMemo, useEffect, useState, useCallback } from "react";
 import { Save, X, Package, Hash, Layers, Scale, Edit3, Target, FileText } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { productCreateSchema, productUpdateSchema } from "@/validations/productValidations";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
+
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useCategories } from "@/hooks/useCategories";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -30,9 +31,13 @@ const ProductModal = ({
   isLoading = false,
   initialData = null,
   isViewOnly: isViewOnlyProp = false
+  
 }) => {
+  console.log("🚀 ~ ProductModal ~ initialData:", initialData)
+  console.log("🚀 ~ UNITS:", UNITS)
   const { theme } = useTheme();
   const { data: productCategories } = useCategories("PRODUCT");
+  console.log("🚀 ~ ProductModal ~ productCategories:", productCategories)
 
   const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
@@ -43,7 +48,7 @@ const ProductModal = ({
   const defaultValues = useMemo(
     () => ({
       name: initialData?.name || "",
-      categoryId: initialData?.categoryId || "",
+      categoryId: initialData?.categoryId || null,
       hsnCode: initialData?.hsnCode || "",
       unit: initialData?.unit || "",
       threshold: initialData?.threshold ?? "",

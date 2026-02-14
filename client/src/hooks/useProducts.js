@@ -99,10 +99,10 @@ export const useDeleteProduct = () => {
   });
 };
 
-export const useProductSuggestions = query => {
+export const useProductSuggestions = (query, partyId, type = "sale") => {
   return useQuery({
-    queryKey: ["product-suggestions", query],
-    queryFn: () => suggestProducts(query),
+    queryKey: ["product-suggestions", query, partyId, type],
+    queryFn: () => suggestProducts(query, partyId, type),
     enabled: !!query && query.length >= 2, // ⬅ important
     staleTime: 60 * 1000
   });

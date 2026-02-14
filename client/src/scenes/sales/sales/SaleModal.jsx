@@ -188,7 +188,7 @@ const SaleModal = ({
   }, [partySuggestionsData]);
 
   /* --------------------- PRODUCT SUGGESTIONS ---------------------- */
-  const { data: productSuggestionsData } = useProductSuggestions(productSearchQuery.query);
+  const { data: productSuggestionsData } = useProductSuggestions(productSearchQuery.query, selectedParty?.id, "sale");
 
   const debouncedProductSearch = useMemo(
     () =>
@@ -214,8 +214,9 @@ const SaleModal = ({
   }, [productSuggestionsData]);
 
   const selectProduct = (product, index) => {
-    setValue(`items.${index}.product`, product);
-    setValue(`items.${index}.productId`, product.id);
+    setValue(`items.${index}.productId`, product.id, { shouldDirty: true });
+    setValue(`items.${index}.product`, product, { shouldDirty: true });
+    setValue(`items.${index}.pricePerUnit`, product.lastPrice || 0, { shouldDirty: true });
 
     // clear search text
     setProductSearchText(prev => ({
@@ -585,8 +586,9 @@ const SaleModal = ({
                                     }));
 
                                     // clear selected product
-                                    setValue(`items.${index}.product`, null);
-                                    setValue(`items.${index}.productId`, "");
+                                    setValue(`items.${index}.productId`, "", { shouldDirty: true });
+                                    setValue(`items.${index}.product`, null, { shouldDirty: true });
+                                    setValue(`items.${index}.pricePerUnit`, 0, { shouldDirty: true });
 
                                     debouncedProductSearch(value, index);
                                   }}

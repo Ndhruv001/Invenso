@@ -26,7 +26,6 @@ function buildDateFilter({ from, to }) {
   return Object.keys(cond).length ? cond : undefined;
 }
 
-
 async function listPurchases({
   page = 1,
   limit = 10,
@@ -268,6 +267,15 @@ async function createPurchase(data, userId = null) {
       const balanceBefore = Number(product.currentStock);
       const balanceAfter = balanceBefore + item.quantity;
 
+      // Calculate new average cost price
+      const oldAvgCostPrice = Number(product.avgCostPrice ?? 0);
+
+      const newAvgCostPrice =
+        balanceBefore === 0 || oldAvgCostPrice === 0
+          ? item.pricePerUnit
+          : (balanceBefore * oldAvgCostPrice + item.quantity * item.pricePerUnit) /
+            (balanceBefore + item.quantity);
+
       // Log the movement
       await tx.inventoryLog.create({
         data: {
@@ -285,7 +293,7 @@ async function createPurchase(data, userId = null) {
       // Update actual stock
       await tx.product.update({
         where: { id: item.productId },
-        data: { currentStock: balanceAfter }
+        data: { currentStock: balanceAfter, avgCostPrice: newAvgCostPrice }
       });
     }
 
@@ -474,6 +482,15 @@ async function updatePurchase(purchaseId, data, userId = null) {
               throw new AppError(`Insufficient stock for product ${product.name}`, 400);
             }
 
+            // Calculate new average cost price
+            const oldAvgCostPrice = Number(product.avgCostPrice ?? 0);
+
+            const newAvgCostPrice =
+              balanceBefore === 0 || oldAvgCostPrice === 0
+                ? item.pricePerUnit
+                : (balanceBefore * oldAvgCostPrice + item.quantity * item.pricePerUnit) /
+                  (balanceBefore + item.quantity);
+
             await tx.inventoryLog.create({
               data: {
                 productId: product.id,
@@ -488,7 +505,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
 
             await tx.product.update({
               where: { id: product.id },
-              data: { currentStock: stockAfter }
+              data: { currentStock: stockAfter, avgCostPrice: newAvgCostPrice }
             });
           }
 
@@ -776,7 +793,7 @@ async function getPurchaseSuggestionsByPartyId(partyId) {
 
   const purchases = await prisma.purchase.findMany({
     where: {
-      partyId: Number(partyId),
+      partyId: Number(partyId)
     },
     orderBy: {
       date: "desc"
@@ -784,15 +801,21 @@ async function getPurchaseSuggestionsByPartyId(partyId) {
     take: 50, // suggestions only, not full list
     include: {
       party: true,
-      purchaseItems: {include : { product: { include: { category: true } } } },
+      purchaseItems: { include: { product: { include: { category: true } } } }
     }
   });
 
   return purchases;
 }
 
-
-export { listPurchases, getPurchaseById, createPurchase, updatePurchase, deletePurchase, getPurchaseSuggestionsByPartyId };
+export {
+  listPurchases,
+  getPurchaseById,
+  createPurchase,
+  updatePurchase,
+  deletePurchase,
+  getPurchaseSuggestionsByPartyId
+};
 export default {
   listPurchases,
   getPurchaseById,

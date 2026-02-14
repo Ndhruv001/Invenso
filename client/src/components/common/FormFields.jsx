@@ -199,8 +199,8 @@ export const SelectField = React.memo(
                   {opt}
                 </option>
               ) : (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                <option key={opt.value || opt.id} value={opt.value || opt.id}>
+                  {opt.label || opt.name}
                 </option>
               )
             )}

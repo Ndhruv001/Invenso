@@ -137,12 +137,12 @@ export const deleteProduct = async id => {
   }
 };
 
-export const suggestProducts = async query => {
+export const suggestProducts = async (query, partyId, type = "sale") => {
   if (!query) return [];
 
   try {
     const { data } = await axiosInstance.get(`/products/suggest`, {
-      params: { q: query },
+      params: { q: query, partyId, type },
     });
     return data;
   } catch (error) {

@@ -1,6 +1,5 @@
 /**
- * Action buttons configuration for different sections of the application.
- * Each section can have primary and secondary action buttons.
+ * Action buttons configuration aligned with new sidebar structure.
  */
 
 const BUTTON_CONFIGS = {
@@ -9,32 +8,38 @@ const BUTTON_CONFIGS = {
     secondary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" }
   },
 
-  inventory: {
-    primary: subSection => {
-      if (["products", "category", "categories"].includes(subSection)) {
-        return { label: "Add Category", icon: "FolderPlus", path: "/inventory/categories" };
-      }
-      if (subSection === "stock-opening") {
-        return { label: "Add Stock", icon: "Package", path: "/inventory/stock" };
-      }
-      return { label: "Add Product", icon: "Package2", path: "/inventory/products" };
-    },
-    secondary: { label: "Add Product", icon: "Package2", path: "/inventory/products" }
-  },
-
-  purchase: {
-    primary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" },
-    secondary: { label: "Add Returns", icon: "RotateCcw", path: "/purchases/returns" }
+  products: {
+    primary: { label: "Add Product", icon: "Package2", path: "/products" }
   },
 
   purchases: {
-    primary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" },
-    secondary: { label: "Add Returns", icon: "RotateCcw", path: "/purchases/returns" }
+    primary: subSection => {
+      if (subSection === "returns") {
+        return { label: "Add Purchase Return", icon: "RotateCcw", path: "/purchases/returns" };
+      }
+      return { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" };
+    },
+    secondary: subSection => {
+      if (subSection === "returns") {
+        return { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" };
+      }
+      return { label: "Add Return", icon: "RotateCcw", path: "/purchases/returns" };
+    }
   },
 
   sales: {
-    primary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" },
-    secondary: { label: "Add Returns", icon: "RotateCcw", path: "/sales/returns" }
+    primary: subSection => {
+      if (subSection === "returns") {
+        return { label: "Add Sales Return", icon: "RotateCcw", path: "/sales/returns" };
+      }
+      return { label: "Add Sale", icon: "Plus", path: "/sales/sales" };
+    },
+    secondary: subSection => {
+      if (subSection === "returns") {
+        return { label: "Add Sale", icon: "Plus", path: "/sales/sales" };
+      }
+      return { label: "Add Return", icon: "RotateCcw", path: "/sales/returns" };
+    }
   },
 
   accounting: {
@@ -43,80 +48,49 @@ const BUTTON_CONFIGS = {
         case "parties":
           return { label: "Add Party", icon: "UserPlus", path: "/accounting/parties" };
         case "payments":
-          return { label: "Payment-in", icon: "ArrowDownToLine", path: "/accounting/payments/in" };
+          return { label: "Payment In", icon: "ArrowDownToLine", path: "/accounting/payments" };
         case "expenses":
-          return { label: "Add Expenses", icon: "Receipt", path: "/accounting/expenses" };
-        case "opening-balances":
-          return {
-            label: "Add Opening-Balance",
-            icon: "DollarSign",
-            path: "/accounting/opening-balances"
-          };
+          return { label: "Add Expense", icon: "Receipt", path: "/accounting/expenses" };
         default:
           return { label: "Add Party", icon: "UserPlus", path: "/accounting/parties" };
-      }
-    },
-    secondary: subSection => {
-      switch (subSection) {
-        case "parties":
-          return {
-            label: "Add Opening Balance",
-            icon: "DollarSign",
-            path: "/accounting/opening-balances"
-          };
-        case "payments":
-          return {
-            label: "Payment-out",
-            icon: "ArrowUpFromLine",
-            path: "/accounting/payments/out"
-          };
-        case "expenses":
-          return {
-            label: "Add Category",
-            icon: "FolderPlus",
-            path: "/accounting/expense-categories"
-          };
-        case "opening-balances":
-          return { label: "Add Party", icon: "UserPlus", path: "/accounting/parties" };
-        default:
-          return {
-            label: "Add Opening Balance",
-            icon: "DollarSign",
-            path: "/accounting/opening-balances"
-          };
       }
     }
   },
 
-  transport: {
-    primary: { label: "Add Transport", icon: "TruckIcon", path: "/transport/vehicles" },
-    secondary: { label: "Add Driver", icon: "UserCheck", path: "/transport/drivers" }
+  transports: {
+    primary: { label: "Add Transport", icon: "TruckIcon", path: "/transports" }
   },
 
   reports: {
-    primary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" },
-    secondary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" }
-  },
-
-  notifications: {
-    primary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" },
-    secondary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" }
+    primary: { label: "View Sales Report", icon: "Plus", path: "/sales/sales" }
   },
 
   admin: {
-    primary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" },
-    secondary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" }
+    primary: subSection => {
+      switch (subSection) {
+        case "audits":
+          return { label: "View Audit Logs", icon: "FileSearch", path: "/admin/audits" };
+        case "inventories":
+          return { label: "View Inventory Logs", icon: "Package2", path: "/admin/inventories" };
+        case "users":
+          return { label: "Add User", icon: "UserPlus", path: "/admin/users" };
+        default:
+          return { label: "Add User", icon: "UserPlus", path: "/admin/users" };
+      }
+    }
+  },
+
+  notifications: {
+    primary: { label: "Go to Sales", icon: "Plus", path: "/sales/sales" }
   },
 
   help: {
-    primary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" },
-    secondary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" }
+    primary: { label: "Contact Support", icon: "Plus", path: "/help" }
   }
 };
 
 const DEFAULT_BUTTONS = {
-  primary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" },
-  secondary: { label: "Add Purchase", icon: "ShoppingCart", path: "/purchases/purchases" }
+  primary: { label: "Add Sale", icon: "Plus", path: "/sales/sales" }
 };
 
 export { BUTTON_CONFIGS, DEFAULT_BUTTONS };

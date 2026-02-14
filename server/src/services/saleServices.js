@@ -285,6 +285,12 @@ async function createSale(data, userId = null) {
       const balanceBefore = Number(product.currentStock);
       const balanceAfter = balanceBefore - item.quantity;
 
+      // calculate new average sell price (for reporting/profit analysis) - OPTIONAL
+      const oldAvgSellPrice = Number(product.avgSellPrice ?? 0);
+
+      const newAvgSellPrice =
+        oldAvgSellPrice === 0 ? item.pricePerUnit : (oldAvgSellPrice + item.pricePerUnit) / 2;
+
       await tx.inventoryLog.create({
         data: {
           productId: item.productId,
@@ -300,7 +306,7 @@ async function createSale(data, userId = null) {
 
       await tx.product.update({
         where: { id: item.productId },
-        data: { currentStock: balanceAfter }
+        data: { currentStock: balanceAfter, avgSellPrice: newAvgSellPrice }
       });
     }
 
@@ -476,6 +482,14 @@ async function updateSale(saleId, data, userId = null) {
               throw new AppError(`Insufficient stock for product ${product.name}`, 400);
             }
 
+            // calculate new average sale price (for reporting/profit analysis) - OPTIONAL
+            const oldAvgSellPrice = Number(product.avgSellPrice ?? 0);
+
+            const newAvgSellPrice =
+              oldAvgSellPrice === 0
+                ? incomingItem.pricePerUnit
+                : (oldAvgSellPrice + incomingItem.pricePerUnit) / 2;
+
             await tx.inventoryLog.create({
               data: {
                 productId: product.id,
@@ -490,7 +504,7 @@ async function updateSale(saleId, data, userId = null) {
 
             await tx.product.update({
               where: { id: product.id },
-              data: { currentStock: stockAfter }
+              data: { currentStock: stockAfter, avgSellPrice: newAvgSellPrice }
             });
           }
 
@@ -528,9 +542,17 @@ async function updateSale(saleId, data, userId = null) {
             throw new AppError(`Insufficient stock for product ${product.name}`, 400);
           }
 
+          // calculate new average sell price (for reporting/profit analysis) - OPTIONAL
+          const oldAvgSellPrice = Number(product.avgSellPrice ?? 0);
+
+          const newAvgSellPrice =
+            oldAvgSellPrice === 0
+              ? incomingItem.pricePerUnit
+              : (oldAvgSellPrice + incomingItem.pricePerUnit) / 2;
+
           await tx.product.update({
             where: { id: product.id },
-            data: { currentStock: stockAfter }
+            data: { currentStock: stockAfter, avgSellPrice: newAvgSellPrice }
           });
 
           const costPrice = Number(product.avgCostPrice || 0);

@@ -1,12 +1,20 @@
 // src/scenes/products/Products.js
-import React, { useState, useMemo, useCallback } from "react";
+
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
-import { useProducts, useUpdateProduct, useDeleteProduct } from "@/hooks/useProducts";
+import {
+  useProducts,
+  useUpdateProduct,
+  useDeleteProduct,
+  useCreateProduct
+} from "@/hooks/useProducts";
+
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
 import { useProductFilterOptions } from "@/hooks/useProductFilterOptions";
+import { useUIAction } from "@/context/UIActionContext";
 
 import Columns from "./Columns";
 import ProductModal from "./ProductModal";
@@ -21,7 +29,6 @@ const FILTER_KEYS = ["categoryId", "hsnCode", "currentStock"];
 
 /**
  * Normalize a product for modal use.
- * Prevents runtime issues when opening view/edit forms with incomplete data.
  */
 function normalizeProductForModal(product) {
   if (!product) return null;
@@ -35,46 +42,81 @@ function normalizeProductForModal(product) {
 const Products = () => {
   const { theme } = useTheme();
 
-  // Unified table controls (filters, pagination, sorting, selection)
+  // ---------------------------
+  // Table Controls
+  // ---------------------------
   const { filters, selection, tableState, handlers } = useTableControls({
     FILTER_KEYS,
     resourceName: "Product"
   });
 
   const { showSelection, setShowSelection, selectedRows, handleSelectionChange } = selection;
+
   const { pagination, sorting } = tableState;
+
   const { handleFiltersChange, handleClearFilters, handlePaginationChange, handleSortingChange } =
     handlers;
 
-  // Modal state
+  // ---------------------------
+  // Modal State
+  // ---------------------------
   const [activeProduct, setActiveProduct] = useState(null);
   const [modalMode, setModalMode] = useState(null); // "view" | "edit" | "create"
 
-  // Confirmation dialog hook
-  const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
-
-  // Product data
-  const { data: productsData, refetch, ...queryStatus } = useProducts(filters);
-  const products = productsData?.data ?? [];
-  const totalRows = productsData?.pagination?.totalRows ?? 0;
-
-  // Mutations
-  const updateProductMutation = useUpdateProduct();
-  const deleteProductMutation = useDeleteProduct();
-
-  // Filter options
-  const filterOptions = useProductFilterOptions();
-
-  /** ---- Handlers ---- **/
+  const handleCancel = useCallback(() => {
+    setActiveProduct(null);
+    setModalMode(null);
+  }, []);
 
   const openModalWith = useCallback((product, mode) => {
     setActiveProduct(normalizeProductForModal(product));
     setModalMode(mode);
   }, []);
 
+  // ---------------------------
+  // Confirmation Dialog
+  // ---------------------------
+  const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
+
+  // ---------------------------
+  // Data Fetching
+  // ---------------------------
+  const { data: productsData, refetch, ...queryStatus } = useProducts(filters);
+  const products = productsData?.data ?? [];
+  const totalRows = productsData?.pagination?.totalRows ?? 0;
+
+  // ---------------------------
+  // Mutations
+  // ---------------------------
+  const createProductMutation = useCreateProduct();
+  const updateProductMutation = useUpdateProduct();
+  const deleteProductMutation = useDeleteProduct();
+
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "product") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
+
+  // ---------------------------
+  // View / Edit (UNCHANGED LOGIC)
+  // ---------------------------
   const handleView = useCallback(
     product => {
-      if (!product?.id) return toast.error("Unable to view: missing product info");
+      if (!product?.id) {
+        toast.error("Unable to view: missing product info");
+        return;
+      }
       openModalWith(product, "view");
     },
     [openModalWith]
@@ -82,38 +124,54 @@ const Products = () => {
 
   const handleEdit = useCallback(
     product => {
-      if (!product?.id) return toast.error("Unable to edit: missing product info");
+      if (!product?.id) {
+        toast.error("Unable to edit: missing product info");
+        return;
+      }
       openModalWith(product, "edit");
     },
     [openModalWith]
   );
 
-  const handleCancel = useCallback(() => {
-    setActiveProduct(null);
-    setModalMode(null);
-  }, []);
-
+  // ---------------------------
+  // Submit Handler
+  // ---------------------------
   const handleSubmit = useCallback(
     async productData => {
-      if (!activeProduct?.id) {
-        toast.error("Cannot save: missing product context");
-        return;
-      }
-
-      await updateProductMutation.mutateAsync(
-        { id: activeProduct.id, data: productData },
-        {
-          onSuccess: () => {
-            toast.success("Product updated successfully");
-            handleCancel();
-          },
-          onError: err => toast.error(err?.message || "Failed to update product")
+      try {
+        // CREATE
+        if (modalMode === "create") {
+          await createProductMutation.mutateAsync(productData);
+          toast.success("Product created successfully");
         }
-      );
+
+        // EDIT
+        if (modalMode === "edit") {
+          if (!activeProduct?.id) {
+            toast.error("Missing product context");
+            return;
+          }
+
+          await updateProductMutation.mutateAsync({
+            id: activeProduct.id,
+            data: productData
+          });
+
+          toast.success("Product updated successfully");
+        }
+
+        handleCancel();
+        refetch();
+      } catch (err) {
+        toast.error(err?.message || "Operation failed");
+      }
     },
-    [activeProduct, updateProductMutation, handleCancel]
+    [modalMode, activeProduct, createProductMutation, updateProductMutation, handleCancel, refetch]
   );
 
+  // ---------------------------
+  // Delete
+  // ---------------------------
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
       toast.error("No products selected");
@@ -125,7 +183,6 @@ const Products = () => {
       message: `Are you sure you want to delete ${selectedRows.length} product(s)?`,
       onConfirm: async () => {
         try {
-          // Use Promise.allSettled to handle each delete safely
           const results = await Promise.allSettled(
             selectedRows.map(p => deleteProductMutation.mutateAsync(p.id))
           );
@@ -149,16 +206,21 @@ const Products = () => {
     });
   }, [selectedRows, deleteProductMutation, openDialog, handleSelectionChange, refetch]);
 
-  // Memoized column definitions
+  // ---------------------------
+  // Columns
+  // ---------------------------
   const columns = useMemo(() => Columns(showSelection), [showSelection]);
 
+  // ---------------------------
+  // Render
+  // ---------------------------
   return (
     <div
       className={`space-y-6 overflow-auto max-h-[calc(100vh-100px)] min-h-0 ${theme.bg} ${theme.text.primary}`}
     >
       <DataFilter
         filters={filters}
-        filterOptions={filterOptions}
+        filterOptions={useProductFilterOptions()}
         onFiltersChange={handleFiltersChange}
         onClearFilters={handleClearFilters}
         totalRows={totalRows}
@@ -175,7 +237,13 @@ const Products = () => {
         selectedCount={selectedRows?.length}
         onToggleSelection={() => setShowSelection(prev => !prev)}
         handlers={{
-          edit: () => handleEdit(selectedRows?.[0]),
+          edit: () => {
+            if (selectedRows?.length !== 1) {
+              toast.error("Select exactly one product to edit");
+              return;
+            }
+            handleEdit(selectedRows[0]);
+          },
           delete: handleDelete,
           print: null,
           download: null
@@ -197,7 +265,7 @@ const Products = () => {
         {...queryStatus}
       />
 
-      {activeProduct && (
+      {modalMode && (
         <ProductModal
           initialData={activeProduct}
           isViewOnly={modalMode === "view"}
