@@ -1,13 +1,16 @@
-// validators/categoryValidator.js
-
 /**
  * @file express-validator middlewares for category resource.
- * Validates request params, body, and query params for category endpoints.
  */
 
 import { body, param, query } from "express-validator";
+import { CategoryType } from "@prisma/client";
 
+// Convert Prisma enums → arrays (IMPORTANT)
+const CATEGORY_TYPES = Object.values(CategoryType);
+
+// --------------------
 // Validate category ID param
+// --------------------
 const validateCategoryId = [
   param("id")
     .exists().withMessage("Category ID is required")
@@ -15,46 +18,65 @@ const validateCategoryId = [
     .toInt(),
 ];
 
+// --------------------
 // Validate category create body
-const validateCategory = [
+// --------------------
+const validateCreateCategory = [
   body("name")
-    .exists().withMessage("Name is required")
-    .isString().withMessage("Name must be a string")
-    .trim(),
+    .exists().withMessage("Category name is required")
+    .isString()
+    .trim()
+    .notEmpty(),
+
   body("type")
     .optional()
-    .isIn(["PRODUCT", "EXPENSE"])
-    .withMessage("Type must be either PRODUCT or EXPENSE"),
+    .isIn(CATEGORY_TYPES)
+    .withMessage(`Type must be one of: ${CATEGORY_TYPES.join(", ")}`),
+
   body("description")
     .optional()
     .isString()
-    .withMessage("Description must be a string")
+    .trim()
+];
+
+// --------------------
+// Validate category update body
+// --------------------
+const validateUpdateCategory = [
+  body("name")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+
+  body("type")
+    .optional()
+    .isIn(CATEGORY_TYPES)
+    .withMessage(`Type must be one of: ${CATEGORY_TYPES.join(", ")}`),
+
+  body("description")
+    .optional()
+    .isString()
     .trim(),
+
   body("isActive")
     .optional()
     .isBoolean()
-    .withMessage("isActive must be a boolean"),
+    .withMessage("isActive must be true or false")
+    .toBoolean()
 ];
 
-// Validate query param for search (q)
-const validateCategorySearch = [
-  query("q")
-    .exists()
-    .withMessage("Search query 'q' is required")
-    .isString()
-    .withMessage("Search query must be a string")
-    .trim()
-    .notEmpty()
-    .withMessage("Search query cannot be empty"),
-];
+// --------------------
+// Exports
+// --------------------
+export {
+  validateCreateCategory,
+  validateUpdateCategory,
+  validateCategoryId,
+};
 
 export default {
-  validateCategory,
+  validateCreateCategory,
+  validateUpdateCategory,
   validateCategoryId,
-  validateCategorySearch,
-};
-export {
-  validateCategory,
-  validateCategoryId,
-  validateCategorySearch,
 };

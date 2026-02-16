@@ -10,10 +10,10 @@ import {
   TrendingUp,
   CheckCircle
 } from "lucide-react";
-import useLogin from "@/hooks/useAuth";
-import { login } from "@/services/authServices";
-import { useNavigate   } from "react-router-dom";
-import useTheme from "@/hooks/useTheme";
+import { useLogin } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { set } from "date-fns";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +24,7 @@ const LoginPage = () => {
   });
   const [errors, setErrors] = useState({});
   const navigate = useNavigate();
-  const {theme, globalColors, orbColors: orbs } = useTheme();
+  const { mutate: login } = useLogin();
 
   const handleInputChange = e => {
     const { name, value } = e.target;
@@ -54,14 +54,25 @@ const LoginPage = () => {
     }
 
     setIsLoading(true);
-    await login(formData);
-    setIsLoading(false);
-    navigate("/dashboard")
-  
+    login(formData, {
+      onSuccess: () => {
+        toast.success("Welcome back 👋");
+        setIsLoading(false);
+
+        navigate("/dashboard", { replace: true });
+      },
+
+      onError: error => {
+        setIsLoading(false);
+        const message = error?.response?.data?.message || "Failed to login. Please try again.";
+
+        toast.error(message);
+      }
+    });
   };
 
   return (
-   <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex overflow-auto">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex overflow-auto">
       {/* Animated Background Effects */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Floating Orbs */}

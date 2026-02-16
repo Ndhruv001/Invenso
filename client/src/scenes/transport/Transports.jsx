@@ -1,11 +1,12 @@
 // src/scenes/transports/Transports.js
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
-import { useTransports, useUpdateTransport, useDeleteTransport } from "@/hooks/useTransports";
+import { useTransports, useUpdateTransport, useDeleteTransport, useCreateTransport } from "@/hooks/useTransports";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
+import { useUIAction } from "@/context/UIActionContext";
 import { useTransportFilterOptions } from "@/hooks/useTransportFilterOptions";
 
 import Columns from "./Columns";
@@ -63,6 +64,7 @@ const Transports = () => {
   // Mutations
   const updateTransportMutation = useUpdateTransport();
   const deleteTransportMutation = useDeleteTransport();
+  const createTransportMutation = useCreateTransport();
 
   // Filter options
   const filterOptions = useTransportFilterOptions();
@@ -73,6 +75,22 @@ const Transports = () => {
     setActiveTransport(normalizeTransportForModal(transport));
     setModalMode(mode);
   }, []);
+
+    // ---------------------------
+      // UIAction (CREATE only)
+      // ---------------------------
+      const { action, clearAction } = useUIAction();
+    
+      useEffect(() => {
+        if (!action) return;
+    
+        if (action.resource !== "transport") return;
+    
+        if (action.type === "CREATE") {
+          openModalWith({}, "create");
+          clearAction();
+        }
+      }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     transport => {
@@ -96,25 +114,47 @@ const Transports = () => {
   }, []);
 
   const handleSubmit = useCallback(
-    async transportData => {
-      if (!activeTransport?.id) {
-        toast.error("Cannot save: missing transport context");
-        return;
-      }
+     async purchaseData => {
+       try {
+         // 🟢 CREATE
+         if (modalMode === "create") {
+           await createTransportMutation.mutateAsync(purchaseData, {
+             onSuccess: () => {
+               toast.success("Transport created successfully");
+               handleCancel();
+             },
+             onError: err => toast.error(err?.message || "Failed to create transport")
+           });
+ 
+           return; // stop execution after create
+         }
+ 
+         // 🔵 EDIT
+         if (modalMode === "edit") {
+           if (!activeTransport?.id) {
+             toast.error("Cannot save: missing transport context");
+             return;
+           }
 
-      await updateTransportMutation.mutateAsync(
-        { id: activeTransport.id, data: transportData },
-        {
-          onSuccess: () => {
-            toast.success("Transport updated successfully");
-            handleCancel();
-          },
-          onError: err => toast.error(err?.message || "Failed to update transport")
-        }
-      );
-    },
-    [activeTransport, updateTransportMutation, handleCancel]
-  );
+           await updateTransportMutation.mutateAsync(
+             { id: activeTransport.id, data: purchaseData },
+             {
+               onSuccess: () => {
+                 toast.success("Transport updated successfully");
+                 handleCancel();
+               },
+               onError: err => toast.error(err?.message || "Failed to update transport")
+             }
+           );
+ 
+           return;
+         }
+       } catch (error) {
+         toast.error(error?.message || "Something went wrong");
+       }
+     },
+     [modalMode, activeTransport, createTransportMutation,updateTransportMutation, handleCancel]
+   );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -199,10 +239,11 @@ const Transports = () => {
         {...queryStatus}
       />
 
-      {activeTransport && (
+      {modalMode && (
         <TransportModal
-          initialData={activeTransport}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activeTransport : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

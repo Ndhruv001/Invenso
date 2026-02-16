@@ -10,6 +10,24 @@ const login = async data => {
   }
 };
 
+const logout = async () => {
+  try {
+    await axiosInstance.post("/auth/logout");
+  } catch (error) {
+    console.error("Failed to logout:", error);
+    throw new Error(error.message || "Failed to logout");
+  }
+};
 
-export default {login}
-export {login}
+const me = async () => {
+  try {
+    const response = await axiosInstance.get("/auth/me");
+    return response.data;
+  } catch (error) {
+    console.error("Failed to retrieve user info:", error);
+    throw new Error(error.message || "Failed to retrieve user info");
+  }
+};
+
+export default {login, logout, me}
+export {login, logout, me}

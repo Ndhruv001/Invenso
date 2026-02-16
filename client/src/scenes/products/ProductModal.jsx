@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect, useState, useCallback } from "react";
-import { Save, X, Package, Hash, Layers, Scale, Edit3, Target, FileText } from "lucide-react";
+import React, { useMemo, useEffect, useCallback, useState } from "react";
+import { Save, X, Package, Hash, Layers, Scale, Edit3, Target, FileText, Plus } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { productCreateSchema, productUpdateSchema } from "@/validations/productValidations";
 import { useForm } from "react-hook-form";
@@ -7,7 +7,8 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import UNITS from "@/constants/UNIT_TYPES";
 
 import ConfirmationModal from "@/components/common/ConfirmationModal";
-import { useCategories } from "@/hooks/useCategories";
+import CategoryModal from "@/scenes/categories/CategoryModal";
+import { useCategories, useCreateCategory } from "@/hooks/useCategories";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { TextField, TextAreaField, SelectField } from "@/components/common/FormFields";
 import { toast } from "react-toastify";
@@ -30,19 +31,16 @@ const ProductModal = ({
   onCancel,
   isLoading = false,
   initialData = null,
-  isViewOnly: isViewOnlyProp = false
-  
+  mode = "view", // "view" | "edit" | "create"
+  setMode = {}
 }) => {
-  console.log("🚀 ~ ProductModal ~ initialData:", initialData)
-  console.log("🚀 ~ UNITS:", UNITS)
   const { theme } = useTheme();
   const { data: productCategories } = useCategories("PRODUCT");
-  console.log("🚀 ~ ProductModal ~ productCategories:", productCategories)
-
-  const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
   // Use custom confirmation dialog hook
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const createCategoryMutation = useCreateCategory();
 
   // Memoize default values for react-hook-form
   const defaultValues = useMemo(
@@ -75,7 +73,7 @@ const ProductModal = ({
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  const isDisabled = !isEditMode || isSubmitting || isLoading;
+  const isDisabled = mode === "view" || isSubmitting || isLoading;
 
   const submitHandler = handleSubmit(
     currentFormValues => {
@@ -99,9 +97,9 @@ const ProductModal = ({
       }
 
       // EDIT MODE → close modal
-      if (initialData && isEditMode) {
+      if (initialData && mode === "edit") {
         onCancel();
-        setIsEditMode(false);
+        setMode(null);
       }
     },
     formErrors => {
@@ -113,15 +111,27 @@ const ProductModal = ({
     }
   );
 
+  const handleSubmitCategory = async categoryData => {
+    try {
+      await createCategoryMutation.mutateAsync({ ...categoryData, type: "PRODUCT" });
+
+      toast.success("Category created successfully");
+
+      setIsCategoryModalOpen(false);
+    } catch (err) {
+      toast.error(err?.message || "Failed to create category");
+    }
+  };
+
   const handleCancel = useCallback(() => {
-    if (initialData && isEditMode && isDirty) {
+    if (initialData && mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "Are you sure you want to discard your changes? All unsaved changes will be lost.",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
@@ -130,23 +140,23 @@ const ProductModal = ({
       }
       onCancel();
     }
-  }, [initialData, isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, isDirty, reset, defaultValues, onCancel, openDialog, setMode]);
 
   const handleToggleEditMode = useCallback(() => {
-    if (isEditMode && isDirty) {
+    if (mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "You have unsaved changes. Do you want to discard them and exit edit mode?",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
-      setIsEditMode(prev => !prev);
+      setMode(prev => (prev === "view" ? "edit" : "view"));
     }
-  }, [isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [mode, isDirty, reset, defaultValues, onCancel, openDialog, setMode]);
 
   return (
     <>
@@ -162,10 +172,14 @@ const ProductModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Product" : "View Product") : "Add Product"}
+                  {initialData
+                    ? mode === "edit"
+                      ? "Edit Product"
+                      : "View Product"
+                    : "Add Product"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
-                  {!isEditMode && initialData
+                  {mode === "view" && initialData
                     ? "Product details (read-only)"
                     : "Fill in the product details below"}
                 </p>
@@ -177,7 +191,7 @@ const ProductModal = ({
                   type="button"
                   onClick={handleToggleEditMode}
                   className={`p-2 ${theme.text.primary} ${theme.hover} rounded-lg cursor-pointer`}
-                  title={isEditMode ? "Exit edit mode" : "Enter edit mode"}
+                  title={mode === "edit" ? "Exit edit mode" : "Enter edit mode"}
                 >
                   <Edit3 className="w-5 h-5" />
                 </button>
@@ -210,25 +224,47 @@ const ProductModal = ({
                   required={true}
                   errors={errors}
                   register={register}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   initialData={initialData}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <SelectField
-                    name="categoryId"
-                    label="Category"
-                    icon={Layers}
-                    options={productCategories || []}
-                    required={true}
-                    errors={errors}
-                    register={register}
-                    isEditMode={isEditMode}
-                    isDisabled={isDisabled}
-                    initialData={initialData}
-                    theme={theme}
-                  />
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <SelectField
+                        name="categoryId"
+                        label="Category"
+                        icon={Layers}
+                        options={productCategories?.data || []}
+                        required={true}
+                        errors={errors}
+                        register={register}
+                        mode={mode}
+                        isDisabled={isDisabled}
+                        initialData={initialData}
+                        theme={theme}
+                      />
+                    </div>
+
+                    {mode !== "view" && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryModalOpen(true)}
+                        className={`h-[42px]  px-3 flex items-center justify-center rounded-lg border ${theme.border} ${theme.bg}
+                                  ${theme.hover} transition-all group cursor-pointer `}
+                        title="Add new category"
+                      >
+                        <span
+                          className={`flex items-center gap-1 text-sm font-medium ${theme.text.secondary} group-hover:${theme.text.primary}`}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add
+                        </span>
+                      </button>
+                    )}
+                  </div>
+
                   <TextField
                     name="hsnCode"
                     label="HSN Code"
@@ -237,7 +273,7 @@ const ProductModal = ({
                     type="text"
                     errors={errors}
                     register={register}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     initialData={initialData}
                     isDisabled={isDisabled}
                     theme={theme}
@@ -252,7 +288,7 @@ const ProductModal = ({
                     required={true}
                     errors={errors}
                     register={register}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     isDisabled={initialData ? true : isDisabled}
                     initialData={initialData}
                     theme={theme}
@@ -265,7 +301,7 @@ const ProductModal = ({
                     type="number"
                     errors={errors}
                     register={register}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     initialData={initialData}
                     isDisabled={isDisabled}
                     theme={theme}
@@ -278,7 +314,7 @@ const ProductModal = ({
                   icon={FileText}
                   errors={errors}
                   register={register}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   initialData={initialData}
                   isDisabled={isDisabled}
                   theme={theme}
@@ -301,7 +337,7 @@ const ProductModal = ({
                     type="number"
                     errors={errors}
                     register={register}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     initialData={initialData}
                     isDisabled={isDisabled}
                     theme={theme}
@@ -318,7 +354,7 @@ const ProductModal = ({
               >
                 Cancel
               </button>
-              {(isEditMode || !initialData) && (
+              {(mode === "edit" || !initialData) && (
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}
@@ -342,6 +378,15 @@ const ProductModal = ({
           </form>
         </div>
       </div>
+
+      {isCategoryModalOpen && (
+        <CategoryModal
+          mode="create"
+          onCancel={() => setIsCategoryModalOpen(false)}
+          onSubmit={handleSubmitCategory}
+        />
+      )}
+
       {/* Confirmation Modal */}
       {dialogConfig.isOpen && (
         <ConfirmationModal

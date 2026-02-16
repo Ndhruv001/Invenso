@@ -1,14 +1,16 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
 import {
   useSaleReturns,
   useUpdateSaleReturn,
-  useDeleteSaleReturn
+  useDeleteSaleReturn,
+  useCreateSaleReturn
 } from "@/hooks/useSaleReturns";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
+import { useUIAction } from "@/context/UIActionContext";
 import { useSaleReturnFilterOptions } from "@/hooks/useSaleReturnFilterOptions";
 
 import Columns from "./Columns";
@@ -63,6 +65,7 @@ const SaleReturns = () => {
   // Mutations
   const updateSaleReturnMutation = useUpdateSaleReturn();
   const deleteSaleReturnMutation = useDeleteSaleReturn();
+  const createSaleReturnMutation = useCreateSaleReturn();
 
   // Filter options
   const filterOptions = useSaleReturnFilterOptions();
@@ -73,6 +76,22 @@ const SaleReturns = () => {
     setActiveSaleReturn(normalizeSaleReturnForModal(saleReturn));
     setModalMode(mode);
   }, []);
+
+   // ---------------------------
+      // UIAction (CREATE only)
+      // ---------------------------
+      const { action, clearAction } = useUIAction();
+    
+      useEffect(() => {
+        if (!action) return;
+    
+        if (action.resource !== "saleReturn") return;
+    
+        if (action.type === "CREATE") {
+          openModalWith({}, "create");
+          clearAction();
+        }
+      }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     saleReturn => {
@@ -96,25 +115,47 @@ const SaleReturns = () => {
   }, []);
 
   const handleSubmit = useCallback(
-    async saleReturnData => {
-      if (!activeSaleReturn?.id) {
-        toast.error("Cannot save: missing sale return context");
-        return;
-      }
-
-      await updateSaleReturnMutation.mutateAsync(
-        { id: activeSaleReturn.id, data: saleReturnData },
-        {
-          onSuccess: () => {
-            toast.success("Sale return updated successfully");
-            handleCancel();
-          },
-          onError: err => toast.error(err?.message || "Failed to update sale return")
-        }
-      );
-    },
-    [activeSaleReturn, updateSaleReturnMutation, handleCancel]
-  );
+     async purchaseData => {
+       try {
+         // 🟢 CREATE
+         if (modalMode === "create") {
+           await createSaleReturnMutation.mutateAsync(purchaseData, {
+             onSuccess: () => {
+               toast.success("Sale return created successfully");
+               handleCancel();
+             },
+             onError: err => toast.error(err?.message || "Failed to create sale return")
+           });
+ 
+           return; // stop execution after create
+         }
+ 
+         // 🔵 EDIT
+         if (modalMode === "edit") {
+           if (!activeSaleReturn?.id) {
+             toast.error("Cannot save: missing sale return context");
+             return;
+           }
+ 
+           await updateSaleReturnMutation.mutateAsync(
+             { id: activeSaleReturn.id, data: purchaseData },
+             {
+               onSuccess: () => {
+                 toast.success("Sale return updated successfully");
+                 handleCancel();
+               },
+               onError: err => toast.error(err?.message || "Failed to update sale return")
+             }
+           );
+ 
+           return;
+         }
+       } catch (error) {
+         toast.error(error?.message || "Something went wrong");
+       }
+     },
+     [modalMode, activeSaleReturn, createSaleReturnMutation, updateSaleReturnMutation, handleCancel]
+   );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -198,10 +239,11 @@ const SaleReturns = () => {
         {...queryStatus}
       />
 
-      {activeSaleReturn && (
+      {modalMode && (
         <SaleReturnModal
-          initialData={activeSaleReturn}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activeSaleReturn : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

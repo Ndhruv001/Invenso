@@ -1,30 +1,44 @@
 /**
- * validations/adjustStockValidations.js
- * Validation rules for adjustStock resource using express-validator.
+ * @file express-validator middlewares for adjustStock resource.
  */
 
 import { body } from "express-validator";
+import { InventoryLogType } from "@prisma/client";
 
-const adjustmentTypes = ["ADD", "SUBTRACT"];
+const INVENTORY_LOG_TYPES = Object.values(InventoryLogType);
 
-const validateAdjustStock = [
+// --------------------
+// Validate create adjust stock body
+// --------------------
+const validateCreateAdjustStock = [
   body("productId")
-    .notEmpty()
+    .exists()
     .withMessage("Product ID is required")
     .isInt({ gt: 0 })
-    .withMessage("Product ID must be a positive integer"),
+    .withMessage("Product ID must be a positive integer")
+    .toInt(),
+
   body("type")
-    .notEmpty()
+    .exists()
     .withMessage("Type is required")
-    .isIn(adjustmentTypes)
-    .withMessage(`Type must be one of: ${adjustmentTypes.join(", ")}`),
+    .isIn(INVENTORY_LOG_TYPES)
+    .withMessage(`Type must be one of: ${INVENTORY_LOG_TYPES.join(", ")}`),
+
   body("quantity")
-    .notEmpty()
+    .exists()
     .withMessage("Quantity is required")
     .isFloat({ gt: 0 })
-    .withMessage("Quantity must be a positive number"),
-  body("remark").optional().isString(),
+    .withMessage("Quantity must be a positive number")
+    .toFloat(),
+
+  body("remark").optional().isString().trim()
 ];
 
-export { validateAdjustStock };
-export default { validateAdjustStock };
+// --------------------
+// Exports
+// --------------------
+export { validateCreateAdjustStock };
+
+export default {
+  validateCreateAdjustStock
+};

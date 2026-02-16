@@ -1,4 +1,4 @@
-import { BUTTON_CONFIGS, DEFAULT_BUTTONS } from "@/constants/buttonConfigs";
+import { BUTTON_CONFIGS, DEFAULT_BUTTONS } from "@/constants/BUTTON_CONFIGS";
 
 /**
  * Parses pathname to extract section and subSection.
@@ -17,16 +17,11 @@ function parsePathname(pathname = "") {
  */
 function getActionButtons(pathname = "") {
   const { section, subSection } = parsePathname(pathname);
-  const config = BUTTON_CONFIGS[section];
+  const config = BUTTON_CONFIGS[subSection] || BUTTON_CONFIGS[section];
 
   if (!config) return { ...DEFAULT_BUTTONS };
 
-  const resolve = btn => (typeof btn === "function" ? btn(subSection) : btn);
-
-  return {
-    primary: resolve(config.primary) || DEFAULT_BUTTONS.primary,
-    secondary: resolve(config.secondary) || DEFAULT_BUTTONS.secondary
-  };
+  return config;
 }
 
 export default getActionButtons;

@@ -106,6 +106,7 @@ const Products = () => {
       openModalWith({}, "create");
       clearAction();
     }
+
   }, [action, openModalWith, clearAction]);
 
   // ---------------------------
@@ -267,8 +268,9 @@ const Products = () => {
 
       {modalMode && (
         <ProductModal
-          initialData={activeProduct}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activeProduct : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

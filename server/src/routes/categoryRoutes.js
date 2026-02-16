@@ -1,27 +1,42 @@
 // routes/categoryRoutes.js
 
-/**
- * @file Routes for Category resource.
- * Sets up RESTful endpoints.
- * Applies validation middleware.
- */
-
 import express from "express";
 const router = express.Router();
 
-import categoryController from "../controllers/categoryControllers.js";
+import authMiddleware from "../middlewares/authMiddleware.js";
 import {
-  validateCategory,
-  validateCategoryId,
-  validateCategorySearch
+  validateCreateCategory,
+  validateUpdateCategory,
+  validateCategoryId
 } from "../validations/categoryValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
-import authMiddleware from "../middlewares/authMiddleware.js";
+import categoryController from "../controllers/categoryControllers.js";
 
-// List categories (GET /categories)
-router.get("/", authMiddleware, validateRequest, categoryController.listCategories);
+/**
+ * ---------------------------
+ * COLLECTION ROUTES
+ * ---------------------------
+ */
 
-// Get single category by ID (GET /categories/:id)
+// List categories
+router.get("/", authMiddleware, categoryController.listCategories);
+
+// Create new category
+router.post(
+  "/",
+  authMiddleware,
+  validateCreateCategory,
+  validateRequest,
+  categoryController.createCategory
+);
+
+/**
+ * ---------------------------
+ * PARAMETERIZED ROUTES
+ * ---------------------------
+ */
+
+// Get single category
 router.get(
   "/:id",
   authMiddleware,
@@ -30,17 +45,24 @@ router.get(
   categoryController.getCategory
 );
 
-// Create new category (POST /categories)
-router.post("/", authMiddleware, validateCategory, validateRequest, categoryController.addCategory);
-
-// Search category names for dropdown (GET /categories/search?q=)
-router.get(
-  "/search",
+// Update category
+router.put(
+  "/:id",
   authMiddleware,
-  validateCategorySearch,
+  validateCategoryId,
+  validateUpdateCategory,
   validateRequest,
-  categoryController.searchCategoriesByName
+  categoryController.updateCategory
+);
+
+// Delete category
+router.delete(
+  "/:id",
+  authMiddleware,
+  validateCategoryId,
+  validateRequest,
+  categoryController.deleteCategory
 );
 
 export default router;
-export { router };
+export { router as categoryRouter };

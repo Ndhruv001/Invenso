@@ -67,9 +67,9 @@ const PurchaseModal = ({
   onCancel,
   isLoading = false,
   initialData = null,
-  isViewOnly: isViewOnlyProp = false
+  mode = "view", // "create" | "edit" | "view"
+  setMode = null,
 }) => {
-  console.log("🚀 ~ PurchaseModal ~ initialData:", initialData);
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */
@@ -90,9 +90,6 @@ const PurchaseModal = ({
   const [activeProductRowIndex, setActiveProductRowIndex] = useState(null);
   const [productSearchText, setProductSearchText] = useState({});
 
-  /* -------------------------- EDIT MODE -------------------------- */
-
-  const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
 
@@ -316,9 +313,9 @@ const PurchaseModal = ({
         reset(defaultValues);
       }
 
-      if (initialData && isEditMode) {
+      if (initialData && mode === "edit") {
         onCancel();
-        setIsEditMode(false);
+        setMode(null);
       }
     },
     error => {
@@ -330,40 +327,40 @@ const PurchaseModal = ({
   /* -------------------- CANCEL ------------------------------- */
 
   const handleCancel = useCallback(() => {
-    if (initialData && isEditMode && isDirty) {
+    if (initialData && mode === "edit" && isDirty) {
       openDialog({
         title: "Discard changes?",
         message: "All unsaved changes will be lost.",
         onConfirm: () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
       reset(defaultValues);
       onCancel();
     }
-  }, [initialData, isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   // Toggle edit mode with confirmation if dirty
   const handleToggleEditMode = useCallback(() => {
-    if (isEditMode && isDirty) {
+    if (mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "You have unsaved changes. Do you want to discard them and exit edit mode?",
         onConfirm: async () => {
           reset(defaultValues);
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
-      setIsEditMode(prev => !prev);
+      setMode(prev => prev === "edit" ? "view" : "edit");
     }
-  }, [isEditMode, isDirty, reset, defaultValues, openDialog]);
+  }, [mode, setMode,  isDirty, reset, defaultValues, openDialog]);
 
   // Disabled state
-  const isDisabled = !isEditMode || isSubmitting || isLoading;
+  const isDisabled = mode === "view" || isSubmitting || isLoading;
 
   return (
     <>
@@ -379,10 +376,10 @@ const PurchaseModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Invoice" : "View Invoice") : "Create Invoice"}
+                  {initialData ? (mode === "edit" ? "Edit Invoice" : "View Invoice") : "Create Invoice"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
-                  {!isEditMode && initialData
+                  {mode === "view" && initialData
                     ? "Invoice details (read-only)"
                     : "Fill in the invoice details"}
                 </p>
@@ -394,7 +391,7 @@ const PurchaseModal = ({
                   type="button"
                   onClick={handleToggleEditMode}
                   className={`p-2 ${theme.text.primary} ${theme.hover} rounded-lg cursor-pointer`}
-                  title={isEditMode ? "Exit edit mode" : "Enter edit mode"}
+                  title={mode === "edit" ? "Exit edit mode" : "Enter edit mode"}
                 >
                   <Edit3 className="w-5 h-5" />
                 </button>
@@ -541,7 +538,7 @@ const PurchaseModal = ({
                           <th className="px-2 py-2 w-28">Price</th>
                           <th className="px-2 py-2 w-32">GST</th>
                           <th className="px-2 py-2 w-32 text-right">Amount</th>
-                          {(isEditMode || !initialData) && (
+                          {(mode === "edit" || !initialData) && (
                             <th className="px-2 py-2 w-16">Action</th>
                           )}
                         </tr>
@@ -672,7 +669,7 @@ const PurchaseModal = ({
                               </td>
 
                               {/* Action */}
-                              {(isEditMode || !initialData) && (
+                              {(mode === "edit" || !initialData) && (
                                 <td className={`border ${theme.border} px-2 py-2 text-center`}>
                                   {purchaseItemFields.length > 1 && (
                                     <button
@@ -689,7 +686,7 @@ const PurchaseModal = ({
                           );
                         })}
                         {/* 👇 ADD-ITEM ROW */}
-                        {(isEditMode || !initialData) && (
+                        {(mode === "edit" || !initialData) && (
                           <tr className={theme.tableRow}>
                             {/* SN */}
                             <td className={`border ${theme.border} px-2 py-2 text-center text-sm`}>
@@ -723,7 +720,7 @@ const PurchaseModal = ({
                             <td className={`border ${theme.border} px-2 py-2`} />
 
                             {/* Action */}
-                            {(isEditMode || !initialData) && (
+                            {(mode === "edit" || !initialData) && (
                               <td className={`border ${theme.border} px-2 py-2`} />
                             )}
                           </tr>
@@ -818,7 +815,7 @@ const PurchaseModal = ({
               >
                 Cancel
               </button>
-              {(isEditMode || !initialData) && (
+              {(mode === "edit" || !initialData) && (
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}

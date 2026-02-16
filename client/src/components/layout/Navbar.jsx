@@ -1,5 +1,5 @@
 import React from "react";
-import { useLocation, NavLink } from "react-router-dom";
+import { useLocation, NavLink, useNavigate } from "react-router-dom";
 import {
   Menu,
   Bell,
@@ -15,7 +15,9 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Receipt,
-  Package
+  Package,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 // Custom Hooks and Helpers
@@ -40,28 +42,32 @@ const iconMap = {
   TruckIcon,
   UserCheck
 };
+import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
 
 const Navbar = ({ setIsSidebarOpen }) => {
   const { theme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const { fireAction } = useUIAction(); // ✅ NEW
+  const { toggleScreenHide, isScreenHidden } = useHideScreenContext();
 
   const title = getPageTitle(location.pathname);
-  console.log("🚀 ~ Navbar ~ title:", title)
   const actionButtons = getActionButtons(location.pathname);
-  console.log("🚀 ~ Navbar ~ actionButtons:", actionButtons)
 
   const PrimaryIcon = iconMap[actionButtons?.primary?.icon] || Plus;
   const SecondaryIcon = iconMap[actionButtons?.secondary?.icon] || ShoppingCart;
 
-  // ✅ NEW CLICK HANDLER
   const handleActionClick = button => {
-    console.log("🚀 ~ handleActionClick ~ button:", button)
-    if (!button?.resource) return;
+    if (!button?.route) return;
 
+    // Step 1: Navigate to correct module page
+    navigate(button.route);
+
+    // Step 2: Trigger action event
     fireAction({
-      type: "CREATE",
-      resource: button.resource
+      type: button.type,
+      resource: button.resource,
+      payload: button.payload || null
     });
   };
 
@@ -84,6 +90,18 @@ const Navbar = ({ setIsSidebarOpen }) => {
 
         {/* Right-side Actions */}
         <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+          <button
+            onClick={toggleScreenHide}
+            title="Hide Screen (Ctrl + H)"
+            className={`flex items-center justify-center h-12 w-12 rounded-xl transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md active:scale-95
+             focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+             ${isScreenHidden ? "bg-blue-500 text-white" : `${theme.bg.secondary} ${theme.text.primary}`}
+              `}
+            style={{ cursor: "pointer" }}
+          >
+            {isScreenHidden ? <EyeOff size={22} /> : <Eye size={22} />}
+          </button>
+
           {/* 🔔 Notification Bell */}
           <NavLink
             to="/notifications"

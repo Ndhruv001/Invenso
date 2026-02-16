@@ -1,11 +1,17 @@
 // src/scenes/purchases/Purchases.js
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
-import { usePurchases, useUpdatePurchase, useDeletePurchase } from "@/hooks/usePurchases";
+import {
+  usePurchases,
+  useCreatePurchase,
+  useUpdatePurchase,
+  useDeletePurchase
+} from "@/hooks/usePurchases";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
+import { useUIAction } from "@/context/UIActionContext";
 import { usePurchaseFilterOptions } from "@/hooks/usePurchaseFilterOptions";
 
 import Columns from "./Columns";
@@ -61,6 +67,7 @@ const Purchases = () => {
   // Mutations
   const updatePurchaseMutation = useUpdatePurchase();
   const deletePurchaseMutation = useDeletePurchase();
+  const createPurchaseMutation = useCreatePurchase();
 
   // Filter options
   const filterOptions = usePurchaseFilterOptions();
@@ -71,6 +78,22 @@ const Purchases = () => {
     setActivePurchase(normalizePurchaseForModal(purchase));
     setModalMode(mode);
   }, []);
+
+    // ---------------------------
+    // UIAction (CREATE only)
+    // ---------------------------
+    const { action, clearAction } = useUIAction();
+  
+    useEffect(() => {
+      if (!action) return;
+  
+      if (action.resource !== "purchase") return;
+  
+      if (action.type === "CREATE") {
+        openModalWith({}, "create");
+        clearAction();
+      }
+    }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     purchase => {
@@ -95,23 +118,45 @@ const Purchases = () => {
 
   const handleSubmit = useCallback(
     async purchaseData => {
-      if (!activePurchase?.id) {
-        toast.error("Cannot save: missing purchase context");
-        return;
-      }
+      try {
+        // 🟢 CREATE
+        if (modalMode === "create") {
+          await createPurchaseMutation.mutateAsync(purchaseData, {
+            onSuccess: () => {
+              toast.success("Purchase created successfully");
+              handleCancel();
+            },
+            onError: err => toast.error(err?.message || "Failed to create purchase")
+          });
 
-      await updatePurchaseMutation.mutateAsync(
-        { id: activePurchase.id, data: purchaseData },
-        {
-          onSuccess: () => {
-            toast.success("Purchase updated successfully");
-            handleCancel();
-          },
-          onError: err => toast.error(err?.message || "Failed to update purchase")
+          return; // stop execution after create
         }
-      );
+
+        // 🔵 EDIT
+        if (modalMode === "edit") {
+          if (!activePurchase?.id) {
+            toast.error("Cannot save: missing purchase context");
+            return;
+          }
+
+          await updatePurchaseMutation.mutateAsync(
+            { id: activePurchase.id, data: purchaseData },
+            {
+              onSuccess: () => {
+                toast.success("Purchase updated successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to update purchase")
+            }
+          );
+
+          return;
+        }
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong");
+      }
     },
-    [activePurchase, updatePurchaseMutation, handleCancel]
+    [modalMode, activePurchase, createPurchaseMutation, updatePurchaseMutation, handleCancel]
   );
 
   const handleDelete = useCallback(() => {
@@ -196,10 +241,11 @@ const Purchases = () => {
         {...queryStatus}
       />
 
-      {activePurchase && (
+      {modalMode && (
         <PurchaseModal
-          initialData={activePurchase}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activePurchase : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

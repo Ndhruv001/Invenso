@@ -30,5 +30,10 @@ const logout = asyncHandler(async (req, res) => {
   return successResponse(res, "User logged out successfully", null, 200);
 });
 
-export default { login, logout };
-export { login, logout };
+const me = asyncHandler(async (req, res) => {
+  const user = req.user; // Assuming authMiddleware attaches user to req
+  return successResponse(res, "User retrieved successfully", user, 200);
+});
+
+export default { login, logout, me };
+export { login, logout, me };

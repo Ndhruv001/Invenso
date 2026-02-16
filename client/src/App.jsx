@@ -40,7 +40,7 @@ import ProtectedRoute from "@/components/common/ProtectedRoute.jsx";
 import NotFound from "@/scenes/error/NotFound.jsx";
 import Unauthorized from "@/scenes/error/Unauthorized.jsx";
 import AddProduct from "@/scenes/products/ProductModal";
-import AddCategory from "@/scenes/categories/AddCategory";
+import AddCategory from "@/scenes/categories/CategoryModal";
 import AddParty from "./scenes/accounting/parties/PartyModal";
 import AddPaymentIn from "./scenes/accounting/payments/PaymentModal";
 import AddExpense from "./scenes/accounting/expenses/ExpenseModal";
@@ -48,15 +48,25 @@ import AddTransport from "./scenes/transport/TransportModal";
 import ComingSoon from "./components/common/ComingSoon";
 import AddSale from "./scenes/sales/sales/SaleModal";
 import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
+import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
+import BlurOverlay from "@/components/common/BlurOverlay.jsx";
 
 function App() {
+  const { isScreenHidden } = useHideScreenContext();
+
   return (
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Redirect root to login */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Navigate to="/dashboard" replace />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Protected Routes - All routes under MainLayout */}
       <Route
@@ -64,6 +74,7 @@ function App() {
         element={
           <ProtectedRoute>
             <MainLayout />
+            {isScreenHidden && <BlurOverlay />}
           </ProtectedRoute>
         }
       >
@@ -110,11 +121,11 @@ function App() {
         {/* Help Route */}
         <Route path="help" element={<Help />} />
 
-         {/* Unauthorized Route */}
+        {/* Unauthorized Route */}
         <Route path="unauthorized" element={<Unauthorized />} />
 
         {/* Catch all unmatched routes */}
-        <Route path="*" element={<AddSale/>} />
+        <Route path="*" element={<AddSale />} />
       </Route>
     </Routes>
   );

@@ -1,14 +1,16 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
 import {
   useExpenses,
   useUpdateExpense,
   useDeleteExpense,
+  useCreateExpense
 } from "@/hooks/useExpenses";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
+import { useUIAction } from "@/context/UIActionContext";
 import { useExpenseFilterOptions } from "@/hooks/useExpenseFilterOptions";
 
 import ExpenseColumns from "./Columns";
@@ -64,6 +66,7 @@ const Expenses = () => {
   // Mutations
   const updateExpenseMutation = useUpdateExpense();
   const deleteExpenseMutation = useDeleteExpense();
+  const createExpenseMutation = useCreateExpense();
 
   // Filter options
   const filterOptions = useExpenseFilterOptions();
@@ -74,6 +77,22 @@ const Expenses = () => {
     setActiveExpense(normalizeExpenseForModal(expense));
     setModalMode(mode);
   }, []);
+
+   // ---------------------------
+      // UIAction (CREATE only)
+      // ---------------------------
+      const { action, clearAction } = useUIAction();
+    
+      useEffect(() => {
+        if (!action) return;
+    
+        if (action.resource !== "expense") return;
+    
+        if (action.type === "CREATE") {
+          openModalWith({}, "create");
+          clearAction();
+        }
+      }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     (expense) => {
@@ -96,26 +115,48 @@ const Expenses = () => {
     setModalMode(null);
   }, []);
 
-  const handleSubmit = useCallback(
-    async (expenseData) => {
-      if (!activeExpense?.id) {
-        toast.error("Cannot save: missing expense context");
-        return;
-      }
-
-      await updateExpenseMutation.mutateAsync(
-        { id: activeExpense.id, data: expenseData },
-        {
-          onSuccess: () => {
-            toast.success("Expense updated successfully");
-            handleCancel();
-          },
-          onError: (err) => toast.error(err?.message || "Failed to update expense"),
-        }
-      );
-    },
-    [activeExpense, updateExpenseMutation, handleCancel]
-  );
+ const handleSubmit = useCallback(
+     async purchaseData => {
+       try {
+         // 🟢 CREATE
+         if (modalMode === "create") {
+           await createExpenseMutation.mutateAsync(purchaseData, {
+             onSuccess: () => {
+               toast.success("Expense created successfully");
+               handleCancel();
+             },
+             onError: err => toast.error(err?.message || "Failed to create expense")
+           });
+ 
+           return; // stop execution after create
+         }
+ 
+         // 🔵 EDIT
+         if (modalMode === "edit") {
+           if (!activeExpense?.id) {
+             toast.error("Cannot save: missing expense context");
+             return;
+           }
+ 
+           await updateExpenseMutation.mutateAsync(
+             { id: activeExpense.id, data: purchaseData },
+             {
+               onSuccess: () => {
+                 toast.success("Expense updated successfully");
+                 handleCancel();
+               },
+               onError: err => toast.error(err?.message || "Failed to update expense")
+             }
+           );
+ 
+           return;
+         }
+       } catch (error) {
+         toast.error(error?.message || "Something went wrong");
+       }
+     },
+     [modalMode, activeExpense, createExpenseMutation, updateExpenseMutation, handleCancel]
+   );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -199,10 +240,11 @@ const Expenses = () => {
         {...queryStatus}
       />
 
-      {activeExpense && (
+      {modalMode && (
         <ExpenseModal
-          initialData={activeExpense}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activeExpense : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

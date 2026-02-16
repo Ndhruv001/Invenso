@@ -29,7 +29,8 @@ import {
   FileSearch,
   Settings
 } from "lucide-react";
-import useTheme from "../../hooks/useTheme";
+import useTheme from "@/hooks/useTheme";
+import {useLogout} from "@/hooks/useAuth";
 // import {}
 
 const sidebarItems = [
@@ -112,6 +113,7 @@ const sidebarItems = [
 const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const { theme: currentTheme, switchTheme } = useTheme();
   const [expandedItems, setExpandedItems] = useState({});
+  const { mutate: logout } = useLogout();
 
   const toggleSubmenu = path => {
     setExpandedItems(prev => ({
@@ -125,7 +127,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   };
 
   const handleLogout = () => {
-
+    logout();
   }
 
   return (
@@ -268,11 +270,11 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
             className={`flex items-center ${currentTheme.hover} rounded-lg p-2 transition-colors duration-200 cursor-pointer group`}
           >
             <div className="w-10 h-10 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-200 flex-shrink-0">
-              <span className="text-white text-sm font-semibold">DR</span>
+              <span className="text-white text-sm font-semibold">JB</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className={`text-sm font-medium ${currentTheme.text.primary} truncate`}>
-                Dianne Russell
+                JB TRADER'S
               </div>
               <div className={`text-xs ${currentTheme.text.muted} truncate`}>Admin</div>
             </div>

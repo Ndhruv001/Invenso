@@ -37,7 +37,7 @@ export const TextField = React.memo(
     inputProps = {},
     errors = {},
     register,
-    isEditMode,
+    mode,// "view" | "edit" | "create"
     initialData,
     isDisabled = false,
     readOnly = false,
@@ -62,7 +62,7 @@ export const TextField = React.memo(
 
           <input
             type={type}
-            placeholder={!isEditMode && initialData ? "Not specified" : placeholder}
+            placeholder={mode === "view" && initialData ? "Not specified" : placeholder}
             aria-invalid={hasError}
             aria-describedby={`${name}-error`}
             disabled={shouldDisable}
@@ -102,7 +102,7 @@ export const TextAreaField = React.memo(
     required = false,
     errors,
     register,
-    isEditMode,
+    mode,// "view" | "edit" | "create"
     initialData,
     isDisabled,
     theme
@@ -121,7 +121,7 @@ export const TextAreaField = React.memo(
           )}
           <textarea
             {...register(name)}
-            placeholder={!isEditMode && initialData ? "Not specified" : placeholder}
+            placeholder={mode === "view" && initialData ? "Not specified" : placeholder}
             disabled={isDisabled}
             rows={3}
             aria-invalid={hasError}
@@ -134,7 +134,7 @@ export const TextAreaField = React.memo(
                   : theme.border
             } ${theme.text.primary} ${theme.bg} placeholder:${theme.text.muted}
               outline-none transition-all ${
-                isEditMode && !isDisabled ? "focus:border-blue-500 cursor-text" : "cursor-default"
+                mode === "edit" && !isDisabled ? "focus:border-blue-500 cursor-text" : "cursor-default"
               }`}
           />
         </div>
@@ -155,7 +155,7 @@ export const SelectField = React.memo(
     placeholder = "Select",
     errors,
     register,
-    isEditMode,
+    mode,// "view" | "edit" | "create"
     isDisabled,
     initialData,
     theme
@@ -187,12 +187,12 @@ export const SelectField = React.memo(
                     : theme.border
               } ${theme.text.primary} ${theme.bg} 
               ${
-                isEditMode && !isDisabled
+                mode === "edit" && !isDisabled
                   ? "focus:border-blue-500 cursor-pointer"
                   : "cursor-default"
               }`}
           >
-            <option value="">{!isEditMode && initialData ? "Not Specified" : placeholder}</option>
+            <option value="">{mode === "view" && initialData ? "Not Specified" : placeholder}</option>
             {options?.map(opt =>
               typeof opt === "string" ? (
                 <option key={opt} value={opt}>

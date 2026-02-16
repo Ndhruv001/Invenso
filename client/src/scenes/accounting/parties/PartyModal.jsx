@@ -42,11 +42,11 @@ const PartyModal = ({
   onCancel,
   isLoading = false,
   initialData = null,
-  isViewOnly: isViewOnlyProp = false
+  mode = "view",
+  setMode = null
 }) => {
 
   const { theme } = useTheme();
-  const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
 
@@ -85,7 +85,7 @@ const PartyModal = ({
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  const isDisabled = !isEditMode || isSubmitting || isLoading;
+  const isDisabled = mode === "view" || isSubmitting || isLoading;
 
   // -----------------------------------
   // Submit
@@ -114,15 +114,14 @@ const PartyModal = ({
             : parseFloat(payload.openingBalance);
 
       onSubmit(payload);
-      console.log("🚀 ~ PartyModal ~ payload:", payload)
 
       if (!initialData) {
         reset(defaultValues);
       }
 
-      if (initialData && isEditMode) {
+      if (initialData && mode === "edit") {
         onCancel();
-        setIsEditMode(false);
+        setMode(null);
       }
     },
     err => {
@@ -136,37 +135,37 @@ const PartyModal = ({
   // Cancel
   // -----------------------------------
   const handleCancel = useCallback(() => {
-    if (initialData && isEditMode && isDirty) {
+    if (initialData && mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "Are you sure you want to discard your changes?",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
       if (!initialData) reset(defaultValues);
       onCancel();
     }
-  }, [initialData, isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   const handleToggleEditMode = useCallback(() => {
-    if (isEditMode && isDirty) {
+    if (mode === "view" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "You have unsaved changes. Exit edit mode?",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
-      setIsEditMode(prev => !prev);
+      setMode(prev => prev === "view" ? "edit" : "view");
     }
-  }, [isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   // -----------------------------------
   // UI
@@ -185,10 +184,10 @@ const PartyModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Party" : "View Party") : "Add Party"}
+                  {initialData ? (mode === "edit" ? "Edit Party" : "View Party") : "Add Party"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
-                  {!isEditMode && initialData
+                  {mode === "view" && initialData
                     ? "Party details (read-only)"
                     : "Fill in the party details below"}
                 </p>
@@ -222,7 +221,7 @@ const PartyModal = ({
                 label="Party Name"
                 icon={Users}
                 required
-                {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                {...{ register, errors, mode, isDisabled, initialData, theme }}
               />
 
               <TextField
@@ -230,7 +229,7 @@ const PartyModal = ({
                 label="Identifier"
                 icon={MapPin}
                 required
-                {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                {...{ register, errors, mode, isDisabled, initialData, theme }}
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -240,7 +239,7 @@ const PartyModal = ({
                   icon={UserCheck}
                   options={PARTY_TYPE_OPTIONS}
                   required
-                  {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                  {...{ register, errors, mode, isDisabled, initialData, theme }}
                 />
                 <TextField
                   name="phone"
@@ -249,7 +248,7 @@ const PartyModal = ({
                   required
                   type="tel"
                   inputProps={{ maxLength: 10 }}
-                  {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                  {...{ register, errors, mode, isDisabled, initialData, theme }}
                 />
               </div>
 
@@ -258,14 +257,14 @@ const PartyModal = ({
                 label="GST Number"
                 icon={Hash}
                 inputProps={{ maxLength: 15, style: { textTransform: "uppercase" } }}
-                {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                {...{ register, errors, mode, isDisabled, initialData, theme }}
               />
 
               <TextAreaField
                 name="remark"
                 label="Remark"
                 icon={FileText}
-                {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                {...{ register, errors, mode, isDisabled, initialData, theme }}
               />
 
               <div className={`pt-6 mt-6 border-t-4 ${theme.border}`}>
@@ -276,7 +275,7 @@ const PartyModal = ({
                     icon={CreditCard}
                     type="number"
                     required
-                    {...{ register, errors, isEditMode, isDisabled, initialData, theme }}
+                    {...{ register, errors, mode, isDisabled, initialData, theme }}
                   />
 
                   <TextField
@@ -303,7 +302,7 @@ const PartyModal = ({
                 Cancel
               </button>
 
-              {(isEditMode || !initialData) && (
+              {(mode === "edit" || !initialData) && (
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}

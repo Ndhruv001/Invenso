@@ -1,31 +1,48 @@
 import rateLimit from "express-rate-limit";
+import { errorResponse } from "../utils/responseUtils.js";
+
+const WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
 
 const globalLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  windowMs: WINDOW_MS, // 15 minutes
   max: parseInt(process.env.GLOBAL_RATE_LIMIT_MAX_REQUESTS) || 50, // limit each IP to 100 requests per windowMs
-  message: {
-    error: "Too many requests from this IP, please try again later.",
-    retryAfter: Math.ceil((parseInt(process.env.GLOBAL_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
-  },
   standardHeaders: true,
   legacyHeaders: false,
   // Skip rate limiting for certain routes (like health checks)
-  skip: req => {
-    const skipPaths = ["/health", "/api/health"];
-    return skipPaths.includes(req.path);
+  skip: req => req.originalUrl.includes("/health"),
+
+  handler: (req, res) => {
+    return errorResponse(
+      res,
+      "RATE_LIMIT_EXCEEDED",
+      "Too many requests from this IP, please try again later.",
+      null,
+      {
+        retryAfter: Math.ceil(WINDOW_MS / 1000)
+      },
+      429
+    );
   }
 });
 
 const loginLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, 
-  max: parseInt(process.env.LOCAL_RATE_LIMIT_MAX_REQUESTS) || 3,
-  message: {
-    error: "Too many login attempts. Try again later.",
-    retryAfter: Math.ceil((parseInt(process.env.LOCAL_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
-  },
+  windowMs: WINDOW_MS, // 15 minutes
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_REQUESTS) || 5, // limit each IP to 5 login attempts per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-})
+  handler: (req, res) => {
+    return errorResponse(
+      res,
+      "RATE_LIMIT_EXCEEDED",
+      "Too many requests from this IP, please try again later.",
+      null,
+      {
+        retryAfter: Math.ceil(WINDOW_MS / 1000)
+      },
+      429
+    );
+  }
+});
 
-export default {globalLimiter, loginLimiter};
+export default { globalLimiter, loginLimiter };
 export { globalLimiter, loginLimiter };

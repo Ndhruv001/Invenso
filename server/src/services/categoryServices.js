@@ -1,95 +1,247 @@
 /**
  * categoryServices.js
- * Pure asynchronous DB logic for categories.
- * Uses Prisma. Throws AppError for business errors.
+ * Prisma-based services for Category resource.
+ *
+ * Mirrors expenseServices.js style:
+ * - Clear sections
+ * - Explicit logic
+ * - Minimal abstraction
+ * - Easy to debug & reason about
  */
 
-// Add a new category
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
-async function addCategory(data, userId) {
-  if (!data.name || typeof data.name !== "string") {
-    throw new AppError("Category name is required", 400);
+/* -------------------------------------------------------------------------- */
+/*                               List Categories                              */
+/* -------------------------------------------------------------------------- */
+
+async function listCategories({
+  page = 1,
+  limit = 10,
+  sortBy = "createdAt",
+  sortOrder = "desc",
+  search = "",
+  filters = {}
+}) {
+  const where = {};
+
+  /* -------------------- Filters -------------------- */
+
+  if (filters.type) {
+    where.type = filters.type;
   }
 
-  // Fallback category type
-  const safeType = data.type || "PRODUCT";
+  if (filters.isActive !== undefined) {
+    where.isActive = filters.isActive === "true";
+  }
 
-  // Use interactive transaction to ensure atomicity
-  return await prisma.$transaction(async (tx) => {
-    // Check unique constraint before create
-    const exists = await tx.category.findUnique({ where: { name: data.name } });
-    if (exists) {
-      throw new AppError("Category name must be unique", 409);
+  /* -------------------- Search -------------------- */
+
+  if (search.trim()) {
+    const q = search.trim();
+
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } }
+    ];
+  }
+
+  /* -------------------- Pagination -------------------- */
+
+  const skip = (page - 1) * limit;
+
+  /* -------------------- Safe Sorting -------------------- */
+
+  const allowedSortFields = ["name", "type", "createdAt", "updatedAt"];
+
+  const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
+
+  const orderBy = { [safeSortBy]: sortOrder };
+
+  /* -------------------- DB Transaction -------------------- */
+
+  const [categories, totalRows] = await prisma.$transaction([
+    prisma.category.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: {
+        _count: {
+          select: {
+            products: true,
+            expenses: true
+          }
+        }
+      }
+    }),
+
+    prisma.category.count({ where })
+  ]);
+
+  return {
+    data: categories,
+    pagination: {
+      page,
+      limit,
+      totalRows,
+      totalPages: Math.ceil(totalRows / limit)
+    },
+    stats: {
+      totalCategories: totalRows
     }
+  };
+}
 
-    // Create category
+/* -------------------------------------------------------------------------- */
+/*                               Get Category                                 */
+/* -------------------------------------------------------------------------- */
+
+async function getCategoryById(id) {
+  if (!id) throw new AppError("Category ID is required", 400);
+
+  const category = await prisma.category.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: {
+          products: true,
+          expenses: true
+        }
+      }
+    }
+  });
+
+  if (!category || !category.isActive) {
+    throw new AppError("Category not found", 404);
+  }
+
+  return category;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               Create Category                              */
+/* -------------------------------------------------------------------------- */
+
+async function createCategory(data, userId = null) {
+  if (!data) throw new AppError("Category data is required", 400);
+
+  return prisma.$transaction(async tx => {
     const category = await tx.category.create({
       data: {
         name: data.name,
-        type: safeType,
-        description: data.description || null,
-        isActive: typeof data.isActive === "boolean" ? data.isActive : true,
-      },
+        type: data.type ?? undefined,
+        description: data.description ?? undefined
+      }
     });
 
-    // Create audit log
     await tx.auditLog.create({
       data: {
         tableName: "categories",
         recordId: String(category.id),
         action: "CREATE",
         newValue: JSON.stringify(category),
-        userId: userId || null,
-      },
+        userId
+      }
     });
 
     return category;
   });
 }
 
-// List all categories (optionally only active)
-async function listCategories(type) {
-  return await prisma.category.findMany({
-    where: { isActive: true, type: type || undefined },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true
+/* -------------------------------------------------------------------------- */
+/*                               Update Category                              */
+/* -------------------------------------------------------------------------- */
+
+async function updateCategory(id, data, userId = null) {
+  if (!id) throw new AppError("Category ID is required", 400);
+
+  return prisma.$transaction(async tx => {
+    const existing = await tx.category.findUnique({
+      where: { id }
+    });
+
+    if (!existing || !existing.isActive) {
+      throw new AppError("Category not found", 404);
     }
+
+    const updateData = {
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.type !== undefined && { type: data.type }),
+      ...(data.description !== undefined && {
+        description: data.description
+      }),
+      ...(data.isActive !== undefined && {
+        isActive: data.isActive
+      })
+    };
+
+    const updatedCategory = await tx.category.update({
+      where: { id },
+      data: updateData
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tableName: "categories",
+        recordId: String(id),
+        action: "UPDATE",
+        oldValue: JSON.stringify(existing),
+        newValue: JSON.stringify(updatedCategory),
+        userId
+      }
+    });
+
+    return updatedCategory;
   });
 }
 
-// Get category by ID
-async function getCategoryById(id) {
-  const category = await prisma.category.findUnique({ where: { id } });
-  if (!category) throw new AppError("Category not found", 404);
-  return category;
-}
+/* -------------------------------------------------------------------------- */
+/*                               Delete Category                              */
+/* -------------------------------------------------------------------------- */
 
-// Search categories by name (case-insensitive, for dropdowns)
-async function searchCategoriesByName(query) {
-  return await prisma.category.findMany({
-    where: {
-      isActive: true,
-      name: { contains: query, mode: "insensitive" },
-    },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-    take: 10,
+async function deleteCategory(id, userId = null) {
+  if (!id) throw new AppError("Category ID is required", 400);
+
+  return prisma.$transaction(async tx => {
+    const existing = await tx.category.findUnique({
+      where: { id }
+    });
+
+    if (!existing || !existing.isActive) {
+      throw new AppError("Category not found", 404);
+    }
+
+    const deleted = await tx.category.update({
+      where: { id },
+      data: { isActive: false }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tableName: "categories",
+        recordId: String(id),
+        action: "DELETE",
+        oldValue: JSON.stringify(existing),
+        userId
+      }
+    });
+
+    return deleted;
   });
 }
 
-export {
-  addCategory,
-  listCategories,
-  getCategoryById,
-  searchCategoriesByName,
-};
+/* -------------------------------------------------------------------------- */
+/*                                   Exports                                  */
+/* -------------------------------------------------------------------------- */
+
+export { listCategories, getCategoryById, createCategory, updateCategory, deleteCategory };
+
 export default {
-  addCategory,
   listCategories,
   getCategoryById,
-  searchCategoriesByName,
+  createCategory,
+  updateCategory,
+  deleteCategory
 };

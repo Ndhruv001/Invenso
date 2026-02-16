@@ -11,7 +11,7 @@ function useExpenseFilterOptions() {
 
   const categoryOptions = useMemo(
     () =>
-      expenseCategories?.map(cat => ({
+      expenseCategories?.data?.map(cat => ({
         value: String(cat.id),
         label: cat.name,
       })) || [],

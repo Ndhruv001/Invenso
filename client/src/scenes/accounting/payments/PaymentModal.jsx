@@ -43,12 +43,11 @@ const PaymentModal = ({
   onCancel,
   isLoading = false,
   initialData = null,
-  isViewOnly: isViewOnlyProp = false
+  mode = "view", // "view" | "edit" | "create"
+  setMode = null
 }) => {
-   
-  console.log("🚀 ~ PaymentModal ~ initialData:", initialData);
+  
   const { theme } = useTheme();
-  const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
   /* ----------------------- PARTY INPUT ------------------------ */
   const [partyInputValue, setPartyInputValue] = useState(initialData?.party?.name || "");
@@ -117,7 +116,7 @@ const PaymentModal = ({
     }
   }, [partySuggestionsData]);
 
-  const isDisabled = !isEditMode || isSubmitting || isLoading;
+  const isDisabled = mode === "view" || isSubmitting || isLoading;
 
   const submitHandler = handleSubmit(
     values => {
@@ -126,11 +125,10 @@ const PaymentModal = ({
         payload = extractModifiedFields(values, dirtyFields);
       }
       onSubmit(payload);
-      console.log("🚀 ~ PaymentModal ~ payload:", payload);
       if (!initialData) reset(defaultValues);
-      if (initialData && isEditMode) {
+      if (initialData && mode === "edit") {
         onCancel();
-        setIsEditMode(false);
+        setMode(null);
       }
     },
     errors => {
@@ -143,14 +141,14 @@ const PaymentModal = ({
   );
 
   const handleCancel = useCallback(() => {
-    if (initialData && isEditMode && isDirty) {
+    if (initialData && mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "Are you sure you want to discard your changes? All unsaved changes will be lost.",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
@@ -159,23 +157,23 @@ const PaymentModal = ({
       }
       onCancel();
     }
-  }, [initialData, isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   const handleToggleEditMode = useCallback(() => {
-    if (isEditMode && isDirty) {
+    if (mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "You have unsaved changes. Do you want to discard them and exit edit mode?",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
-      setIsEditMode(prev => !prev);
+      setMode(prev => prev === "edit" ? "view" : "edit");
     }
-  }, [isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   return (
     <>
@@ -191,10 +189,10 @@ const PaymentModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Payment" : "View Payment") : "Add Payment"}
+                  {initialData ? (mode === "edit" ? "Edit Payment" : "View Payment") : "Add Payment"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
-                  {!isEditMode && initialData
+                  {mode === "view" && initialData
                     ? "Payment details (read-only)"
                     : "Fill in the payment details below"}
                 </p>
@@ -206,7 +204,7 @@ const PaymentModal = ({
                   type="button"
                   onClick={handleToggleEditMode}
                   className={`p-2 ${theme.text.primary} ${theme.hover} rounded-lg cursor-pointer`}
-                  title={isEditMode ? "Exit edit mode" : "Enter edit mode"}
+                  title={mode === "edit" ? "Exit edit mode" : "Enter edit mode"}
                 >
                   <Edit3 className="w-5 h-5" />
                 </button>
@@ -292,7 +290,7 @@ const PaymentModal = ({
                     required
                     register={register}
                     errors={errors}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     isDisabled={isDisabled}
                     theme={theme}
                   />
@@ -304,7 +302,7 @@ const PaymentModal = ({
                     required
                     register={register}
                     errors={errors}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     isDisabled={isDisabled}
                     theme={theme}
                   />
@@ -319,7 +317,7 @@ const PaymentModal = ({
                     required
                     register={register}
                     errors={errors}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     isDisabled={isDisabled}
                     theme={theme}
                   />
@@ -331,7 +329,7 @@ const PaymentModal = ({
                     required
                     register={register}
                     errors={errors}
-                    isEditMode={isEditMode}
+                    mode={mode}
                     isDisabled={isDisabled}
                     theme={theme}
                   />
@@ -344,7 +342,7 @@ const PaymentModal = ({
                   icon={Hash}
                   register={register}
                   errors={errors}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
@@ -358,7 +356,7 @@ const PaymentModal = ({
                   required
                   register={register}
                   errors={errors}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
@@ -370,7 +368,7 @@ const PaymentModal = ({
                   icon={FileText}
                   register={register}
                   errors={errors}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
@@ -385,7 +383,7 @@ const PaymentModal = ({
               >
                 Cancel
               </button>
-              {(isEditMode || !initialData) && (
+              {(mode === "edit" || !initialData) && (
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}

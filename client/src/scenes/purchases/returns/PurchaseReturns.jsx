@@ -1,14 +1,16 @@
 // src/scenes/purchaseReturns/PurchaseReturns.js
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
 import {
   usePurchaseReturns,
+  useCreatePurchaseReturn,
   useUpdatePurchaseReturn,
   useDeletePurchaseReturn
 } from "@/hooks/usePurchaseReturns";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
+import { useUIAction } from "@/context/UIActionContext";
 import { useTheme } from "@/hooks/useTheme";
 import { usePurchaseReturnFilterOptions } from "@/hooks/usePurchaseReturnFilterOptions";
 
@@ -65,6 +67,7 @@ const PurchaseReturns = () => {
   // Mutations
   const updatePurchaseReturnMutation = useUpdatePurchaseReturn();
   const deletePurchaseReturnMutation = useDeletePurchaseReturn();
+  const createPurchaseReturnMutation = useCreatePurchaseReturn();
 
   // Filter options
   const filterOptions = usePurchaseReturnFilterOptions();
@@ -75,6 +78,22 @@ const PurchaseReturns = () => {
     setActivePurchaseReturn(normalizePurchaseReturnForModal(purchaseReturn));
     setModalMode(mode);
   }, []);
+
+    // ---------------------------
+    // UIAction (CREATE only)
+    // ---------------------------
+    const { action, clearAction } = useUIAction();
+  
+    useEffect(() => {
+      if (!action) return;
+  
+      if (action.resource !== "purchaseReturn") return;
+  
+      if (action.type === "CREATE") {
+        openModalWith({}, "create");
+        clearAction();
+      }
+    }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     purchaseReturn => {
@@ -100,25 +119,47 @@ const PurchaseReturns = () => {
   }, []);
 
   const handleSubmit = useCallback(
-    async purchaseReturnData => {
-      if (!activePurchaseReturn?.id) {
-        toast.error("Cannot save: missing purchase return context");
-        return;
-      }
-
-      await updatePurchaseReturnMutation.mutateAsync(
-        { id: activePurchaseReturn.id, data: purchaseReturnData },
-        {
-          onSuccess: () => {
-            toast.success("Purchase return updated successfully");
-            handleCancel();
-          },
-          onError: err => toast.error(err?.message || "Failed to update purchase return")
-        }
-      );
-    },
-    [activePurchaseReturn, updatePurchaseReturnMutation, handleCancel]
-  );
+     async purchaseData => {
+       try {
+         // 🟢 CREATE
+         if (modalMode === "create") {
+           await createPurchaseReturnMutation.mutateAsync(purchaseData, {
+             onSuccess: () => {
+               toast.success("Purchase return created successfully");
+               handleCancel();
+             },
+             onError: err => toast.error(err?.message || "Failed to create purchase return")
+           });
+ 
+           return; // stop execution after create
+         }
+ 
+         // 🔵 EDIT
+         if (modalMode === "edit") {
+           if (!activePurchaseReturn?.id) {
+             toast.error("Cannot save: missing purchase return context");
+             return;
+           }
+ 
+           await updatePurchaseReturnMutation.mutateAsync(
+             { id: activePurchaseReturn.id, data: purchaseData },
+             {
+               onSuccess: () => {
+                 toast.success("Purchase return updated successfully");
+                 handleCancel();
+               },
+               onError: err => toast.error(err?.message || "Failed to update purchase return")
+             }
+           );
+ 
+           return;
+         }
+       } catch (error) {
+         toast.error(error?.message || "Something went wrong");
+       }
+     },
+     [modalMode, activePurchaseReturn, createPurchaseReturnMutation, updatePurchaseReturnMutation, handleCancel]
+   );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -202,10 +243,11 @@ const PurchaseReturns = () => {
         {...queryStatus}
       />
 
-      {activePurchaseReturn && (
+      {modalMode && (
         <PurchaseReturnModal
-          initialData={activePurchaseReturn}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activePurchaseReturn : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

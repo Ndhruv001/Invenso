@@ -9,7 +9,7 @@ function useProductFilterOptions() {
   const { data: hsnCodesData } = useHsnCodes();
 
   const categoryOptions = useMemo(
-    () => categoryData?.map(cat => ({ value: String(cat.id), label: cat.name })) || [],
+    () => categoryData?.data?.map(cat => ({ value: String(cat.id), label: cat.name })) || [],
     [categoryData]
   );
 

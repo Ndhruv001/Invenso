@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
-import { useParties, useUpdateParty, useDeleteParty } from "@/hooks/useParties";
+import { useParties, useUpdateParty, useDeleteParty, useCreateParty } from "@/hooks/useParties";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
+import { useUIAction } from "@/context/UIActionContext";
 import { usePartyFilterOptions } from "@/hooks/usePartyFilterOptions";
 
 import Columns from "./Columns";
@@ -58,6 +59,7 @@ const Parties = () => {
   // Mutations
   const updatePartyMutation = useUpdateParty();
   const deletePartyMutation = useDeleteParty();
+  const createPartyMutation = useCreateParty();
 
   // Filter options
   const filterOptions = usePartyFilterOptions();
@@ -68,6 +70,22 @@ const Parties = () => {
     setActiveParty(normalizePartyForModal(party));
     setModalMode(mode);
   }, []);
+
+    // ---------------------------
+      // UIAction (CREATE only)
+      // ---------------------------
+      const { action, clearAction } = useUIAction();
+    
+      useEffect(() => {
+        if (!action) return;
+    
+        if (action.resource !== "party") return;
+    
+        if (action.type === "CREATE") {
+          openModalWith({}, "create");
+          clearAction();
+        }
+      }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     party => {
@@ -91,25 +109,47 @@ const Parties = () => {
   }, []);
 
   const handleSubmit = useCallback(
-    async partyData => {
-      if (!activeParty?.id) {
-        toast.error("Cannot save: missing party context");
-        return;
-      }
-
-      await updatePartyMutation.mutateAsync(
-        { id: activeParty.id, data: partyData },
-        {
-          onSuccess: () => {
-            toast.success("Party updated successfully");
-            handleCancel();
-          },
-          onError: err => toast.error(err?.message || "Failed to update party")
+      async purchaseData => {
+        try {
+          // 🟢 CREATE
+          if (modalMode === "create") {
+            await createPartyMutation.mutateAsync(purchaseData, {
+              onSuccess: () => {
+                toast.success("Party created successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to create party")
+            });
+  
+            return; // stop execution after create
+          }
+  
+          // 🔵 EDIT
+          if (modalMode === "edit") {
+            if (!activeParty?.id) {
+              toast.error("Cannot save: missing party context");
+              return;
+            }
+  
+            await updatePartyMutation.mutateAsync(
+              { id: activeParty.id, data: purchaseData },
+              {
+                onSuccess: () => {
+                  toast.success("Party updated successfully");
+                  handleCancel();
+                },
+                onError: err => toast.error(err?.message || "Failed to update party")
+              }
+            );
+  
+            return;
+          }
+        } catch (error) {
+          toast.error(error?.message || "Something went wrong");
         }
-      );
-    },
-    [activeParty, updatePartyMutation, handleCancel]
-  );
+      },
+      [modalMode, activeParty, createPartyMutation, updatePartyMutation, handleCancel]
+    );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -193,10 +233,11 @@ const Parties = () => {
         {...queryStatus}
       />
 
-      {activeParty && (
+      {modalMode && (
         <PartyModal
-          initialData={activeParty}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activeParty : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

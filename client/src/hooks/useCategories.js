@@ -5,7 +5,6 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
-  bulkDeleteCategories,
 } from "@/services/categoryServices";
 
 // ---------------------------------------------
@@ -71,27 +70,13 @@ const useDeleteCategory = () => {
   });
 };
 
-const useBulkDeleteCategories = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (ids) => bulkDeleteCategories(ids),
-    onSuccess: (ids) => {
-      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
-      ids.forEach((id) => {
-        queryClient.removeQueries({ queryKey: [QUERY_KEYS.CATEGORY, id] });
-      });
-    },
-  });
-};
-
 export default {
   useCategories,
   useCategory,
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
-  useBulkDeleteCategories,
+  
 };
 
 export {
@@ -100,5 +85,5 @@ export {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
-  useBulkDeleteCategories,
+  
 };

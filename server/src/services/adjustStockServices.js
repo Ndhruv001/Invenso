@@ -1,72 +1,90 @@
 /**
  * adjustStockServices.js
- * Services for adjusting product stock via inventory logs.
- * Operations supported:
- * - Create adjustment log (add/subtract stock)
- * - Update product current stock based on adjustment
- * - Insert audit log for adjustment
- * Note: No update or delete on adjustments allowed.
+ * prisma-based services for Adjust Stock resource.
+ *
+ * Supports:
+ * - Create stock adjustment (ADD / SUBTRACT)
+ * - Update product currentStock accordingly
+ * - Insert inventory log with balance tracking
+ * - Insert audit log
+ *
+ * Note:
+ * - Only CREATE adjustment is allowed.
+ * - No update/delete on adjustment entries.
  */
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
 
 /**
- * Create stock adjustment (add or subtract)
- * @param {Object} data { productId, type(add|subtract), quantity, remark }
- * @param {number|null} userId for audit logging
- * @returns Created InventoryLog record
+ * Create stock adjustment
+ * Wrap in transaction for atomicity
+ *
+ * @param {Object} data
+ * @param {number|null} userId
+ * @returns created inventoryLog
  */
 async function createAdjustStock(data, userId = null) {
-  const { productId, type, quantity, remark } = data;
+  if (!data?.productId) throw new AppError("Product ID is required", 400);
+  if (!["ADD", "SUBTRACT"].includes(data.type))
+    throw new AppError("Type must be ADD or SUBTRACT", 400);
 
-  if (!productId) throw new AppError("Product ID is required", 400);
-  if (!["ADD", "SUBTRACT"].includes(type)) throw new AppError("Type must be ADD or SUBTRACT", 400);
-  if (!quantity || quantity <= 0) throw new AppError("Quantity must be positive", 400);
+  const quantity = Number(data.quantity);
+  if (!quantity || quantity <= 0)
+    throw new AppError("Quantity must be positive", 400);
 
-  return await prisma.$transaction(async (tx) => {
-    // Fetch current stock before adjustment
-    const product = await tx.product.findUnique({ where: { id: productId } });
-    if (!product || !product.isActive) throw new AppError("Product not found or inactive", 404);
+  return prisma.$transaction(async tx => {
+    // 1. Load product
+    const product = await tx.product.findUnique({
+      where: { id: data.productId }
+    });
 
-    const balanceBefore = Number(product.currentStock);
-    let balanceAfter;
+    if (!product || !product.isActive)
+      throw new AppError("Product not found", 404);
 
-    if (type === "ADD") {
-      balanceAfter = balanceBefore + Number(quantity);
-    } else if (type === "SUBTRACT") {
-      if (balanceBefore < quantity) throw new AppError("Insufficient stock to subtract", 400);
-      balanceAfter = balanceBefore - Number(quantity);
+    const balanceBefore = Number(product.currentStock) || 0;
+    let balanceAfter = balanceBefore;
+
+    // 2. Business logic
+    if (data.type === "ADD") {
+      balanceAfter = balanceBefore + quantity;
     }
 
-    // Create inventory log
+    if (data.type === "SUBTRACT") {
+      if (balanceBefore < quantity)
+        throw new AppError("Insufficient stock", 400);
+
+      balanceAfter = balanceBefore - quantity;
+    }
+
+    // 3. Create inventory log
     const inventoryLog = await tx.inventoryLog.create({
       data: {
-        productId,
-        type,
+        productId: data.productId,
+        type: data.type,
         quantity,
         referenceType: "ADJUSTMENT",
-        remark,
+        remark: data.remark || null,
         balanceBefore,
-        balanceAfter,
-      },
+        balanceAfter
+      }
     });
 
-    // Update product currentStock
+    // 4. Update product stock
     await tx.product.update({
-      where: { id: productId },
-      data: { currentStock: balanceAfter },
+      where: { id: data.productId },
+      data: { currentStock: balanceAfter }
     });
 
-    // Create audit log
+    // 5. Audit log
     await tx.auditLog.create({
       data: {
         tableName: "inventoryLogs",
         recordId: String(inventoryLog.id),
         action: "CREATE",
         newValue: JSON.stringify(inventoryLog),
-        userId,
-      },
+        userId
+      }
     });
 
     return inventoryLog;
@@ -74,4 +92,7 @@ async function createAdjustStock(data, userId = null) {
 }
 
 export { createAdjustStock };
-export default { createAdjustStock };
+
+export default {
+  createAdjustStock
+};

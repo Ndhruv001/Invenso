@@ -1,15 +1,17 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
 import {
   usePayments,
   useUpdatePayment,
   useDeletePayment,
+  useCreatePayment
 } from "@/hooks/usePayments";
 
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
+import { useUIAction } from "@/context/UIActionContext";
 import { usePaymentFilterOptions } from "@/hooks/usePaymentFilterOptions";
 
 import Columns from "./Columns";
@@ -64,6 +66,7 @@ const Payments = () => {
   // Mutations
   const updatePaymentMutation = useUpdatePayment();
   const deletePaymentMutation = useDeletePayment();
+  const createPaymentMutation = useCreatePayment();
 
   // Filter options
   const filterOptions = usePaymentFilterOptions();
@@ -74,6 +77,22 @@ const Payments = () => {
     setActivePayment(normalizePaymentForModal(payment));
     setModalMode(mode);
   }, []);
+
+   // ---------------------------
+      // UIAction (CREATE only)
+      // ---------------------------
+      const { action, clearAction } = useUIAction();
+    
+      useEffect(() => {
+        if (!action) return;
+    
+        if (action.resource !== "payment") return;
+    
+        if (action.type === "CREATE") {
+          openModalWith({}, "create");
+          clearAction();
+        }
+      }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     (payment) => {
@@ -96,27 +115,48 @@ const Payments = () => {
     setModalMode(null);
   }, []);
 
-  const handleSubmit = useCallback(
-    async (paymentData) => {
-      if (!activePayment?.id) {
-        toast.error("Cannot save: missing payment context");
-        return;
-      }
+ const handleSubmit = useCallback(
+     async purchaseData => {
+       try {
+         // 🟢 CREATE
+         if (modalMode === "create") {
+           await createPaymentMutation.mutateAsync(purchaseData, {
+             onSuccess: () => {
+               toast.success("Payment created successfully");
+               handleCancel();
+             },
+             onError: err => toast.error(err?.message || "Failed to create payment")
+           });
+ 
+           return; // stop execution after create
+         }
+ 
+         // 🔵 EDIT
+         if (modalMode === "edit") {
+           if (!activePayment?.id) {
+             toast.error("Cannot save: missing payment context");
+             return;
+           }
 
-      await updatePaymentMutation.mutateAsync(
-        { id: activePayment.id, data: paymentData },
-        {
-          onSuccess: () => {
-            toast.success("Payment updated successfully");
-            handleCancel();
-          },
-          onError: (err) => toast.error(err?.message || "Failed to update payment"),
-        }
-      );
-    },
-    [activePayment, updatePaymentMutation, handleCancel]
-  );
-
+           await updatePaymentMutation.mutateAsync(
+             { id: activePayment.id, data: purchaseData },
+             {
+               onSuccess: () => {
+                 toast.success("Payment updated successfully");
+                 handleCancel();
+               },
+               onError: err => toast.error(err?.message || "Failed to update payment")
+             }
+           );
+ 
+           return;
+         }
+       } catch (error) {
+         toast.error(error?.message || "Something went wrong");
+       }
+     },
+     [modalMode, activePayment, createPaymentMutation, updatePaymentMutation, handleCancel]
+   );
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
       toast.error("No payments selected");
@@ -199,10 +239,11 @@ const Payments = () => {
         {...queryStatus}
       />
 
-      {activePayment && (
+      {modalMode && (
         <PaymentModal
-          initialData={activePayment}
-          isViewOnly={modalMode === "view"}
+          initialData={modalMode === "edit" || modalMode === "view" ? activePayment : null}
+          mode={modalMode}
+          setMode={setModalMode}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

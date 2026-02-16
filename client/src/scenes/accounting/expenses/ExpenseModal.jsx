@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from "react";
+import React, { useMemo, useEffect, useCallback, useState } from "react";
 import {
   Save,
   X,
@@ -8,13 +8,15 @@ import {
   Edit3,
   Layers,
   CreditCard,
-  Hash
+  Hash,
+   Plus
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { expenseCreateSchema, expenseUpdateSchema } from "@/validations/expenseValidations";
-import { useCategories } from "@/hooks/useCategories";
+import CategoryModal from "@/scenes/categories/CategoryModal";
+import { useCategories, useCreateCategory } from "@/hooks/useCategories";
 import { toast } from "react-toastify";
 import PaymentModeOptions from "@/constants/PAYMENT_MODES";
 import { SelectField, TextField, TextAreaField } from "@/components/common/FormFields";
@@ -38,13 +40,15 @@ const ExpenseModal = ({
   onCancel,
   isLoading = false,
   initialData = null,
-  isViewOnly: isViewOnlyProp = false
+  mode = "view", // "view" | "edit" | "create"
+  setMode = null
 }) => {
   const { theme } = useTheme();
   const { data: expenseCategories } = useCategories("EXPENSE");
-  const [isEditMode, setIsEditMode] = useState(() => (initialData ? !isViewOnlyProp : true));
 
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const createCategoryMutation = useCreateCategory();
 
   const defaultValues = useMemo(
     () => ({
@@ -77,44 +81,56 @@ const ExpenseModal = ({
   }, [defaultValues, reset]);
 
   const categoryOptions = useMemo(
-    () => expenseCategories?.map(cat => ({ value: String(cat.id), label: cat.name })) || [],
+    () => expenseCategories?.data?.map(cat => ({ value: String(cat.id), label: cat.name })) || [],
     [expenseCategories]
   );
 
-  const isDisabled = !isEditMode || isSubmitting || isLoading;
+  const isDisabled = mode === "view" || isSubmitting || isLoading;
 
   const handleCancel = useCallback(() => {
-    if (initialData && isEditMode && isDirty) {
+    if (initialData && mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "Are you sure you want to discard unsaved changes?",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
       if (!initialData) reset(defaultValues);
       onCancel();
     }
-  }, [initialData, isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   const handleToggleEditMode = useCallback(() => {
-    if (isEditMode && isDirty) {
+    if (mode === "edit" && isDirty) {
       openDialog({
         title: "Discard Changes?",
         message: "You have unsaved changes. Do you want to discard them and exit edit mode?",
         onConfirm: async () => {
           reset(defaultValues);
           onCancel();
-          setIsEditMode(false);
+          setMode(null);
         }
       });
     } else {
-      setIsEditMode(prev => !prev);
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
-  }, [isEditMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+
+  const handleSubmitCategory = async categoryData => {
+    try {
+      await createCategoryMutation.mutateAsync({ ...categoryData, type: "EXPENSE" });
+
+      toast.success("Category created successfully");
+
+      setIsCategoryModalOpen(false);
+    } catch (err) {
+      toast.error(err?.message || "Failed to create category");
+    }
+  };
 
   const submitHandler = handleSubmit(
     values => {
@@ -123,11 +139,10 @@ const ExpenseModal = ({
         payload = extractModifiedFields(values, dirtyFields);
       }
       onSubmit(payload);
-      console.log("🚀 ~ ExpenseModal ~ payload:", payload);
       if (!initialData) reset(defaultValues);
-      if (initialData && isEditMode) {
+      if (initialData && mode === "edit") {
         onCancel();
-        setIsEditMode(false);
+        setMode(null);
       }
     },
     errors => {
@@ -151,10 +166,14 @@ const ExpenseModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (isEditMode ? "Edit Expense" : "View Expense") : "Add Expense"}
+                  {initialData
+                    ? mode === "edit"
+                      ? "Edit Expense"
+                      : "View Expense"
+                    : "Add Expense"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
-                  {!isEditMode && initialData
+                  {mode === "view" && initialData
                     ? "Expense details (read-only)"
                     : "Fill in the expense details below"}
                 </p>
@@ -166,7 +185,7 @@ const ExpenseModal = ({
                   type="button"
                   onClick={handleToggleEditMode}
                   className={`p-2 ${theme.text.primary} ${theme.hover} rounded-lg cursor-pointer`}
-                  title={isEditMode ? "Exit edit mode" : "Enter edit mode"}
+                  title={mode === "edit" ? "Exit edit mode" : "Enter edit mode"}
                 >
                   <Edit3 className="w-5 h-5" />
                 </button>
@@ -191,18 +210,39 @@ const ExpenseModal = ({
           >
             <div className="p-6 space-y-6 flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SelectField
-                  name="categoryId"
-                  label="Category"
-                  icon={Layers}
-                  required
-                  options={categoryOptions}
-                  register={register}
-                  errors={errors}
-                  isEditMode={isEditMode}
-                  isDisabled={isDisabled}
-                  theme={theme}
-                />
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <SelectField
+                      name="categoryId"
+                      label="Category"
+                      icon={Layers}
+                      required
+                      options={categoryOptions || []}
+                      register={register}
+                      errors={errors}
+                      mode={mode}
+                      isDisabled={isDisabled}
+                      theme={theme}
+                    />
+                  </div>
+
+                  {mode !== "view" && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryModalOpen(true)}
+                      className={`h-[42px]  px-3 flex items-center justify-center rounded-lg border ${theme.border} ${theme.bg}
+                                  ${theme.hover} transition-all group cursor-pointer `}
+                      title="Add new category"
+                    >
+                      <span
+                        className={`flex items-center gap-1 text-sm font-medium ${theme.text.secondary} group-hover:${theme.text.primary}`}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add
+                      </span>
+                    </button>
+                  )}
+                </div>
                 <TextField
                   name="date"
                   label="Date"
@@ -211,7 +251,7 @@ const ExpenseModal = ({
                   required
                   register={register}
                   errors={errors}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
@@ -227,7 +267,7 @@ const ExpenseModal = ({
                   required
                   register={register}
                   errors={errors}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
@@ -245,7 +285,7 @@ const ExpenseModal = ({
                   }))}
                   register={register}
                   errors={errors}
-                  isEditMode={isEditMode}
+                  mode={mode}
                   isDisabled={isDisabled}
                   theme={theme}
                 />
@@ -258,7 +298,7 @@ const ExpenseModal = ({
                 icon={Hash}
                 register={register}
                 errors={errors}
-                isEditMode={isEditMode}
+                mode={mode}
                 isDisabled={isDisabled}
                 theme={theme}
               />
@@ -270,7 +310,7 @@ const ExpenseModal = ({
                 icon={FileText}
                 register={register}
                 errors={errors}
-                isEditMode={isEditMode}
+                mode={mode}
                 isDisabled={isDisabled}
                 theme={theme}
               />
@@ -284,7 +324,7 @@ const ExpenseModal = ({
               >
                 Cancel
               </button>
-              {(isEditMode || !initialData) && (
+              {(mode === "edit" || !initialData) && (
                 <button
                   type="submit"
                   disabled={isLoading || isSubmitting}
@@ -308,6 +348,14 @@ const ExpenseModal = ({
           </form>
         </div>
       </div>
+
+      {isCategoryModalOpen && (
+        <CategoryModal
+          mode="create"
+          onCancel={() => setIsCategoryModalOpen(false)}
+          onSubmit={handleSubmitCategory}
+        />
+      )}
 
       {/* Confirmation Modal */}
       {dialogConfig.isOpen && (

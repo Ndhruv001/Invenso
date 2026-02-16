@@ -70,22 +70,6 @@ const deleteCategory = async id => {
     throw new Error(error.message || "Failed to delete category");
   }
 };
-
-// ---------------------- BULK DELETE: Delete Multiple Categories ----------------------
-const bulkDeleteCategories = async ids => {
-  try {
-    if (!Array.isArray(ids) || ids.length === 0)
-      throw new Error("IDs array is required for bulk delete");
-    const response = await axiosInstance.delete(`/categories/bulk-delete`, {
-      data: { ids }
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Failed to bulk delete categories:", error);
-    throw new Error(error.message || "Failed to bulk delete categories");
-  }
-};
-
 // ────────────────────────────────────────────────────────────
 // Final Export Object
 // ────────────────────────────────────────────────────────────
@@ -95,7 +79,7 @@ export const categoriesApi = {
   createCategory,
   updateCategory,
   deleteCategory,
-  bulkDeleteCategories
+  
 };
 
 export {
@@ -104,5 +88,4 @@ export {
   createCategory,
   updateCategory,
   deleteCategory,
-  bulkDeleteCategories
 };
