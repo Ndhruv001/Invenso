@@ -1,5 +1,6 @@
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
+import { generatePdfFromTemplate } from "../services/pdfServices.js";
 
 /**
  * Helper: Build date filter for Prisma
@@ -826,12 +827,74 @@ async function getSaleSuggestionsByPartyId(partyId) {
   return sales;
 }
 
-export { listSales, getSaleById, createSale, updateSale, deleteSale, getSaleSuggestionsByPartyId };
+async function getSaleInvoicePdf(saleId) {
+
+  // 1. Fetch sale + items + party from DB
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: {
+      party: true,
+      saleItems: {
+        include: { product: true }
+      }
+    }
+  });
+
+  if (!sale) throw new Error("Sale not found");
+
+  // 2. Build item rows HTML
+  const itemRowsHtml = sale.saleItems.map((item, index) => `
+    <tr>
+      <td class="sno">${index + 1}</td>
+      <td class="name">${item.product.name}</td>
+      <td class="r">${item.quantity}</td>
+      <td class="r">${item.product.unit ?? "-"}</td>
+      <td class="r">₹${item.pricePerUnit}</td>
+      <td class="r">${item.gstRate}%</td>
+      <td class="r">₹${item.gstAmount}</td>
+      <td class="r">₹${item.amount}</td>
+    </tr>
+  `).join("");
+
+  // 3. Calculate pending amount
+  const pending =
+    Number(sale.totalAmount) - Number(sale.receivedAmount);
+
+  // 4. Build data object (must match template placeholders)
+  const data = {
+    company_name: "Your Company Name",
+    company_address: "Your Address, City",
+    invoice_number: String(sale.invoiceNumber),
+    invoice_date: sale.date.toLocaleDateString("en-IN"),
+    party_name: sale.party.name,
+    party_phone: sale.party.phone ?? "",
+    total_amount: sale.totalAmount.toString(),
+    received_amount: sale.receivedAmount.toString(),
+    pending_amount: pending.toFixed(2),
+    payment_mode: sale.paymentMode,
+    payment_reference: sale.paymentReference ?? "",
+    remarks: sale.remarks ?? "",
+    generated_at: new Date().toLocaleString("en-IN"),
+    item_rows: itemRowsHtml // 🔥 Inject rows here
+  };
+
+  // 5. Generate PDF
+  const pdfBuffer = await generatePdfFromTemplate(
+    "saleInvoiceTemplate.html",
+    data
+  );
+
+  return pdfBuffer;
+}
+
+
+export { listSales, getSaleById, createSale, updateSale, deleteSale, getSaleSuggestionsByPartyId, getSaleInvoicePdf };
 export default {
   listSales,
   getSaleById,
   createSale,
   updateSale,
   deleteSale,
-  getSaleSuggestionsByPartyId
+  getSaleSuggestionsByPartyId,
+  getSaleInvoicePdf
 };

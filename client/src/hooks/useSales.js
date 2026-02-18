@@ -5,7 +5,8 @@ import {
   createSale,
   updateSale,
   deleteSale,
-  getSaleSuggestionsByPartyId
+  getSaleSuggestionsByPartyId,
+  downloadSaleInvoicePdf,
 } from "@/services/saleServices";
 
 /**
@@ -97,6 +98,27 @@ export const useSaleSuggestionsByPartyId = (partyId, options = {}) => {
   });
 };
 
+export const useDownloadSaleInvoice = () => {
+  return useMutation({
+    mutationKey: ["download-sale-invoice"],
+    mutationFn: downloadSaleInvoicePdf,
+    onSuccess: (blob, id) => {
+      // Create temporary link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `invoice-${id}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+};
+
 // --------------------------------------------------
 // Default export
 export default {
@@ -105,5 +127,6 @@ export default {
   useCreateSale,
   useUpdateSale,
   useDeleteSale,
-  useSaleSuggestionsByPartyId
+  useSaleSuggestionsByPartyId,
+  useDownloadSaleInvoice
 };

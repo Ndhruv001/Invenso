@@ -71,21 +71,21 @@ const Parties = () => {
     setModalMode(mode);
   }, []);
 
-    // ---------------------------
-      // UIAction (CREATE only)
-      // ---------------------------
-      const { action, clearAction } = useUIAction();
-    
-      useEffect(() => {
-        if (!action) return;
-    
-        if (action.resource !== "party") return;
-    
-        if (action.type === "CREATE") {
-          openModalWith({}, "create");
-          clearAction();
-        }
-      }, [action, openModalWith, clearAction]);
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "party") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     party => {
@@ -109,47 +109,47 @@ const Parties = () => {
   }, []);
 
   const handleSubmit = useCallback(
-      async purchaseData => {
-        try {
-          // 🟢 CREATE
-          if (modalMode === "create") {
-            await createPartyMutation.mutateAsync(purchaseData, {
-              onSuccess: () => {
-                toast.success("Party created successfully");
-                handleCancel();
-              },
-              onError: err => toast.error(err?.message || "Failed to create party")
-            });
-  
-            return; // stop execution after create
-          }
-  
-          // 🔵 EDIT
-          if (modalMode === "edit") {
-            if (!activeParty?.id) {
-              toast.error("Cannot save: missing party context");
-              return;
-            }
-  
-            await updatePartyMutation.mutateAsync(
-              { id: activeParty.id, data: purchaseData },
-              {
-                onSuccess: () => {
-                  toast.success("Party updated successfully");
-                  handleCancel();
-                },
-                onError: err => toast.error(err?.message || "Failed to update party")
-              }
-            );
-  
+    async purchaseData => {
+      try {
+        // 🟢 CREATE
+        if (modalMode === "create") {
+          await createPartyMutation.mutateAsync(purchaseData, {
+            onSuccess: () => {
+              toast.success("Party created successfully");
+              handleCancel();
+            },
+            onError: err => toast.error(err?.message || "Failed to create party")
+          });
+
+          return; // stop execution after create
+        }
+
+        // 🔵 EDIT
+        if (modalMode === "edit") {
+          if (!activeParty?.id) {
+            toast.error("Cannot save: missing party context");
             return;
           }
-        } catch (error) {
-          toast.error(error?.message || "Something went wrong");
+
+          await updatePartyMutation.mutateAsync(
+            { id: activeParty.id, data: purchaseData },
+            {
+              onSuccess: () => {
+                toast.success("Party updated successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to update party")
+            }
+          );
+
+          return;
         }
-      },
-      [modalMode, activeParty, createPartyMutation, updatePartyMutation, handleCancel]
-    );
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong");
+      }
+    },
+    [modalMode, activeParty, createPartyMutation, updatePartyMutation, handleCancel]
+  );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {

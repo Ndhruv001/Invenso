@@ -8,7 +8,7 @@ import express from "express";
 const router = express.Router();
 
 import adjustStockController from "../controllers/adjustStockControllers.js";
-import { validateAdjustStock } from "../validations/adjustStockValidations.js";
+import { validateCreateAdjustStock } from "../validations/adjustStockValidations.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 
@@ -16,7 +16,7 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 router.post(
   "/",
   authMiddleware,
-  validateAdjustStock,
+  validateCreateAdjustStock,
   validateRequest,
   adjustStockController.createAdjustStock
 );

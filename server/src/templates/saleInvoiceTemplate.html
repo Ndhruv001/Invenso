@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Invoice #{{invoice_number}}</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap");
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        background: #f0f0ee;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #1a1a1a;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      /* ── A4 PAGE ── */
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 24px auto;
+        background: #fff;
+        padding: 40px 44px;
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ── TOP ── */
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 28px;
+      }
+      .company-name {
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: -0.3px;
+      }
+      .company-address {
+        font-size: 11px;
+        color: #888;
+        margin-top: 3px;
+        line-height: 1.5;
+      }
+      .inv-meta {
+        text-align: right;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11.5px;
+        line-height: 1.7;
+        color: #555;
+      }
+      .inv-meta .inv-num {
+        font-size: 14px;
+        font-weight: 500;
+        color: #1a1a1a;
+      }
+
+      hr {
+        border: none;
+        border-top: 1px solid #ddd;
+        margin-bottom: 18px;
+      }
+
+      /* ── PARTY ── */
+      .party-row {
+        margin-bottom: 22px;
+      }
+      .party-name {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .party-phone {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11.5px;
+        color: #666;
+        margin-top: 2px;
+      }
+
+      /* ── ITEMS TABLE — constrained to page width ── */
+      table {
+        width: 100%;
+        table-layout: fixed; /* forces columns to stay within page width */
+        border-collapse: collapse;
+      }
+
+      /* column widths — total = 100% */
+      col.c-no {
+        width: 4%;
+      }
+      col.c-name {
+        width: 24%;
+      }
+      col.c-qty {
+        width: 9%;
+      }
+      col.c-unit {
+        width: 9%;
+      }
+      col.c-ppu {
+        width: 13%;
+      }
+      col.c-gstr {
+        width: 8%;
+      }
+      col.c-gsta {
+        width: 13%;
+      }
+      col.c-amt {
+        width: 14%;
+      }
+
+      table thead tr {
+        border-top: 1.5px solid #1a1a1a;
+        border-bottom: 1.5px solid #1a1a1a;
+      }
+      table thead th {
+        padding: 6px 5px;
+        font-size: 10px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        text-align: left;
+        color: #555;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      table thead th.r {
+        text-align: right;
+      }
+
+      table tbody td {
+        padding: 6px 5px;
+        font-size: 12px;
+        border-bottom: 1px solid #ebebeb;
+        vertical-align: top;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      table tbody td.r {
+        text-align: right;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11.5px;
+      }
+      table tbody td.sno {
+        color: #ccc;
+        font-size: 10.5px;
+      }
+      table tbody td.name {
+        font-weight: 400;
+      }
+
+      /* ── TOTALS (inline after table, right-aligned) ── */
+      .totals {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12.5px;
+      }
+      .totals .t-row {
+        display: flex;
+        gap: 32px;
+        justify-content: flex-end;
+        padding: 3px 5px;
+        width: 240px;
+      }
+      .totals .t-row .lbl {
+        color: #999;
+        flex: 1;
+        text-align: left;
+      }
+      .totals .t-row .val {
+        text-align: right;
+        min-width: 90px;
+      }
+
+      .totals .t-row.total-row {
+        font-weight: 500;
+        font-size: 13.5px;
+        color: #1a1a1a;
+        border-top: 1.5px solid #1a1a1a;
+        margin-top: 2px;
+        padding-top: 5px;
+      }
+      .totals .t-row.total-row .lbl {
+        color: #1a1a1a;
+      }
+
+      .totals .t-row.paid-row .lbl,
+      .totals .t-row.paid-row .val {
+        color: #888;
+      }
+
+      .totals .t-row.pending-row {
+        font-weight: 600;
+        border-top: 1px solid #ddd;
+        padding-top: 4px;
+        margin-top: 1px;
+      }
+
+      /* ── PAYMENT MODE + REMARK ── */
+      .bottom-info {
+        margin-top: 22px;
+        font-size: 12px;
+        color: #666;
+        line-height: 1.9;
+      }
+      .bottom-info strong {
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+      .remark {
+        color: #999;
+        font-style: italic;
+        margin-top: 4px;
+        font-size: 11.5px;
+      }
+
+      /* ── FOOTER ── */
+      .footer {
+        margin-top: auto;
+        padding-top: 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      .footer .generated {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 10px;
+        color: #ccc;
+      }
+      .footer .invenso-note {
+        font-size: 10.5px;
+        color: #bbb;
+        text-align: right;
+        font-style: italic;
+        line-height: 1.5;
+      }
+      .footer .invenso-note strong {
+        color: #999;
+        font-style: normal;
+        font-weight: 500;
+      }
+
+      @media print {
+        html,
+        body {
+          background: white;
+        }
+        .page {
+          margin: 0;
+          box-shadow: none;
+          padding: 32px 36px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- TOP -->
+      <div class="top">
+        <div>
+          <div class="company-name">JB TRADER'S</div>
+          <div class="company-address">Shop no - 8983, Gali No - 1, Multani Dhandha, Paharganj</div>
+        </div>
+        <div class="inv-meta">
+          <div class="inv-num">Invoice #{{invoice_number}}</div>
+          <div>{{invoice_date}}</div>
+        </div>
+      </div>
+
+      <hr />
+
+      <!-- PARTY -->
+      <div class="party-row">
+        <div class="party-name">{{party_name}}</div>
+        <div class="party-phone">{{party_phone}}</div>
+      </div>
+
+      <!-- ITEMS TABLE -->
+      <table>
+        <colgroup>
+          <col class="c-no" />
+          <col class="c-name" />
+          <col class="c-qty" />
+          <col class="c-unit" />
+          <col class="c-ppu" />
+          <col class="c-gstr" />
+          <col class="c-gsta" />
+          <col class="c-amt" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product</th>
+            <th class="r">Qty</th>
+            <th class="r">Unit</th>
+            <th class="r">Price/Unit</th>
+            <th class="r">GST%</th>
+            <th class="r">GST Amt</th>
+            <th class="r">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{item_rows}}
+        </tbody>
+      </table>
+
+      <!-- TOTALS — right below last item -->
+      <div class="totals">
+        <!-- sale.totalAmount -->
+        <div class="t-row total-row">
+          <span class="lbl">Total</span>
+          <span class="val">₹{{total_amount}}</span>
+        </div>
+        <!-- sale.receivedAmount -->
+        <div class="t-row paid-row">
+          <span class="lbl">— Paid</span>
+          <span class="val">₹{{received_amount}}</span>
+        </div>
+        <!-- calculated: totalAmount - receivedAmount -->
+        <div class="t-row pending-row">
+          <span class="lbl">Pending</span>
+          <span class="val">₹{{pending_amount}}</span>
+        </div>
+      </div>
+
+      <!-- PAYMENT MODE + REMARK -->
+      <div class="bottom-info">
+        <!-- sale.paymentMode -->
+        Paid via <strong>{{payment_mode}}</strong>
+        <!-- show only if sale.paymentReference not null -->
+        &nbsp;·&nbsp; Ref: <strong>{{payment_reference}}</strong>
+        <!-- show only if sale.remarks not null -->
+        <div class="remark">{{remarks}}</div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="footer">
+        <span class="generated">{{generated_at}}</span>
+        <div class="invenso-note">
+          Made with <strong><b>Invenso</b></strong>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

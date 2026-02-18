@@ -2,7 +2,13 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
-import { useSales, useUpdateSale, useDeleteSale, useCreateSale } from "@/hooks/useSales";
+import {
+  useSales,
+  useUpdateSale,
+  useDeleteSale,
+  useCreateSale,
+  useDownloadSaleInvoice
+} from "@/hooks/useSales";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
@@ -63,6 +69,7 @@ const Sales = () => {
   const updateSaleMutation = useUpdateSale();
   const deleteSaleMutation = useDeleteSale();
   const createSaleMutation = useCreateSale();
+  const downloadInvoiceMutation = useDownloadSaleInvoice();
 
   // Filter options
   const filterOptions = useSaleFilterOptions();
@@ -74,22 +81,21 @@ const Sales = () => {
     setModalMode(mode);
   }, []);
 
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
 
-   // ---------------------------
-      // UIAction (CREATE only)
-      // ---------------------------
-      const { action, clearAction } = useUIAction();
-    
-      useEffect(() => {
-        if (!action) return;
-    
-        if (action.resource !== "sale") return;
-    
-        if (action.type === "CREATE") {
-          openModalWith({}, "create");
-          clearAction();
-        }
-      }, [action, openModalWith, clearAction]);
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "sale") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     sale => {
@@ -112,48 +118,48 @@ const Sales = () => {
     setModalMode(null);
   }, []);
 
-   const handleSubmit = useCallback(
-      async purchaseData => {
-        try {
-          // 🟢 CREATE
-          if (modalMode === "create") {
-            await createSaleMutation.mutateAsync(purchaseData, {
-              onSuccess: () => {
-                toast.success("Sale created successfully");
-                handleCancel();
-              },
-              onError: err => toast.error(err?.message || "Failed to create sale")
-            });
-  
-            return; // stop execution after create
-          }
-  
-          // 🔵 EDIT
-          if (modalMode === "edit") {
-            if (!activeSale?.id) {
-              toast.error("Cannot save: missing sale context");
-              return;
-            }
-  
-            await updateSaleMutation.mutateAsync(
-              { id: activeSale.id, data: purchaseData },
-              {
-                onSuccess: () => {
-                  toast.success("Sale updated successfully");
-                  handleCancel();
-                },
-                onError: err => toast.error(err?.message || "Failed to update sale")
-              }
-            );
-  
+  const handleSubmit = useCallback(
+    async purchaseData => {
+      try {
+        // 🟢 CREATE
+        if (modalMode === "create") {
+          await createSaleMutation.mutateAsync(purchaseData, {
+            onSuccess: () => {
+              toast.success("Sale created successfully");
+              handleCancel();
+            },
+            onError: err => toast.error(err?.message || "Failed to create sale")
+          });
+
+          return; // stop execution after create
+        }
+
+        // 🔵 EDIT
+        if (modalMode === "edit") {
+          if (!activeSale?.id) {
+            toast.error("Cannot save: missing sale context");
             return;
           }
-        } catch (error) {
-          toast.error(error?.message || "Something went wrong");
+
+          await updateSaleMutation.mutateAsync(
+            { id: activeSale.id, data: purchaseData },
+            {
+              onSuccess: () => {
+                toast.success("Sale updated successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to update sale")
+            }
+          );
+
+          return;
         }
-      },
-      [modalMode, activeSale, createSaleMutation, updateSaleMutation, handleCancel]
-    );
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong");
+      }
+    },
+    [modalMode, activeSale, createSaleMutation, updateSaleMutation, handleCancel]
+  );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -189,6 +195,47 @@ const Sales = () => {
     });
   }, [selectedRows, deleteSaleMutation, openDialog, handleSelectionChange, refetch]);
 
+  const handleDownload = useCallback(() => {
+    if (!selectedRows?.length) {
+      toast.error("No sales selected");
+      return;
+    }
+
+    openDialog({
+      title: "Download Selected Invoices",
+      message: `Download invoice for ${selectedRows.length} sale(s)?`,
+      onConfirm: async () => {
+        try {
+          const results = await Promise.allSettled(
+            selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+          );
+
+          const successCount = results.filter(r => r.status === "fulfilled").length;
+
+          const failedCount = results.length - successCount;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} invoice(s) downloaded successfully`);
+          }
+
+          if (failedCount > 0) {
+            toast.error(`${failedCount} invoice(s) failed to download`);
+          }
+        } catch (err) {
+          toast.error(err?.message || "Unexpected error during download");
+        }
+      }
+    });
+  }, [selectedRows, downloadInvoiceMutation, openDialog]);
+
+  const handlePrint = saleId => {
+    if (!saleId) return;
+
+    const url = `${import.meta.env.VITE_API_BASE_URL}/sales/print/invoice/${saleId}`;
+
+    window.open(url, "_blank");
+  };
+
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);
 
@@ -217,8 +264,8 @@ const Sales = () => {
         handlers={{
           edit: () => handleEdit(selectedRows?.[0]),
           delete: handleDelete,
-          print: null,
-          download: null
+          print: () => handlePrint(selectedRows?.[0].id),
+          download: handleDownload
         }}
       />
 

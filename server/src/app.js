@@ -82,7 +82,7 @@ app.use(`${BASE}/parties`, partyRoutes);
 app.use(`${BASE}/payments`, paymentRoutes);
 app.use(`${BASE}/expenses`, expenseRoutes);
 app.use(`${BASE}/transports`, transportRoutes);
-app.use(`${BASE}/adjustments`, adjustStockRoutes);
+app.use(`${BASE}/stock-adjustments`, adjustStockRoutes);
 app.use(`${BASE}/sales`, saleRoutes);
 app.use(`${BASE}/sale-returns`, saleReturnRoutes);
 app.use(`${BASE}/purchases`, purchaseRoutes);

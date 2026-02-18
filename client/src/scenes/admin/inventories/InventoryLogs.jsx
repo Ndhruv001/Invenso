@@ -1,9 +1,13 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useInventoryLogs } from "@/hooks/useInventoryLogs";
 import InventoryLogColumns from "./Columns";
 import DataTable from "@/components/common/DataTable";
+import { useUIAction } from "@/context/UIActionContext";
+import { useStockAdjustments } from "@/hooks/useStockAdjustments";
 import { useTheme } from "@/hooks/useTheme";
 import { useTableControls } from "@/hooks/useTableControls";
+import { toast } from "react-toastify";
+import StockAdjustmentModal from "@/scenes/stock-adjustments/StockAdjustmentModal";
 
 /**
  * Main page for displaying InventoryLog table (no filters, actions, stats).
@@ -22,7 +26,36 @@ const InventoryLogs = () => {
 
   // Query inventory logs with current table state as params
   const { data: logsData, ...queryStatus } = useInventoryLogs(filters);
-  console.log("🚀 ~ InventoryLogs ~ logsData:", logsData)
+  const [isStockAdjustmentModalOpen, setIsStockAdjustmentModalOpen] = useState(false);
+  const createStockAdjustments = useStockAdjustments();
+
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "stockAdjustment") return;
+
+    if (action.type === "CREATE") {
+      setIsStockAdjustmentModalOpen(true);
+      clearAction();
+    }
+  }, [action, isStockAdjustmentModalOpen, clearAction]);
+
+  const handleSubmitStockAdjustments = async stockAdjustmentData => {
+    try {
+      await createStockAdjustments.mutateAsync(stockAdjustmentData);
+
+      toast.success("Stock Adjusted successfully");
+
+      setIsStockAdjustmentModalOpen(false);
+    } catch (err) {
+      toast.error(err?.message || "Failed to create category");
+    }
+  };
 
   const logs = logsData?.data ?? [];
   const totalRows = logsData?.pagination?.totalRows ?? 0;
@@ -46,6 +79,14 @@ const InventoryLogs = () => {
         // No filters, no action ribbon, no search, read-only
         {...queryStatus}
       />
+
+      {isStockAdjustmentModalOpen && (
+        <StockAdjustmentModal
+          mode="create"
+          onCancel={() => setIsStockAdjustmentModalOpen(false)}
+          onSubmit={handleSubmitStockAdjustments}
+        />
+      )}
     </div>
   );
 };

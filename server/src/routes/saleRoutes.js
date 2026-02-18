@@ -24,6 +24,9 @@ router.get(
   saleController.listSales
 );
 
+router.get("/download/invoice/:id", saleController.getSaleInvoicePdf);
+router.get("/print/invoice/:id", saleController.printSaleInvoicePdf);
+
 // Get sales by Party ID (suggestions)
 router.get(
   "/party-id/:partyId",
