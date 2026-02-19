@@ -24,6 +24,9 @@ router.get(
   purchaseController.listPurchases
 );
 
+router.get("/download/invoice/:id", purchaseController.getPurchaseInvoicePdf);
+router.get("/print/invoice/:id", purchaseController.printPurchaseInvoicePdf);
+
 // Get purchase by Party ID
 router.get(
   "/party-id/:partyId",

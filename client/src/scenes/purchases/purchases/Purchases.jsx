@@ -6,7 +6,8 @@ import {
   usePurchases,
   useCreatePurchase,
   useUpdatePurchase,
-  useDeletePurchase
+  useDeletePurchase,
+  useDownloadPurchaseInvoice
 } from "@/hooks/usePurchases";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -68,6 +69,7 @@ const Purchases = () => {
   const updatePurchaseMutation = useUpdatePurchase();
   const deletePurchaseMutation = useDeletePurchase();
   const createPurchaseMutation = useCreatePurchase();
+  const downloadInvoiceMutation = useDownloadPurchaseInvoice();
 
   // Filter options
   const filterOptions = usePurchaseFilterOptions();
@@ -193,6 +195,49 @@ const Purchases = () => {
     });
   }, [selectedRows, deletePurchaseMutation, openDialog, handleSelectionChange, refetch]);
 
+
+   const handleDownload = useCallback(() => {
+      if (!selectedRows?.length) {
+        toast.error("No purchases selected");
+        return;
+      }
+  
+      openDialog({
+        title: "Download Selected Invoices",
+        message: `Download invoice for ${selectedRows.length} purchase(s)?`,
+        onConfirm: async () => {
+          try {
+            const results = await Promise.allSettled(
+              selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+            );
+  
+            const successCount = results.filter(r => r.status === "fulfilled").length;
+  
+            const failedCount = results.length - successCount;
+  
+            if (successCount > 0) {
+              toast.success(`${successCount} invoice(s) downloaded successfully`);
+            }
+  
+            if (failedCount > 0) {
+              toast.error(`${failedCount} invoice(s) failed to download`);
+            }
+          } catch (err) {
+            toast.error(err?.message || "Unexpected error during download");
+          }
+        }
+      });
+    }, [selectedRows, downloadInvoiceMutation, openDialog]);
+  
+    const handlePrint = purchaseId => {
+      if (!purchaseId) return;
+  
+      const url = `${import.meta.env.VITE_API_BASE_URL}/purchases/print/invoice/${purchaseId}`;
+  
+      window.open(url, "_blank");
+    };
+  
+
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);
 
@@ -221,8 +266,8 @@ const Purchases = () => {
         handlers={{
           edit: () => handleEdit(selectedRows?.[0]),
           delete: handleDelete,
-          print: null,
-          download: null
+          print: () => handlePrint(selectedRows?.[0].id),
+          download: handleDownload
         }}
       />
 

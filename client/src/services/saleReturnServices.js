@@ -115,6 +115,24 @@ export const deleteSaleReturn = async id => {
   }
 };
 
+// Download Sale Invoice PDF
+export const downloadSaleReturnInvoicePdf = async (id) => {
+  if (!id) throw new Error("Sale return ID is required");
+
+  try {
+    const response = await axiosInstance.get(
+      `/sale-returns/download/invoice/${id}`,
+      {
+        responseType: "blob" // 🔥 IMPORTANT for file download
+      }
+    );
+
+    return response; // returns Blob
+  } catch (error) {
+    handleAxiosError(error, `Failed to download invoice for sale return ${id}`);
+  }
+};
+
 // -------------------------------------
 // Named export bundle
 export const saleReturnApi = {
@@ -122,7 +140,8 @@ export const saleReturnApi = {
   getSaleReturn,
   createSaleReturn,
   updateSaleReturn,
-  deleteSaleReturn
+  deleteSaleReturn,
+  downloadSaleReturnInvoicePdf
 };
 
 export default saleReturnApi;

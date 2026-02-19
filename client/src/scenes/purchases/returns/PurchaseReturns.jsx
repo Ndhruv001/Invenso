@@ -6,7 +6,8 @@ import {
   usePurchaseReturns,
   useCreatePurchaseReturn,
   useUpdatePurchaseReturn,
-  useDeletePurchaseReturn
+  useDeletePurchaseReturn,
+  useDownloadPurchaseReturnInvoice
 } from "@/hooks/usePurchaseReturns";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -68,6 +69,7 @@ const PurchaseReturns = () => {
   const updatePurchaseReturnMutation = useUpdatePurchaseReturn();
   const deletePurchaseReturnMutation = useDeletePurchaseReturn();
   const createPurchaseReturnMutation = useCreatePurchaseReturn();
+  const downloadInvoiceMutation = useDownloadPurchaseReturnInvoice();
 
   // Filter options
   const filterOptions = usePurchaseReturnFilterOptions();
@@ -195,6 +197,48 @@ const PurchaseReturns = () => {
     });
   }, [selectedRows, deletePurchaseReturnMutation, openDialog, handleSelectionChange, refetch]);
 
+
+  const handleDownload = useCallback(() => {
+        if (!selectedRows?.length) {
+          toast.error("No purchases returns selected");
+          return;
+        }
+    
+        openDialog({
+          title: "Download Selected Invoices",
+          message: `Download invoice for ${selectedRows.length} purchase return(s)?`,
+          onConfirm: async () => {
+            try {
+              const results = await Promise.allSettled(
+                selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+              );
+    
+              const successCount = results.filter(r => r.status === "fulfilled").length;
+    
+              const failedCount = results.length - successCount;
+    
+              if (successCount > 0) {
+                toast.success(`${successCount} invoice(s) downloaded successfully`);
+              }
+    
+              if (failedCount > 0) {
+                toast.error(`${failedCount} invoice(s) failed to download`);
+              }
+            } catch (err) {
+              toast.error(err?.message || "Unexpected error during download");
+            }
+          }
+        });
+      }, [selectedRows, downloadInvoiceMutation, openDialog]);
+    
+      const handlePrint = purchaseId => {
+        if (!purchaseId) return;
+    
+        const url = `${import.meta.env.VITE_API_BASE_URL}/purchase-returns/print/invoice/${purchaseId}`;
+    
+        window.open(url, "_blank");
+      };
+
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);
 
@@ -223,8 +267,8 @@ const PurchaseReturns = () => {
         handlers={{
           edit: () => handleEdit(selectedRows?.[0]),
           delete: handleDelete,
-          print: null,
-          download: null
+          print: () => handlePrint(selectedRows?.[0].id),
+          download: handleDownload
         }}
       />
 

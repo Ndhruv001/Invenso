@@ -12,6 +12,7 @@
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
+import { generatePdfFromTemplate } from "../services/pdfServices.js";
 
 /**
  * Helper: Build date filter for Prisma
@@ -808,13 +809,72 @@ async function getPurchaseSuggestionsByPartyId(partyId) {
   return purchases;
 }
 
+async function getPurchaseInvoicePdf(purchaseId) {
+
+  // 1. Fetch sale + items + party from DB
+  const purchase = await prisma.purchase.findUnique({
+    where: { id: purchaseId },
+    include: {
+      party: true,
+      purchaseItems: {
+        include: { product: true }
+      }
+    }
+  });
+
+  if (!purchase) throw new Error("purchase not found");
+
+  // 2. Build item rows HTML
+  const itemRowsHtml = purchase.purchaseItems.map((item, index) => `
+    <tr>
+      <td class="sno">${index + 1}</td>
+      <td class="name">${item.product.name}</td>
+      <td class="r">${item.quantity}</td>
+      <td class="r">${item.product.unit ?? "-"}</td>
+      <td class="r">₹${item.pricePerUnit}</td>
+      <td class="r">${item.gstRate}%</td>
+      <td class="r">₹${item.gstAmount}</td>
+      <td class="r">₹${item.amount}</td>
+    </tr>
+  `).join("");
+
+  // 3. Calculate pending amount
+  const pending =
+    Number(purchase.totalAmount) - Number(purchase.paidAmount);
+
+  // 4. Build data object (must match template placeholders)
+  const data = {
+    invoice_number: String(purchase.invoiceNumber),
+    invoice_date: purchase.date.toLocaleDateString("en-IN"),
+    party_name: purchase.party.name,
+    party_phone: purchase.party.phone ?? "",
+    total_amount: purchase.totalAmount.toString(),
+    paid_amount: purchase.paidAmount.toString(),
+    pending_amount: pending.toFixed(2),
+    payment_mode: purchase.paymentMode,
+    payment_reference: purchase.paymentReference ?? "",
+    remarks: purchase.remarks ?? "",
+    generated_at: new Date().toLocaleString("en-IN"),
+    item_rows: itemRowsHtml // 🔥 Inject rows here
+  };
+
+  // 5. Generate PDF
+  const pdfBuffer = await generatePdfFromTemplate(
+    "purchaseInvoiceTemplate.html",
+    data
+  );
+
+  return pdfBuffer;
+}
+
 export {
   listPurchases,
   getPurchaseById,
   createPurchase,
   updatePurchase,
   deletePurchase,
-  getPurchaseSuggestionsByPartyId
+  getPurchaseSuggestionsByPartyId,
+  getPurchaseInvoicePdf
 };
 export default {
   listPurchases,
@@ -822,5 +882,6 @@ export default {
   createPurchase,
   updatePurchase,
   deletePurchase,
-  getPurchaseSuggestionsByPartyId
+  getPurchaseSuggestionsByPartyId,
+  getPurchaseInvoicePdf
 };

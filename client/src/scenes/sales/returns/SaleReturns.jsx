@@ -5,7 +5,8 @@ import {
   useSaleReturns,
   useUpdateSaleReturn,
   useDeleteSaleReturn,
-  useCreateSaleReturn
+  useCreateSaleReturn,
+  useDownloadSaleReturnInvoice
 } from "@/hooks/useSaleReturns";
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -66,6 +67,7 @@ const SaleReturns = () => {
   const updateSaleReturnMutation = useUpdateSaleReturn();
   const deleteSaleReturnMutation = useDeleteSaleReturn();
   const createSaleReturnMutation = useCreateSaleReturn();
+  const downloadInvoiceMutation = useDownloadSaleReturnInvoice();
 
   // Filter options
   const filterOptions = useSaleReturnFilterOptions();
@@ -191,6 +193,48 @@ const SaleReturns = () => {
     });
   }, [selectedRows, deleteSaleReturnMutation, openDialog, handleSelectionChange, refetch]);
 
+
+   const handleDownload = useCallback(() => {
+      if (!selectedRows?.length) {
+        toast.error("No sales returns selected");
+        return;
+      }
+  
+      openDialog({
+        title: "Download Selected Invoices",
+        message: `Download invoice for ${selectedRows.length} sale return(s)?`,
+        onConfirm: async () => {
+          try {
+            const results = await Promise.allSettled(
+              selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+            );
+  
+            const successCount = results.filter(r => r.status === "fulfilled").length;
+  
+            const failedCount = results.length - successCount;
+  
+            if (successCount > 0) {
+              toast.success(`${successCount} invoice(s) downloaded successfully`);
+            }
+  
+            if (failedCount > 0) {
+              toast.error(`${failedCount} invoice(s) failed to download`);
+            }
+          } catch (err) {
+            toast.error(err?.message || "Unexpected error during download");
+          }
+        }
+      });
+    }, [selectedRows, downloadInvoiceMutation, openDialog]);
+  
+    const handlePrint = saleReturnId => {
+      if (!saleReturnId) return;
+  
+      const url = `${import.meta.env.VITE_API_BASE_URL}/sale-returns/print/invoice/${saleReturnId}`;
+  
+      window.open(url, "_blank");
+    };
+
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);
 
@@ -219,8 +263,8 @@ const SaleReturns = () => {
         handlers={{
           edit: () => handleEdit(selectedRows?.[0]),
           delete: handleDelete,
-          print: null,
-          download: null
+          print: () => handlePrint(selectedRows?.[0].id),
+          download: handleDownload
         }}
       />
 

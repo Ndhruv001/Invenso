@@ -20,8 +20,8 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 // List sale returns with filters and stats
 router.get("/", authMiddleware, saleReturnController.listSaleReturns);
 
-// Get sale returns by Party ID (suggestions)
-router.get("/party-id/:partyId", authMiddleware, saleReturnController.getSaleReturnsByPartyId);
+router.get("/download/invoice/:id", saleReturnController.getSaleReturnInvoicePdf);
+router.get("/print/invoice/:id", saleReturnController.printSaleReturnInvoicePdf);
 
 // Get sale return by ID
 router.get(

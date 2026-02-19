@@ -12,6 +12,7 @@
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
+import { generatePdfFromTemplate } from "../services/pdfServices.js";
 
 /**
  * Helper: Build date filter for Prisma
@@ -762,17 +763,77 @@ async function deletePurchaseReturn(purchaseReturnId, userId = null) {
   });
 }
 
+async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
+
+  // 1. Fetch sale + items + party from DB
+  const purchaseReturn = await prisma.purchaseReturn.findUnique({
+    where: { id: purchaseReturnId },
+    include: {
+      party: true,
+      purchaseReturnItems: {
+        include: { product: true }
+      }
+    }
+  });
+
+  if (!purchaseReturn) throw new Error("Purchase return not found");
+
+  // 2. Build item rows HTML
+  const itemRowsHtml = purchaseReturn.purchaseReturnItems.map((item, index) => `
+    <tr>
+      <td class="sno">${index + 1}</td>
+      <td class="name">${item.product.name}</td>
+      <td class="r">${item.quantity}</td>
+      <td class="r">${item.product.unit ?? "-"}</td>
+      <td class="r">₹${item.pricePerUnit}</td>
+      <td class="r">${item.gstRate}%</td>
+      <td class="r">₹${item.gstAmount}</td>
+      <td class="r">₹${item.amount}</td>
+    </tr>
+  `).join("");
+
+  // 3. Calculate pending amount
+  const pending =
+    Number(purchaseReturn.totalAmount) - Number(purchaseReturn.receivedAmount);
+
+  // 4. Build data object (must match template placeholders)
+  const data = {
+    purchase_id: String(purchaseReturn.purchaseId),
+    invoice_date: purchaseReturn.date.toLocaleDateString("en-IN"),
+    party_name: purchaseReturn.party.name,
+    party_phone: purchaseReturn.party.phone ?? "",
+    total_amount: purchaseReturn.totalAmount.toString(),
+    received_amount: purchaseReturn.receivedAmount.toString(),
+    pending_amount: pending.toFixed(2),
+    payment_mode: purchaseReturn.paymentMode,
+    payment_reference: purchaseReturn.paymentReference ?? "",
+    reason: purchaseReturn.reason ?? "",
+    generated_at: new Date().toLocaleString("en-IN"),
+    item_rows: itemRowsHtml // 🔥 Inject rows here
+  };
+
+  // 5. Generate PDF
+  const pdfBuffer = await generatePdfFromTemplate(
+    "purchaseReturnInvoiceTemplate.html",
+    data
+  );
+
+  return pdfBuffer;
+}
+
 export {
   listPurchaseReturns,
   getPurchaseReturnById,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
+  getPurchaseReturnInvoicePdf
 };
 export default {
   listPurchaseReturns,
   getPurchaseReturnById,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
+  getPurchaseReturnInvoicePdf
 };

@@ -106,13 +106,32 @@ export const getPurchaseSuggestionsByPartyId = async partyId => {
   }
 };
 
+// Download Sale Invoice PDF
+export const downloadPurchaseInvoicePdf = async (id) => {
+  if (!id) throw new Error("Purchase ID is required");
+
+  try {
+    const response = await axiosInstance.get(
+      `/purchases/download/invoice/${id}`,
+      {
+        responseType: "blob" // 🔥 IMPORTANT for file download
+      }
+    );
+
+    return response; // returns Blob
+  } catch (error) {
+    handleAxiosError(error, `Failed to download invoice for purchase ${id}`);
+  }
+};
+
 export const purchasesApi = {
   getPurchases,
   getPurchase,
   createPurchase,
   updatePurchase,
   deletePurchase,
-  getPurchaseSuggestionsByPartyId
+  getPurchaseSuggestionsByPartyId,
+  downloadPurchaseInvoicePdf
 };
 
 export default purchasesApi;

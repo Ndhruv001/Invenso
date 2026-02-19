@@ -112,6 +112,24 @@ export const deletePurchaseReturn = async id => {
   }
 };
 
+// Download Sale Invoice PDF
+export const downloadPurchaseReturnInvoicePdf = async (id) => {
+  if (!id) throw new Error("Purchase return ID is required");
+
+  try {
+    const response = await axiosInstance.get(
+      `/purchase-returns/download/invoice/${id}`,
+      {
+        responseType: "blob" // 🔥 IMPORTANT for file download
+      }
+    );
+
+    return response; // returns Blob
+  } catch (error) {
+    handleAxiosError(error, `Failed to download invoice for purchase return ${id}`);
+  }
+};
+
 // -------------------------------------
 // Named export bundle
 export const purchaseReturnApi = {
@@ -119,7 +137,8 @@ export const purchaseReturnApi = {
   getPurchaseReturn,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
+  downloadPurchaseReturnInvoicePdf
 };
 
 export default purchaseReturnApi;

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Invoice #{{invoice_number}}</title>
+    <title>Invoice #{{purchase_id}}</title>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap");
 
@@ -279,7 +279,7 @@
           <div class="company-address">Shop no - 8983, Gali No - 1, Multani Dhandha, Paharganj</div>
         </div>
         <div class="inv-meta">
-          <div class="inv-num">Invoice #{{invoice_number}}</div>
+          <div class="inv-num">Purchase Invoice #{{purchase_id}}</div>
           <div>{{invoice_date}}</div>
         </div>
       </div>
@@ -347,7 +347,7 @@
         <!-- show only if sale.paymentReference not null -->
         &nbsp;·&nbsp; Ref: <strong>{{payment_reference}}</strong>
         <!-- show only if sale.remarks not null -->
-        <div class="remark">{{remarks}}</div>
+        <div class="remark">{{reason}}</div>
       </div>
 
       <!-- FOOTER -->

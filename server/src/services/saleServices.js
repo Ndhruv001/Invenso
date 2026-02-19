@@ -862,8 +862,6 @@ async function getSaleInvoicePdf(saleId) {
 
   // 4. Build data object (must match template placeholders)
   const data = {
-    company_name: "Your Company Name",
-    company_address: "Your Address, City",
     invoice_number: String(sale.invoiceNumber),
     invoice_date: sale.date.toLocaleDateString("en-IN"),
     party_name: sale.party.name,

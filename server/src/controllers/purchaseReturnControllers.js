@@ -87,12 +87,61 @@ const deletePurchaseReturn = asyncHandler(async (req, res) => {
   return successResponse(res, "Purchase return deleted successfully", deleted, 200);
 });
 
+/**
+ * GET /sales/:id/invoice
+ * Generate and download sale invoice PDF
+ */
+const getPurchaseReturnInvoicePdf = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!id) {
+    throw new Error("Invalid sale ID");
+  }
+
+  // Call service
+  const pdfBuffer = await purchaseReturnServices.getPurchaseReturnInvoicePdf(id);
+
+  // Set headers for download
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=invoice-${id}.pdf`
+  );
+
+  return res.status(200).send(pdfBuffer);
+});
+/**
+ * GET /sales/:id/invoice
+ * Print sale invoice PDF
+ */
+const printPurchaseReturnInvoicePdf = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!id) {
+    throw new Error("Invalid sale ID");
+  }
+
+  // Call service
+  const pdfBuffer = await purchaseReturnServices.getPurchaseReturnInvoicePdf(id);
+
+  // Set headers for download
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename=invoice-${id}.pdf`
+  );
+
+  return res.status(200).send(pdfBuffer);
+});
+
 export default {
   listPurchaseReturns,
   getPurchaseReturn,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
+  getPurchaseReturnInvoicePdf,
+  printPurchaseReturnInvoicePdf
 };
 
 export {
@@ -100,5 +149,7 @@ export {
   getPurchaseReturn,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
+  getPurchaseReturnInvoicePdf,
+  printPurchaseReturnInvoicePdf
 };

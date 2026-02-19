@@ -4,7 +4,8 @@ import {
   getPurchaseReturn,
   createPurchaseReturn,
   updatePurchaseReturn,
-  deletePurchaseReturn
+  deletePurchaseReturn,
+  downloadPurchaseReturnInvoicePdf
 } from "@/services/purchaseReturnServices";
 
 /**
@@ -95,6 +96,28 @@ export const useDeletePurchaseReturn = () => {
   });
 };
 
+export const useDownloadPurchaseReturnInvoice = () => {
+  return useMutation({
+    mutationKey: ["download-purchase-return-invoice"],
+    mutationFn: downloadPurchaseReturnInvoicePdf,
+    onSuccess: (blob, id) => {
+      // Create temporary link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `invoice-${id}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+};
+
+
 // --------------------------------------------------
 // Default export
 export default {
@@ -102,5 +125,6 @@ export default {
   usePurchaseReturn,
   useCreatePurchaseReturn,
   useUpdatePurchaseReturn,
-  useDeletePurchaseReturn
+  useDeletePurchaseReturn,
+  useDownloadPurchaseReturnInvoice
 };

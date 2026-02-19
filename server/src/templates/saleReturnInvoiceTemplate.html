@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Invoice #{{invoice_number}}</title>
+    <title>Invoice #{{sale_id}}</title>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap");
 
@@ -279,7 +279,7 @@
           <div class="company-address">Shop no - 8983, Gali No - 1, Multani Dhandha, Paharganj</div>
         </div>
         <div class="inv-meta">
-          <div class="inv-num">Invoice #{{invoice_number}}</div>
+          <div class="inv-num">Sale Invoice #{{sale_id}}</div>
           <div>{{invoice_date}}</div>
         </div>
       </div>
@@ -323,17 +323,17 @@
 
       <!-- TOTALS — right below last item -->
       <div class="totals">
-        <!-- sale.totalAmount -->
+        <!-- saleReturn.totalAmount -->
         <div class="t-row total-row">
           <span class="lbl">Total</span>
           <span class="val">₹{{total_amount}}</span>
         </div>
-        <!-- sale.receivedAmount -->
+        <!-- saleReturn.paidAmount -->
         <div class="t-row paid-row">
-          <span class="lbl">— Received</span>
-          <span class="val">₹{{received_amount}}</span>
+          <span class="lbl">— Paid</span>
+          <span class="val">₹{{paid_amount}}</span>
         </div>
-        <!-- calculated: totalAmount - receivedAmount -->
+        <!-- calculated: totalAmount - paidAmount -->
         <div class="t-row pending-row">
           <span class="lbl">Pending</span>
           <span class="val">₹{{pending_amount}}</span>
@@ -342,12 +342,12 @@
 
       <!-- PAYMENT MODE + REMARK -->
       <div class="bottom-info">
-        <!-- sale.paymentMode -->
+        <!-- saleReturn.paymentMode -->
         Paid via <strong>{{payment_mode}}</strong>
         <!-- show only if sale.paymentReference not null -->
         &nbsp;·&nbsp; Ref: <strong>{{payment_reference}}</strong>
-        <!-- show only if sale.remarks not null -->
-        <div class="remark">{{remarks}}</div>
+        <!-- show only if saleReturn.reason not null -->
+        <div class="remark">{{reason}}</div>
       </div>
 
       <!-- FOOTER -->

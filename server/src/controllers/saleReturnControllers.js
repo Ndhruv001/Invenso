@@ -78,15 +78,45 @@ const deleteSaleReturn = asyncHandler(async (req, res) => {
   return successResponse(res, "Sale return deleted successfully", deleted, 200);
 });
 
-/**
- * GET /sale-returns/party-id/:partyId
- * Get sale return suggestions by Party ID
- */
-const getSaleReturnsByPartyId = asyncHandler(async (req, res) => {
-  const partyId = Number(req.params.partyId);
-  const saleReturns = await saleReturnServices.getSaleReturnSuggestionsByPartyId(partyId);
+const getSaleReturnInvoicePdf = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
 
-  return successResponse(res, "Sale return suggestions fetched successfully", saleReturns, 200);
+  if (!id) {
+    throw new Error("Invalid sale return ID");
+  }
+
+  // Call service
+  const pdfBuffer = await saleReturnServices.getSaleReturnInvoicePdf(id);
+
+  // Set headers for download
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=invoice-${id}.pdf`
+  );
+
+  return res.status(200).send(pdfBuffer);
+});
+
+
+const printSaleReturnInvoicePdf = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!id) {
+    throw new Error("Invalid sale return ID");
+  }
+
+  // Call service
+  const pdfBuffer = await saleReturnServices.getSaleReturnInvoicePdf(id);
+
+  // Set headers for download
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename=invoice-${id}.pdf`
+  );
+
+  return res.status(200).send(pdfBuffer);
 });
 
 export default {
@@ -95,7 +125,8 @@ export default {
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  getSaleReturnsByPartyId
+  getSaleReturnInvoicePdf,
+  printSaleReturnInvoicePdf
 };
 
 export {
@@ -104,5 +135,6 @@ export {
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  getSaleReturnsByPartyId
+  getSaleReturnInvoicePdf,
+  printSaleReturnInvoicePdf
 };

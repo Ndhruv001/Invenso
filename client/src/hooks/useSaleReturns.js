@@ -4,7 +4,8 @@ import {
   getSaleReturn,
   createSaleReturn,
   updateSaleReturn,
-  deleteSaleReturn
+  deleteSaleReturn,
+  downloadSaleReturnInvoicePdf
 } from "@/services/saleReturnServices";
 
 /**
@@ -95,6 +96,27 @@ export const useDeleteSaleReturn = () => {
   });
 };
 
+export const useDownloadSaleReturnInvoice = () => {
+  return useMutation({
+    mutationKey: ["download-sale-return-invoice"],
+    mutationFn: downloadSaleReturnInvoicePdf,
+    onSuccess: (blob, id) => {
+      // Create temporary link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `invoice-${id}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+};
+
 // --------------------------------------------------
 // Default export
 export default {
@@ -102,5 +124,6 @@ export default {
   useSaleReturn,
   useCreateSaleReturn,
   useUpdateSaleReturn,
-  useDeleteSaleReturn
+  useDeleteSaleReturn,
+  useDownloadSaleReturnInvoice
 };

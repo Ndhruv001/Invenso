@@ -5,7 +5,8 @@ import {
   createPurchase,
   updatePurchase,
   deletePurchase,
-  getPurchaseSuggestionsByPartyId
+  getPurchaseSuggestionsByPartyId,
+  downloadPurchaseInvoicePdf
 } from "@/services/purchaseServices";
 
 /**
@@ -97,6 +98,27 @@ export const usePurchaseSuggestionsbyPartyId = (partyId, options = {}) => {
   });
 };
 
+export const useDownloadPurchaseInvoice = () => {
+  return useMutation({
+    mutationKey: ["download-purchase-invoice"],
+    mutationFn: downloadPurchaseInvoicePdf,
+    onSuccess: (blob, id) => {
+      // Create temporary link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `invoice-${id}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+};
+
 // --------------------------------------------------
 // Default export
 export default {
@@ -105,5 +127,6 @@ export default {
   useCreatePurchase,
   useUpdatePurchase,
   useDeletePurchase,
-  usePurchaseSuggestionsbyPartyId
+  usePurchaseSuggestionsbyPartyId,
+  useDownloadPurchaseInvoice
 };

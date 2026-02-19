@@ -1,5 +1,6 @@
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
+import { generatePdfFromTemplate } from "../services/pdfServices.js";
 
 /**
  * Helper: Build date filter for Prisma
@@ -810,35 +811,62 @@ async function deleteSaleReturn(saleReturnId, userId = null) {
   });
 }
 
-async function getSaleReturnSuggestionsByPartyId(partyId) {
-  if (!partyId) {
-    throw new AppError("Party ID is required", 400);
-  }
+async function getSaleReturnInvoicePdf(saleReturnId) {
 
-  const saleReturns = await prisma.saleReturn.findMany({
-    where: {
-      partyId: Number(partyId)
-    },
-    orderBy: {
-      date: "desc"
-    },
-    take: 50, // suggestions only
+  // 1. Fetch sale + items + party from DB
+  const saleReturn = await prisma.saleReturn.findUnique({
+    where: { id: saleReturnId },
     include: {
       party: true,
-      sale: true,
       saleReturnItems: {
-        include: {
-          product: {
-            include: {
-              category: true
-            }
-          }
-        }
+        include: { product: true }
       }
     }
   });
 
-  return saleReturns;
+  if (!saleReturn) throw new Error("Sale return not found");
+
+  // 2. Build item rows HTML
+  const itemRowsHtml = saleReturn.saleReturnItems.map((item, index) => `
+    <tr>
+      <td class="sno">${index + 1}</td>
+      <td class="name">${item.product.name}</td>
+      <td class="r">${item.quantity}</td>
+      <td class="r">${item.product.unit ?? "-"}</td>
+      <td class="r">₹${item.pricePerUnit}</td>
+      <td class="r">${item.gstRate}%</td>
+      <td class="r">₹${item.gstAmount}</td>
+      <td class="r">₹${item.amount}</td>
+    </tr>
+  `).join("");
+
+  // 3. Calculate pending amount
+  const pending =
+    Number(saleReturn.totalAmount) - Number(saleReturn.paidAmount);
+
+  // 4. Build data object (must match template placeholders)
+  const data = {
+    sale_id: String(saleReturn.saleId),
+    invoice_date: saleReturn.date.toLocaleDateString("en-IN"),
+    party_name: saleReturn.party.name,
+    party_phone: saleReturn.party.phone ?? "",
+    total_amount: saleReturn.totalAmount.toString(),
+    paid_amount: saleReturn.paidAmount.toString(),
+    pending_amount: pending.toFixed(2),
+    payment_mode: saleReturn.paymentMode,
+    payment_reference: saleReturn.paymentReference ?? "",
+    reason: saleReturn.reason ?? "",
+    generated_at: new Date().toLocaleString("en-IN"),
+    item_rows: itemRowsHtml // 🔥 Inject rows here
+  };
+
+  // 5. Generate PDF
+  const pdfBuffer = await generatePdfFromTemplate(
+    "saleReturnInvoiceTemplate.html",
+    data
+  );
+
+  return pdfBuffer;
 }
 
 export {
@@ -847,7 +875,7 @@ export {
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  getSaleReturnSuggestionsByPartyId
+  getSaleReturnInvoicePdf
 };
 
 export default {
@@ -856,5 +884,5 @@ export default {
   createSaleReturn,
   updateSaleReturn,
   deleteSaleReturn,
-  getSaleReturnSuggestionsByPartyId
+  getSaleReturnInvoicePdf
 };

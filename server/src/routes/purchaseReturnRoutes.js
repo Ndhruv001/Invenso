@@ -20,6 +20,9 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 // List purchase returns with filters and stats
 router.get("/", authMiddleware, purchaseReturnController.listPurchaseReturns);
 
+router.get("/download/invoice/:id", purchaseReturnController.getPurchaseReturnInvoicePdf);
+router.get("/print/invoice/:id", purchaseReturnController.printPurchaseReturnInvoicePdf);
+
 // Get purchase return by ID
 router.get(
   "/:id",
