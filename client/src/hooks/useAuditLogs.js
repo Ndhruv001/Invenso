@@ -16,7 +16,6 @@ export const useAuditLogs = (params = {}) =>
     keepPreviousData: true
   });
 
-
 export default {
   useAuditLogs,
 };

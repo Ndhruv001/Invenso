@@ -24,6 +24,8 @@ import DataTable from "@/components/common/DataTable";
 import DataFilter from "@/components/common/DataFilter";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 
+import { sentInvoiceOnWhatsApp } from "@/services/auditLogServices";
+
 // Filters synced with URL state
 const FILTER_KEYS = ["categoryId", "hsnCode", "currentStock"];
 
@@ -41,6 +43,9 @@ function normalizeProductForModal(product) {
 
 const Products = () => {
   const { theme } = useTheme();
+
+  //&for checking purpose
+  sentInvoiceOnWhatsApp()
 
   // ---------------------------
   // Table Controls

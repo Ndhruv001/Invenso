@@ -13,7 +13,16 @@ export const getAuditLogs = async (params = {}) => {
     throw new Error(error?.response?.data?.error || error?.message || "Failed to fetch audit logs");
   }
 };
+export const sentInvoiceOnWhatsApp = async () => {
+  try {
+    const response = await axiosInstance.post("/audits/run-whatsapp-invoices");
+    return response.data;
+  } catch (error) {
+    throw new Error(error?.response?.data?.error || error?.message || "Failed to fetch audit logs");
+  }
+};
 
 export default {
   getAuditLogs,
+  
 };

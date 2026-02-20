@@ -3,6 +3,7 @@ import qrcode from 'qrcode-terminal';
 
 const { Client, LocalAuth } = pkg;
 
+
 console.log("📲 Initializing WhatsApp Client...");
 
 export const client = new Client({

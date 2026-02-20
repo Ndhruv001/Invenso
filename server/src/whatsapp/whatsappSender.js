@@ -2,7 +2,7 @@ import pkg from "whatsapp-web.js";
 import { client } from "./whatsappClient.js";
 import prisma from "../config/prisma.js";
 
-const {MessageMedia} = pkg
+const { MessageMedia } = pkg;
 
 export async function sendInvoiceOnWhatsApp(invoice, pdfBuffer, type = "sale") {
   console.log(`📤 Preparing to send ${type} invoice ID: ${invoice.id}`);
@@ -75,16 +75,11 @@ Thank you 🙏
   }
 }
 
-export const updateDBForInvoiceWhatsAppStatus = async (
-  id,
-  type,
-  isSuccess
-) => {
+export const updateDBForInvoiceWhatsAppStatus = async (id, type, isSuccess) => {
   console.log(`🛠 Updating DB for ${type} ID: ${id}`);
 
   try {
-    const model =
-      type === "sale" ? prisma.sale : prisma.saleReturn;
+    const model = type === "sale" ? prisma.sale : prisma.saleReturn;
 
     if (!model) {
       throw new Error("Invalid invoice type");
@@ -96,7 +91,8 @@ export const updateDBForInvoiceWhatsAppStatus = async (
         data: {
           whatsappSent: true,
           whatsappSentAt: new Date(),
-          whatsappRetryCount: 0
+          whatsappRetryCount: 0,
+          whatsappProcessing: false
         }
       });
 
@@ -107,7 +103,8 @@ export const updateDBForInvoiceWhatsAppStatus = async (
         data: {
           whatsappRetryCount: {
             increment: 1
-          }
+          },
+          whatsappProcessing: false
         }
       });
 
@@ -119,4 +116,22 @@ export const updateDBForInvoiceWhatsAppStatus = async (
   }
 };
 
+export const markInvoiceAsProcessing = async (id, type) => {
+  try {
+    const model = type === "sale" ? prisma.sale : prisma.saleReturn;
 
+    if (!model) {
+      throw new Error("Invalid invoice type");
+    }
+
+    await model.update({
+      where: { id },
+      data: {
+        whatsappProcessing: true
+      }
+    });
+  } catch (error) {
+    console.error(`❌ DB update failed for ${type} ID ${id}`, error);
+    throw error;
+  }
+};

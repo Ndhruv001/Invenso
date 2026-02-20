@@ -1,7 +1,8 @@
 import prisma from "../config/prisma.js";
 import {
   updateDBForInvoiceWhatsAppStatus,
-  sendInvoiceOnWhatsApp
+  sendInvoiceOnWhatsApp,
+  markInvoiceAsProcessing
 } from "../whatsapp/whatsappSender.js";
 import { getSaleInvoicePdf } from "./saleServices.js";
 import { getSaleReturnInvoicePdf } from "./saleReturnServices.js";
@@ -28,11 +29,11 @@ export const getTodayPendingInvoicesForWhatsApp = async limit => {
       whatsappRetryCount: {
         lt: 3
       },
+      whatsappProcessing: false,
       party: {
         name: {
           not: {
-            equals: "cash",
-            mode: "insensitive"
+            equals: "cash"
           }
         },
         phone: {
@@ -64,11 +65,11 @@ export const getTodayPendingInvoicesForWhatsApp = async limit => {
       whatsappRetryCount: {
         lt: 3
       },
+      whatsappProcessing: false,
       party: {
         name: {
           not: {
-            equals: "cash",
-            mode: "insensitive"
+            equals: "cash"
           }
         },
         phone: {
@@ -107,7 +108,15 @@ const delayRandom = async () => {
   return new Promise(resolve => setTimeout(resolve, randomMs));
 };
 
+let isProcessing = false;
+
 export const processDailyWhatsAppInvoices = async () => {
+  if (isProcessing) {
+    console.log("⚠ WhatsApp automation already running. Skipping...");
+    return;
+  }
+
+  isProcessing = true;
   console.log("🚀 WhatsApp Invoice Automation Started...");
 
   try {
@@ -131,6 +140,8 @@ export const processDailyWhatsAppInvoices = async () => {
       console.log(`\n📄 Processing ${type.toUpperCase()} ID: ${id}`);
 
       try {
+        await markInvoiceAsProcessing(id, type);
+
         let pdfBuffer;
 
         // 5️⃣ Route correct PDF generator
@@ -161,6 +172,9 @@ export const processDailyWhatsAppInvoices = async () => {
         await updateDBForInvoiceWhatsAppStatus(id, type, false);
 
         console.log(`🔁 Retry count updated for ${type} ID ${id}`);
+      } finally {
+        isProcessing = false;
+        console.log("🔓 Automation lock released.");
       }
     }
 

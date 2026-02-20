@@ -294,8 +294,9 @@ model Sale {
   totalProfit        Decimal           @default(0) @db.Decimal(15, 2)
   remarks            String?
   whatsappSent       Boolean           @default(false)
-  whatsappSentAt     DateTime          @default(null)
+  whatsappSentAt     DateTime?          
   whatsappRetryCount Int               @default(0)
+  whatsappProcessing Boolean @default(false)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -342,8 +343,9 @@ model SaleReturn {
   totalProfitLoss    Decimal           @default(0) @db.Decimal(15, 2)
   reason             String?
   whatsappSent       Boolean           @default(false)
-  whatsappSentAt     DateTime          @default(null)
+  whatsappSentAt     DateTime?          
   whatsappRetryCount Int               @default(0)
+  whatsappProcessing Boolean @default(false)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 

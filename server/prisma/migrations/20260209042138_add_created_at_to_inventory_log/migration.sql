@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "inventory_logs" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
