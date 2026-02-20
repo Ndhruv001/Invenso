@@ -293,6 +293,9 @@ model Sale {
   paymentReference   String?
   totalProfit        Decimal           @default(0) @db.Decimal(15, 2)
   remarks            String?
+  whatsappSent       Boolean           @default(false)
+  whatsappSentAt     DateTime          @default(null)
+  whatsappRetryCount Int               @default(0)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -338,6 +341,9 @@ model SaleReturn {
   paymentReference   String?
   totalProfitLoss    Decimal           @default(0) @db.Decimal(15, 2)
   reason             String?
+  whatsappSent       Boolean           @default(false)
+  whatsappSentAt     DateTime          @default(null)
+  whatsappRetryCount Int               @default(0)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 

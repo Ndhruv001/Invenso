@@ -1,5 +1,7 @@
 import app from "./app.js";
 import logger from "./config/logger.js";
+import "./whatsapp/whatsappClient.js"
+import "./crons/invoiceWhatsAppCrons.js";
 
 const PORT = process.env.PORT || 3000;
 
