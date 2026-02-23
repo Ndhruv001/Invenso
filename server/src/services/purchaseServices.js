@@ -810,7 +810,6 @@ async function getPurchaseSuggestionsByPartyId(partyId) {
 }
 
 async function getPurchaseInvoicePdf(purchaseId) {
-
   // 1. Fetch sale + items + party from DB
   const purchase = await prisma.purchase.findUnique({
     where: { id: purchaseId },
@@ -825,7 +824,9 @@ async function getPurchaseInvoicePdf(purchaseId) {
   if (!purchase) throw new Error("purchase not found");
 
   // 2. Build item rows HTML
-  const itemRowsHtml = purchase.purchaseItems.map((item, index) => `
+  const itemRowsHtml = purchase.purchaseItems
+    .map(
+      (item, index) => `
     <tr>
       <td class="sno">${index + 1}</td>
       <td class="name">${item.product.name}</td>
@@ -836,11 +837,12 @@ async function getPurchaseInvoicePdf(purchaseId) {
       <td class="r">₹${item.gstAmount}</td>
       <td class="r">₹${item.amount}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   // 3. Calculate pending amount
-  const pending =
-    Number(purchase.totalAmount) - Number(purchase.paidAmount);
+  const pending = Number(purchase.totalAmount) - Number(purchase.paidAmount);
 
   // 4. Build data object (must match template placeholders)
   const data = {
@@ -859,10 +861,7 @@ async function getPurchaseInvoicePdf(purchaseId) {
   };
 
   // 5. Generate PDF
-  const pdfBuffer = await generatePdfFromTemplate(
-    "purchaseInvoiceTemplate.html",
-    data
-  );
+  const pdfBuffer = await generatePdfFromTemplate("purchaseInvoiceTemplate.html", data);
 
   return pdfBuffer;
 }

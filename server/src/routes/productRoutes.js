@@ -41,7 +41,13 @@ router.get(
 router.get("/", authMiddleware, productController.listProducts);
 
 // Create new product
-router.post("/", authMiddleware, validateCreateProduct, validateRequest, productController.createProduct);
+router.post(
+  "/",
+  authMiddleware,
+  validateCreateProduct,
+  validateRequest,
+  productController.createProduct
+);
 
 /**
  * ---------------------------

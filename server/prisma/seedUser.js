@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
-import prisma from "../src/config/prisma.js"; 
+import prisma from "../src/config/prisma.js";
 
-const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || 12)
+const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || 12);
 
 async function seedUser() {
   const username = "super";

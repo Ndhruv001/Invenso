@@ -45,7 +45,7 @@ async function listPayments({
   if (filters.referenceType) where.referenceType = filters.referenceType;
   if (filters.paymentMode) where.paymentMode = filters.paymentMode;
 
-   if (filters.dateFrom || filters.dateTo) {
+  if (filters.dateFrom || filters.dateTo) {
     const dateFilter = buildDateFilter({
       from: filters.dateFrom,
       to: filters.dateTo

@@ -764,7 +764,6 @@ async function deletePurchaseReturn(purchaseReturnId, userId = null) {
 }
 
 async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
-
   // 1. Fetch sale + items + party from DB
   const purchaseReturn = await prisma.purchaseReturn.findUnique({
     where: { id: purchaseReturnId },
@@ -779,7 +778,9 @@ async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
   if (!purchaseReturn) throw new Error("Purchase return not found");
 
   // 2. Build item rows HTML
-  const itemRowsHtml = purchaseReturn.purchaseReturnItems.map((item, index) => `
+  const itemRowsHtml = purchaseReturn.purchaseReturnItems
+    .map(
+      (item, index) => `
     <tr>
       <td class="sno">${index + 1}</td>
       <td class="name">${item.product.name}</td>
@@ -790,11 +791,12 @@ async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
       <td class="r">₹${item.gstAmount}</td>
       <td class="r">₹${item.amount}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   // 3. Calculate pending amount
-  const pending =
-    Number(purchaseReturn.totalAmount) - Number(purchaseReturn.receivedAmount);
+  const pending = Number(purchaseReturn.totalAmount) - Number(purchaseReturn.receivedAmount);
 
   // 4. Build data object (must match template placeholders)
   const data = {
@@ -813,10 +815,7 @@ async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
   };
 
   // 5. Generate PDF
-  const pdfBuffer = await generatePdfFromTemplate(
-    "purchaseReturnInvoiceTemplate.html",
-    data
-  );
+  const pdfBuffer = await generatePdfFromTemplate("purchaseReturnInvoiceTemplate.html", data);
 
   return pdfBuffer;
 }

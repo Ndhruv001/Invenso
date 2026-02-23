@@ -7,15 +7,8 @@ import { query } from "express-validator";
  * @param {string[]} [options.allowedFilterKeys=[]] - Allowed filter keys for the specific module
  * @param {Object} [options.customFilterValidators={}] - Custom per-key validation logic
  */
-const createListValidation = ({
-  allowedFilterKeys = [],
-  customFilterValidators = {},
-} = {}) => [
-  query("page")
-    .optional()
-    .isInt({ gt: 0 })
-    .toInt()
-    .withMessage("Page must be a positive integer"),
+const createListValidation = ({ allowedFilterKeys = [], customFilterValidators = {} } = {}) => [
+  query("page").optional().isInt({ gt: 0 }).toInt().withMessage("Page must be a positive integer"),
 
   query("limit")
     .optional()
@@ -23,25 +16,16 @@ const createListValidation = ({
     .toInt()
     .withMessage("Limit must be a positive integer"),
 
-  query("sortBy")
-    .optional()
-    .isString()
-    .withMessage("SortBy must be a string"),
+  query("sortBy").optional().isString().withMessage("SortBy must be a string"),
 
   query("sortOrder")
     .optional()
     .isIn(["asc", "desc"])
     .withMessage("SortOrder must be 'asc' or 'desc'"),
 
-  query("search")
-    .optional()
-    .isString()
-    .withMessage("Search must be a string"),
+  query("search").optional().isString().withMessage("Search must be a string"),
 
-  query("q")
-    .optional()
-    .isString()
-    .withMessage("Search query must be a string for search/suggest"),
+  query("q").optional().isString().withMessage("Search query must be a string for search/suggest"),
 
   query("filters")
     .optional()
@@ -70,7 +54,7 @@ const createListValidation = ({
       }
 
       return true;
-    }),
+    })
 ];
 
 export default createListValidation;

@@ -90,14 +90,10 @@ const getSaleReturnInvoicePdf = asyncHandler(async (req, res) => {
 
   // Set headers for download
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename=invoice-${id}.pdf`
-  );
+  res.setHeader("Content-Disposition", `attachment; filename=invoice-${id}.pdf`);
 
   return res.status(200).send(pdfBuffer);
 });
-
 
 const printSaleReturnInvoicePdf = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
@@ -111,10 +107,7 @@ const printSaleReturnInvoicePdf = asyncHandler(async (req, res) => {
 
   // Set headers for download
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `inline; filename=invoice-${id}.pdf`
-  );
+  res.setHeader("Content-Disposition", `inline; filename=invoice-${id}.pdf`);
 
   return res.status(200).send(pdfBuffer);
 });

@@ -9,7 +9,7 @@ const validateRequest = asyncHandler(async (req, res, next) => {
       .array()
       .map(e => `${e.param}: ${e.msg}`)
       .join("--------> ");
-    console.log("🚀 ~ errorMsg:", errorMsg)//& try to hide this in production
+    console.log("🚀 ~ errorMsg:", errorMsg); //& try to hide this in production
     return next(
       new AppError("Invalid request data", 400, `Validation error: ${errorMsg}`, {
         requestId: req.requestId,

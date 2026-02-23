@@ -2,7 +2,8 @@
 import jwt from "jsonwebtoken";
 import AppError from "./appErrorUtils.js";
 
-const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || "F70rn6nd1iDOfMKAb07nB62Y7SKjBb+WUbBW58PIc8TGURNsQOTSWflEXZO/jbem";
+const JWT_SECRET_KEY =
+  process.env.JWT_SECRET_KEY || "F70rn6nd1iDOfMKAb07nB62Y7SKjBb+WUbBW58PIc8TGURNsQOTSWflEXZO/jbem";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d";
 
 // Generate JWT token
@@ -15,7 +16,7 @@ export const generateToken = (payload, expiresIn = JWT_EXPIRES_IN) => {
 };
 
 // Verify JWT token
-export const verifyToken = (token) => {
+export const verifyToken = token => {
   try {
     return jwt.verify(token, JWT_SECRET_KEY);
   } catch (err) {

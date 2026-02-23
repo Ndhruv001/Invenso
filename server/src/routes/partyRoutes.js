@@ -38,13 +38,7 @@ router.get(
 router.get("/", authMiddleware, partyController.listParties);
 
 // Create new party
-router.post(
-  "/",
-  authMiddleware,
-  validateCreateParty,
-  validateRequest,
-  partyController.createParty
-);
+router.post("/", authMiddleware, validateCreateParty, validateRequest, partyController.createParty);
 
 /**
  * ---------------------------
@@ -53,13 +47,7 @@ router.post(
  */
 
 // Get single party
-router.get(
-  "/:id",
-  authMiddleware,
-  validatePartyId,
-  validateRequest,
-  partyController.getParty
-);
+router.get("/:id", authMiddleware, validatePartyId, validateRequest, partyController.getParty);
 
 // Update party
 router.put(

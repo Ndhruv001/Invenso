@@ -11,28 +11,20 @@ import purchaseController from "../controllers/purchaseControllers.js";
 import {
   validateCreatePurchase,
   validateUpdatePurchase,
-  validatePurchaseId,
+  validatePurchaseId
 } from "../validations/purchaseValidations.js";
 
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 
 // List purchases with filters and stats
-router.get(
-  "/",
-  authMiddleware,
-  purchaseController.listPurchases
-);
+router.get("/", authMiddleware, purchaseController.listPurchases);
 
 router.get("/download/invoice/:id", purchaseController.getPurchaseInvoicePdf);
 router.get("/print/invoice/:id", purchaseController.printPurchaseInvoicePdf);
 
 // Get purchase by Party ID
-router.get(
-  "/party-id/:partyId",
-  authMiddleware,
-  purchaseController.getPurchaseByPartyId
-);
+router.get("/party-id/:partyId", authMiddleware, purchaseController.getPurchaseByPartyId);
 
 // Get purchase by ID
 router.get(
@@ -70,7 +62,6 @@ router.delete(
   validateRequest,
   purchaseController.deletePurchase
 );
-
 
 export default router;
 export { router };

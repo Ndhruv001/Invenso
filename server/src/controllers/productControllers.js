@@ -16,16 +16,13 @@ import { successResponse } from "../utils/responseUtils.js";
  * Returns paginated list of products with filters and aggregates.
  */
 
-  // List HSN Codes
+// List HSN Codes
 const listHsnCodes = asyncHandler(async (req, res) => {
   const result = await productServices.listHsnCodes();
   successResponse(res, "HSN Codes fetched successfully", result, 200);
 });
 
-
 const listProducts = asyncHandler(async (req, res) => {
-
-
   const { page, limit, sortBy, sortOrder, search, ...rest } = req.query;
 
   const query = {
@@ -92,7 +89,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
  * Suggest product names for dropdown, max 10
  */
 const suggestProductNames = asyncHandler(async (req, res) => {
-  const {q: query, partyId, type = "sale"} = req.query || {};
+  const { q: query, partyId, type = "sale" } = req.query || {};
   const results = await productServices.suggestProductNames(query, partyId, type);
   return successResponse(res, "Product name suggestions", results, 200);
 });
@@ -104,7 +101,7 @@ export default {
   createProduct,
   updateProduct,
   deleteProduct,
-  suggestProductNames,
+  suggestProductNames
 };
 export {
   listHsnCodes,
@@ -113,5 +110,5 @@ export {
   createProduct,
   updateProduct,
   deleteProduct,
-  suggestProductNames,
+  suggestProductNames
 };

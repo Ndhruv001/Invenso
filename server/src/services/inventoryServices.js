@@ -5,7 +5,12 @@ import prisma from "../config/prisma.js";
  * List all inventory logs with pagination and sorting.
  * No filters/search/stats required.
  */
-async function listInventoryLogs({ page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" }) {
+async function listInventoryLogs({
+  page = 1,
+  limit = 20,
+  sortBy = "createdAt",
+  sortOrder = "desc"
+}) {
   const skip = (page - 1) * limit;
   const take = limit;
 
@@ -29,9 +34,7 @@ async function listInventoryLogs({ page = 1, limit = 20, sortBy = "createdAt", s
   };
 }
 
-export {
-  listInventoryLogs,
-};
+export { listInventoryLogs };
 export default {
-  listInventoryLogs,
+  listInventoryLogs
 };

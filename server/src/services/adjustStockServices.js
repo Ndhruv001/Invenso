@@ -30,8 +30,7 @@ async function createAdjustStock(data, userId = null) {
     throw new AppError("Type must be ADD or SUBTRACT", 400);
 
   const quantity = Number(data.quantity);
-  if (!quantity || quantity <= 0)
-    throw new AppError("Quantity must be positive", 400);
+  if (!quantity || quantity <= 0) throw new AppError("Quantity must be positive", 400);
 
   return prisma.$transaction(async tx => {
     // 1. Load product
@@ -39,8 +38,7 @@ async function createAdjustStock(data, userId = null) {
       where: { id: data.productId }
     });
 
-    if (!product || !product.isActive)
-      throw new AppError("Product not found", 404);
+    if (!product || !product.isActive) throw new AppError("Product not found", 404);
 
     const balanceBefore = Number(product.currentStock) || 0;
     let balanceAfter = balanceBefore;
@@ -51,8 +49,7 @@ async function createAdjustStock(data, userId = null) {
     }
 
     if (data.type === "SUBTRACT") {
-      if (balanceBefore < quantity)
-        throw new AppError("Insufficient stock", 400);
+      if (balanceBefore < quantity) throw new AppError("Insufficient stock", 400);
 
       balanceAfter = balanceBefore - quantity;
     }

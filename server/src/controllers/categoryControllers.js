@@ -77,19 +77,12 @@ const deleteCategory = asyncHandler(async (req, res) => {
   return successResponse(res, "Category deleted successfully", deleted, 200);
 });
 
-
 export default {
   listCategories,
   getCategory,
   createCategory,
   updateCategory,
-  deleteCategory,
+  deleteCategory
 };
 
-export {
-  listCategories,
-  getCategory,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-};
+export { listCategories, getCategory, createCategory, updateCategory, deleteCategory };

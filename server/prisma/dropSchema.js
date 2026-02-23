@@ -1,4 +1,4 @@
-import prisma from '../src/config/prisma.js';
+import prisma from "../src/config/prisma.js";
 
 async function main() {
   await prisma.$executeRawUnsafe(`DROP SCHEMA invenso_dev CASCADE;`);
@@ -6,7 +6,7 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
+  .catch(e => {
     console.error(e);
     process.exit(1);
   })

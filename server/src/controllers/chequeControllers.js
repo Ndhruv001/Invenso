@@ -94,10 +94,4 @@ export default {
   deleteCheque
 };
 
-export {
-  listCheques,
-  getCheque,
-  createCheque,
-  updateCheque,
-  deleteCheque
-};
+export { listCheques, getCheque, createCheque, updateCheque, deleteCheque };

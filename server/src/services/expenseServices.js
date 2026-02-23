@@ -90,7 +90,7 @@ async function listExpenses({
 
   /* -------------------- Safe Sorting -------------------- */
 
-  const allowedSortFields = ["date", "category", "amount", "createdAt", "paymentMode",];
+  const allowedSortFields = ["date", "category", "amount", "createdAt", "paymentMode"];
 
   const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
 

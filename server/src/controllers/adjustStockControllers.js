@@ -6,7 +6,7 @@
 
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as adjustStockServices from "../services/adjustStockServices.js";
-import {successResponse} from "../utils/responseUtils.js";
+import { successResponse } from "../utils/responseUtils.js";
 
 /**
  * POST /adjust-stock

@@ -48,13 +48,7 @@ router.post(
  */
 
 // Get single cheque
-router.get(
-  "/:id",
-  authMiddleware,
-  validateChequeId,
-  validateRequest,
-  chequeController.getCheque
-);
+router.get("/:id", authMiddleware, validateChequeId, validateRequest, chequeController.getCheque);
 
 // Update cheque
 router.put(

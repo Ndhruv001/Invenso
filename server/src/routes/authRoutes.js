@@ -4,7 +4,7 @@ import { login, logout, me } from "../controllers/authControllers.js";
 import validateRequest from "../middlewares/validateRequestMiddleware.js";
 import { loginValidation } from "../validations/authValidations.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
-import {loginLimiter} from "../config/limiter.js";
+import { loginLimiter } from "../config/limiter.js";
 
 const router = express.Router();
 

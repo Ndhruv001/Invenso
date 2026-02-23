@@ -19,5 +19,5 @@ async function comparePassword(password, hashedPassword) {
   return await bcrypt.compare(password, hashedPassword);
 }
 
-export default {hashPassword, comparePassword}
-export  {hashPassword, comparePassword}
+export default { hashPassword, comparePassword };
+export { hashPassword, comparePassword };

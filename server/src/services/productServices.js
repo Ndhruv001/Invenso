@@ -416,7 +416,7 @@ async function suggestProductNames(query, partyId, type = "sale") {
 
   // Fetch last prices in parallel
   const productsWithLastPrice = await Promise.all(
-    products.map(async (product) => {
+    products.map(async product => {
       const lastItem =
         type === "sale"
           ? await prisma.saleItem.findFirst({

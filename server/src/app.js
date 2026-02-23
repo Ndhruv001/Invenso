@@ -5,7 +5,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import cookieParser from 'cookie-parser'
+import cookieParser from "cookie-parser";
 import corsOptions from "./config/corsOptions.js";
 import helmetConfig from "./config/helmetConfig.js";
 import { globalLimiter } from "./config/limiter.js";
@@ -34,14 +34,20 @@ app.use(cookieParser());
 app.use(compressionConfig);
 
 // ── Body Parsers
-app.use(express.json({
-  limit: process.env.JSON_LIMIT || "10mb",
-  verify: (req, res, buf) => { req.rawBody = buf; }
-}));
-app.use(express.urlencoded({
-  extended: true,
-  limit: process.env.URL_ENCODED_LIMIT || "10mb"
-}));
+app.use(
+  express.json({
+    limit: process.env.JSON_LIMIT || "10mb",
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    }
+  })
+);
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: process.env.URL_ENCODED_LIMIT || "10mb"
+  })
+);
 
 // ── Access Logs
 app.use(morganConfig);
@@ -50,31 +56,33 @@ app.use(morganConfig);
 app.use(requestContext);
 
 // ── Favicon noise avoidance
-app.get("/favicon.ico", (req, res) => res.status(204).set("Cache-Control", "public, max-age=86400").end());
+app.get("/favicon.ico", (req, res) =>
+  res.status(204).set("Cache-Control", "public, max-age=86400").end()
+);
 
 const BASE = `${process.env.BASE_URL}/${process.env.API_VERSION}`;
 
 // Routes
-import  authRoutes  from "./routes/authRoutes.js";
-import  productRoutes  from "./routes/productRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import productRoutes from "./routes/productRoutes.js";
 
-import  categoryRoutes  from "./routes/categoryRoutes.js";
-import  partyRoutes  from "./routes/partyRoutes.js";
-import  paymentRoutes  from "./routes/paymentRoutes.js";
-import  expenseRoutes  from "./routes/expenseRoutes.js";
-import  transportRoutes  from "./routes/transportRoutes.js";
-import  adjustStockRoutes  from "./routes/adjustStockRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
+import partyRoutes from "./routes/partyRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import expenseRoutes from "./routes/expenseRoutes.js";
+import transportRoutes from "./routes/transportRoutes.js";
+import adjustStockRoutes from "./routes/adjustStockRoutes.js";
 
-import  saleRoutes  from "./routes/saleRoutes.js";
-import  saleReturnRoutes  from "./routes/saleReturnRoutes.js";
-import  purchaseRoutes  from "./routes/purchaseRoutes.js";
-import  purchaseReturnRoutes  from "./routes/purchaseReturnRoutes.js";
+import saleRoutes from "./routes/saleRoutes.js";
+import saleReturnRoutes from "./routes/saleReturnRoutes.js";
+import purchaseRoutes from "./routes/purchaseRoutes.js";
+import purchaseReturnRoutes from "./routes/purchaseReturnRoutes.js";
 
-import  inventoryRoutes  from "./routes/inventoryRoutes.js";
-import  auditRoutes  from "./routes/auditRoutes.js";
-import  adminRoutes  from "./routes/adminRoutes.js";
-import  dashboardRoutes  from "./routes/dashboardRoutes.js";
-import chequeRoutes from "./routes/chequeRoutes.js"
+import inventoryRoutes from "./routes/inventoryRoutes.js";
+import auditRoutes from "./routes/auditRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import chequeRoutes from "./routes/chequeRoutes.js";
 
 app.use(`${BASE}/auth`, authRoutes);
 app.use(`${BASE}/products`, productRoutes);
@@ -95,29 +103,45 @@ app.use(`${BASE}/admin`, adminRoutes);
 app.use(`${BASE}/dashboards`, dashboardRoutes);
 app.use(`${BASE}/cheques`, chequeRoutes);
 
-
 // ── Health Check (uses successResponse)
 app.get("/health", async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return successResponse(res, "healthy", {
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV,
-      version: process.env.NPM_PACKAGE_VERSION || "1.0.0",
-      database: "connected"
-    }, 200);
+    return successResponse(
+      res,
+      "healthy",
+      {
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV,
+        version: process.env.NPM_PACKAGE_VERSION || "1.0.0",
+        database: "connected"
+      },
+      200
+    );
   } catch (error) {
     req.logger.error("Health check failed:", { error: error.message });
-    return errorResponse(res, "SERVICE_UNAVAILABLE", "Database connection failed", error.stack, null, 503);
+    return errorResponse(
+      res,
+      "SERVICE_UNAVAILABLE",
+      "Database connection failed",
+      error.stack,
+      null,
+      503
+    );
   }
 });
 
 // ── Root (uses successResponse)
 app.get("/", (req, res) => {
-  return successResponse(res, "API Server is running", {
-    version: process.env.NPM_PACKAGE_VERSION || "1.0.0",
-    environment: process.env.NODE_ENV
-  }, 200);
+  return successResponse(
+    res,
+    "API Server is running",
+    {
+      version: process.env.NPM_PACKAGE_VERSION || "1.0.0",
+      environment: process.env.NODE_ENV
+    },
+    200
+  );
 });
 
 // ── 404 Handler (forward to error handler)

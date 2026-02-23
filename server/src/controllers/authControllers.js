@@ -4,10 +4,10 @@ import asyncHandler from "../utils/asyncHandlerUtils.js";
 import { successResponse } from "../utils/responseUtils.js";
 
 const login = asyncHandler(async (req, res) => {
-  const {username, password} = req.body;
+  const { username, password } = req.body;
 
   const { token, user } = await loginUser(username, password);
-  
+
   // set cookie
   res.cookie("token", token, {
     httpOnly: true,

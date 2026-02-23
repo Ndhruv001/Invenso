@@ -23,7 +23,7 @@ const validatePartyId = [
 // --------------------
 // Validate party create body
 // --------------------
-const validateCreateParty =[
+const validateCreateParty = [
   body("name").exists().withMessage("Party name is required").isString().trim().notEmpty(),
 
   body("type")
