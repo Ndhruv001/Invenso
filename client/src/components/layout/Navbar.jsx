@@ -17,7 +17,8 @@ import {
   Receipt,
   Package,
   Eye,
-  EyeOff
+  EyeOff,
+  Ticket
 } from "lucide-react";
 
 // Custom Hooks and Helpers
@@ -40,7 +41,8 @@ const iconMap = {
   DollarSign,
   ArrowUpFromLine,
   TruckIcon,
-  UserCheck
+  UserCheck,
+  Ticket
 };
 import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
 

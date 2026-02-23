@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { processDailyWhatsAppInvoices } from "../services/invoiceAutomationServices.js";
+import { processDailyWhatsAppInvoices } from "../whatsapp/whatsappSchedular.js";
 
 console.log("🕒 WhatsApp Invoice Cron Initialized...");
 

@@ -79,7 +79,14 @@ async function listParties({
 
   /* -------------------- Safe Sorting -------------------- */
 
-  const allowedSortFields = ["date", "name", "type", "openingBalance", "currentBalance", "createdAt"];
+  const allowedSortFields = [
+    "date",
+    "name",
+    "type",
+    "openingBalance",
+    "currentBalance",
+    "createdAt"
+  ];
 
   const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "date";
 
@@ -92,7 +99,7 @@ async function listParties({
       where,
       skip,
       take: limit,
-      orderBy,
+      orderBy
     }),
 
     prisma.party.count({ where }),

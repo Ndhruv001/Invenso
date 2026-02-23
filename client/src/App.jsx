@@ -18,6 +18,7 @@ import SalesReturns from "@/scenes/sales/returns/SaleReturns.jsx";
 import Parties from "@/scenes/accounting/parties/Parties.jsx";
 import Payments from "@/scenes/accounting/payments/Payments.jsx";
 import Expenses from "@/scenes/accounting/expenses/Expenses.jsx";
+import Cheques from "@/scenes/accounting/cheques/Cheques.jsx";
 
 // Other Components
 import Transports from "@/scenes/transport/Transports.jsx";
@@ -101,6 +102,7 @@ function App() {
           <Route path="parties" element={<Parties />} />
           <Route path="payments" element={<Payments />} />
           <Route path="expenses" element={<Expenses />} />
+          <Route path="cheques" element={<Cheques />} />
         </Route>
 
         {/* Single Routes */}
@@ -115,7 +117,7 @@ function App() {
           <Route path="audits" element={<AuditLogs />} />
           <Route path="inventories" element={<InventoryLogs />} />
           <Route path="users" element={<ComingSoon />} />
-          <Route path="settings" element={<ComingSoon />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* Help Route */}

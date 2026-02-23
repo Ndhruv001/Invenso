@@ -1,0 +1,157 @@
+import React from "react";
+import { formatCurrency, formatDate } from "@/lib/helpers/formatters";
+import { useTheme } from "@/hooks/useTheme";
+
+/**
+ * Table column definitions for Cheque resource.
+ * Excludes createdAt and updatedAt.
+ */
+const Columns = (showSelection = false) => {
+  const { theme } = useTheme();
+
+  const baseColumns = [
+    {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ getValue }) => (
+        <span className="font-mono text-sm font-semibold text-gray-400">
+          #{String(getValue()).padStart(4, "0")}
+        </span>
+      ),
+      size: 80
+    },
+    {
+      accessorKey: "chequeNumber",
+      header: "Cheque No.",
+      cell: ({ getValue }) => (
+        <span className="font-mono font-medium text-sm" style={{ color: theme.text.primary }}>
+          {getValue()}
+        </span>
+      ),
+      size: 130
+    },
+    {
+      accessorKey: "party",
+      header: "Party",
+      cell: ({ getValue }) =>
+        getValue() ? (
+          <span className="font-medium text-sm" style={{ color: theme.text.primary }}>
+            {getValue()?.name}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">N/A</span>
+        ),
+      size: 160
+    },
+    {
+      accessorKey: "bankName",
+      header: "Bank",
+      cell: ({ getValue }) => (
+        <span className="text-sm italic" style={{ color: theme.text.secondary }}>
+          {getValue()}
+        </span>
+      ),
+      size: 140
+    },
+    {
+      accessorKey: "amount",
+      header: "Amount",
+      cell: ({ getValue }) => (
+        <span className="font-semibold block text-right" style={{ color: theme.text.primary }}>
+          {formatCurrency(getValue())}
+        </span>
+      ),
+      size: 120,
+      meta: { align: "right" }
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ getValue }) => (
+        <span className={`rounded px-2 py-0.5 text-xs font-bold ${
+          getValue() === 'INWARD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+        }`}>
+          {getValue()}
+        </span>
+      ),
+      size: 100
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ getValue }) => {
+        const status = getValue() || "";
+        return (
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+            {status.replace(/_/g, " ").replace(/\b(\w)/g, c => c.toUpperCase())}
+          </span>
+        );
+      },
+      size: 110
+    },
+    {
+      accessorKey: "chequeDate",
+      header: "Cheque Date",
+      cell: ({ getValue }) => (
+        <span className="text-sm" style={{ color: theme.text.primary }}>
+          {formatDate(getValue())}
+        </span>
+      ),
+      size: 120
+    },
+    {
+      accessorKey: "bounceReason",
+      header: "Remarks/Bounce Reason",
+      cell: ({ getValue }) =>
+        getValue() ? (
+          <span className="text-xs text-red-500 truncate block w-full" title={getValue()}>
+            {getValue()}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">-</span>
+        ),
+      size: 180
+    }
+  ];
+
+  if (showSelection) {
+    baseColumns.unshift({
+      id: "select",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          className="rounded border-gray-300 cursor-pointer text-indigo-600 focus:ring-indigo-500"
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          ref={el => {
+            if (el)
+              el.indeterminate =
+                table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected();
+          }}
+          onChange={table.getToggleAllPageRowsSelectedHandler()}
+          aria-label="Select all rows"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          className="rounded border-gray-300 cursor-pointer text-indigo-600 focus:ring-indigo-500"
+          checked={row.getIsSelected()}
+          disabled={!row.getCanSelect()}
+          onChange={row.getToggleSelectedHandler()}
+          aria-label={`Select row ${row.index + 1}`}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50
+    });
+  }
+
+  return baseColumns;
+};
+
+export default Columns;
+export { Columns };

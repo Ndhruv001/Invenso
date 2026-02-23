@@ -109,6 +109,20 @@ enum TransactionStatus {
   DRAFT
 }
 
+enum ChequeType {
+  INWARD
+  OUTWARD
+}
+
+enum ChequeStatus {
+  RECEIVED
+  DEPOSITED
+  CLEARED
+  BOUNCED
+  ISSUED
+  ENCASHED
+}
+
 // Models
 
 model User {
@@ -190,6 +204,7 @@ model Party {
   payments       Payment[]
   transports     Transport[] @relation("TransportParty")
   drives         Transport[] @relation("TransportDriver")
+  cheques        Cheque[]
 
   @@map("parties")
 }
@@ -395,6 +410,7 @@ model Payment {
   purchaseReturnId Int?
   saleReturnId     Int?
   transportId      Int?
+  chequeId         Int?
   
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -405,6 +421,7 @@ model Payment {
   purchaseReturn  PurchaseReturn?    @relation("PurchaseReturnPayments", fields: [purchaseReturnId], references: [id])
   saleReturn      SaleReturn?        @relation("SaleReturnPayments", fields: [saleReturnId], references: [id])
   transport       Transport?         @relation("TransportPayments", fields: [transportId], references: [id])
+  cheque          Cheque?            @relation("ChequePayments", fields: [chequeId], references: [id])
 
   @@map("payments")
 }
@@ -492,4 +509,36 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model Cheque {
+  id            Int           @id @default(autoincrement())
+
+  chequeNumber  String
+  type          ChequeType
+  status        ChequeStatus
+
+  partyId       Int
+  party         Party         @relation(fields: [partyId], references: [id])
+
+  amount        Decimal       @db.Decimal(15, 2)
+
+  bankName      String
+  chequeDate    DateTime
+
+  depositDate   DateTime?
+  clearDate     DateTime?
+
+  bounceReason  String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  payments  Payment[] @relation("ChequePayments")
+
+  @@unique([chequeNumber, bankName])
+  @@index([type])
+  @@index([status])
+  @@index([partyId])
+  @@map("cheques")
 }

@@ -27,7 +27,8 @@ import {
   PiggyBank,
   UserPlus,
   FileSearch,
-  Settings
+  Settings,
+  Ticket
 } from "lucide-react";
 import useTheme from "@/hooks/useTheme";
 import {useLogout} from "@/hooks/useAuth";
@@ -74,6 +75,7 @@ const sidebarItems = [
       { label: "Parties", path: "/accounting/parties", icon: Users },
       { label: "Payments", path: "/accounting/payments", icon: CreditCard },
       { label: "Expenses", path: "/accounting/expenses", icon: Receipt },
+      { label: "Cheques", path: "/accounting/cheques", icon: Ticket },
     ]
   },
   {

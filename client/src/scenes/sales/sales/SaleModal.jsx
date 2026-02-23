@@ -70,6 +70,7 @@ const SaleModal = ({
   mode = "view", // "view" | "edit" | "create"
   setMode = null
 }) => {
+  console.log("🚀 ~ SaleModal ~ initialData:", initialData)
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */

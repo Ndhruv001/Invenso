@@ -186,6 +186,16 @@ const BUTTON_CONFIGS = {
       label: "Add Expense"
     },
   },
+  cheques: {
+    primary: {
+      type: "CREATE",
+      resource: "cheque",
+      route: "/accounting/cheques",
+      payload: null,
+      icon: "Ticket",
+      label: "Add Cheque"
+    },
+  },
 
   // ===============================
   // TRANSPORT
