@@ -38,8 +38,9 @@ prisma/*.db
 ############################
 sessions/
 *.session
-.wwebjs.*
-.*_cache
+
+
+.wwebjs_cache/
 
 ############################
 # OS Files

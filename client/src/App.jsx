@@ -40,14 +40,7 @@ import ProtectedRoute from "@/components/common/ProtectedRoute.jsx";
 // Error Components
 import NotFound from "@/scenes/error/NotFound.jsx";
 import Unauthorized from "@/scenes/error/Unauthorized.jsx";
-import AddProduct from "@/scenes/products/ProductModal";
-import AddCategory from "@/scenes/categories/CategoryModal";
-import AddParty from "./scenes/accounting/parties/PartyModal";
-import AddPaymentIn from "./scenes/accounting/payments/PaymentModal";
-import AddExpense from "./scenes/accounting/expenses/ExpenseModal";
-import AddTransport from "./scenes/transport/TransportModal";
 import ComingSoon from "./components/common/ComingSoon";
-import AddSale from "./scenes/sales/sales/SaleModal";
 import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
 import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
 import BlurOverlay from "@/components/common/BlurOverlay.jsx";
@@ -127,7 +120,7 @@ function App() {
         <Route path="unauthorized" element={<Unauthorized />} />
 
         {/* Catch all unmatched routes */}
-        <Route path="*" element={<AddSale />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   );
