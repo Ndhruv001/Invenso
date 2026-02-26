@@ -21,7 +21,7 @@ import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { toast } from "react-toastify";
 import { partyCreateSchema, partyUpdateSchema } from "@/validations/partyValidations";
 import { PARTY_TYPE_OPTIONS } from "@/constants/PARTY_TYPES";
-import {useCreateParty} from "@/hooks/useParties";
+import { useCreateParty } from "@/hooks/useParties";
 
 // -----------------------------------
 // Helpers
@@ -45,7 +45,6 @@ const PartyModal = ({
   mode = "view",
   setMode = null
 }) => {
-
   const { theme } = useTheme();
 
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
@@ -61,7 +60,7 @@ const PartyModal = ({
       phone: initialData?.phone || "",
       gstNumber: initialData?.gstNumber || "",
       remark: initialData?.remark || "",
-      openingBalance: initialData?.openingBalance || 0,
+      openingBalance: initialData?.openingBalance || 0
     }),
     [initialData]
   );
@@ -163,7 +162,7 @@ const PartyModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "view" ? "edit" : "view");
+      setMode(prev => (prev === "view" ? "edit" : "view"));
     }
   }, [mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 

@@ -4,7 +4,7 @@ import {
   getExpense,
   createExpense,
   updateExpense,
-  deleteExpense,
+  deleteExpense
 } from "@/services/expenseServices";
 
 /**
@@ -29,10 +29,7 @@ export const EXPENSE_KEYS = {
 export const useExpenses = (filters = {}) => {
   return useQuery({
     queryKey: EXPENSE_KEYS.list(filters),
-    queryFn: () => getExpenses(filters),
-    staleTime: 5 * 60 * 1000, // 5 mins fresh cache
-    cacheTime: 30 * 60 * 1000, // 30 mins kept in memory
-    keepPreviousData: true // Prevent flicker during pagination/filtering
+    queryFn: () => getExpenses(filters)
   });
 };
 
@@ -40,9 +37,7 @@ export const useExpense = id =>
   useQuery({
     queryKey: EXPENSE_KEYS.detail(id),
     queryFn: () => getExpense(id),
-    enabled: !!id, // Only fetch if ID is provided
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000
+    enabled: !!id // Only fetch if ID is provided
   });
 
 // --------------------------------------------------
@@ -80,7 +75,7 @@ export const useDeleteExpense = () => {
 
   return useMutation({
     mutationKey: ["delete-expense"],
-    mutationFn: (id) => deleteExpense(id),
+    mutationFn: id => deleteExpense(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: EXPENSE_KEYS.all });
       queryClient.invalidateQueries({ queryKey: EXPENSE_KEYS.detail(id) });
@@ -96,5 +91,5 @@ export default {
   useExpense,
   useCreateExpense,
   useUpdateExpense,
-  useDeleteExpense,
+  useDeleteExpense
 };

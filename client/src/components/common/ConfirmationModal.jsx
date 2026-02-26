@@ -111,10 +111,7 @@ const ConfirmationModal = React.memo(
       >
         <div className="flex min-h-screen items-center justify-center p-4 text-center">
           {/* Modal Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/50 transition-opacity"
-            aria-hidden="true"
-          />
+          <div className="fixed inset-0 bg-black/50 transition-opacity" aria-hidden="true" />
 
           {/* Modal Content Container */}
           <div

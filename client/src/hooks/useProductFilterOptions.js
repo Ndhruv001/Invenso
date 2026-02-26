@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { useCategories } from "@/hooks/useCategories";
 import { useHsnCodes } from "@/hooks/useProducts";
-import {STOCK_STATUSES} from "@/constants/STOCK_STATUSES";
+import { STOCK_STATUSES } from "@/constants/STOCK_STATUSES";
 
 function useProductFilterOptions() {
   const { data: categoryData, isLoading } = useCategories("PRODUCT");
@@ -13,16 +13,16 @@ function useProductFilterOptions() {
     [categoryData]
   );
 
-const hsnCodeOptions = useMemo(
-  () =>
-    hsnCodesData
-      ?.filter(item => item?.hsnCode?.trim()) 
-      .map(item => ({
-        value: item.hsnCode.trim(),
-        label: item.hsnCode.trim(),
-      })) || [],
-  [hsnCodesData]
-);
+  const hsnCodeOptions = useMemo(
+    () =>
+      hsnCodesData
+        ?.filter(item => item?.hsnCode?.trim())
+        .map(item => ({
+          value: item.hsnCode.trim(),
+          label: item.hsnCode.trim()
+        })) || [],
+    [hsnCodesData]
+  );
 
   const stockOptions = useMemo(
     () =>
@@ -55,7 +55,7 @@ const hsnCodeOptions = useMemo(
       label: "Stock Status",
       placeholder: "All Statuses",
       options: stockOptions
-    },
+    }
   ];
 }
 

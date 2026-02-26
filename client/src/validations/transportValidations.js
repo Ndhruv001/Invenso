@@ -3,8 +3,6 @@ import * as Yup from "yup";
 import PAYMENT_MODES from "@/constants/PAYMENT_MODES";
 import DRIVER_SHIFTS from "@/constants/DRIVER_SHIFTS";
 
-
-
 /**
  * ---------------------------
  * CREATE TRANSPORT
@@ -66,7 +64,7 @@ const transportCreateSchema = Yup.object({
     .nullable()
     .notRequired(),
 
-  paymentMode: Yup.string().oneOf(PAYMENT_MODES, "Invalid payment mode").nullable().notRequired(),
+  paymentMode: Yup.string().nullable().oneOf(PAYMENT_MODES, "Invalid payment mode").notRequired(),
 
   paymentReference: Yup.string()
     .trim()
@@ -132,7 +130,7 @@ const transportUpdateSchema = Yup.object({
     .nullable()
     .notRequired(),
 
-  paymentMode: Yup.string().oneOf(PAYMENT_MODES, "Invalid payment mode").nullable().notRequired(),
+  paymentMode: Yup.string().nullable().oneOf(PAYMENT_MODES, "Invalid payment mode").notRequired(),
 
   paymentReference: Yup.string()
     .trim()

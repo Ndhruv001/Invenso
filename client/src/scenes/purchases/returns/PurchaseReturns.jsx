@@ -81,21 +81,21 @@ const PurchaseReturns = () => {
     setModalMode(mode);
   }, []);
 
-    // ---------------------------
-    // UIAction (CREATE only)
-    // ---------------------------
-    const { action, clearAction } = useUIAction();
-  
-    useEffect(() => {
-      if (!action) return;
-  
-      if (action.resource !== "purchaseReturn") return;
-  
-      if (action.type === "CREATE") {
-        openModalWith({}, "create");
-        clearAction();
-      }
-    }, [action, openModalWith, clearAction]);
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "purchaseReturn") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     purchaseReturn => {
@@ -121,47 +121,53 @@ const PurchaseReturns = () => {
   }, []);
 
   const handleSubmit = useCallback(
-     async purchaseData => {
-       try {
-         // 🟢 CREATE
-         if (modalMode === "create") {
-           await createPurchaseReturnMutation.mutateAsync(purchaseData, {
-             onSuccess: () => {
-               toast.success("Purchase return created successfully");
-               handleCancel();
-             },
-             onError: err => toast.error(err?.message || "Failed to create purchase return")
-           });
- 
-           return; // stop execution after create
-         }
- 
-         // 🔵 EDIT
-         if (modalMode === "edit") {
-           if (!activePurchaseReturn?.id) {
-             toast.error("Cannot save: missing purchase return context");
-             return;
-           }
- 
-           await updatePurchaseReturnMutation.mutateAsync(
-             { id: activePurchaseReturn.id, data: purchaseData },
-             {
-               onSuccess: () => {
-                 toast.success("Purchase return updated successfully");
-                 handleCancel();
-               },
-               onError: err => toast.error(err?.message || "Failed to update purchase return")
-             }
-           );
- 
-           return;
-         }
-       } catch (error) {
-         toast.error(error?.message || "Something went wrong");
-       }
-     },
-     [modalMode, activePurchaseReturn, createPurchaseReturnMutation, updatePurchaseReturnMutation, handleCancel]
-   );
+    async purchaseData => {
+      try {
+        // 🟢 CREATE
+        if (modalMode === "create") {
+          await createPurchaseReturnMutation.mutateAsync(purchaseData, {
+            onSuccess: () => {
+              toast.success("Purchase return created successfully");
+              handleCancel();
+            },
+            onError: err => toast.error(err?.message || "Failed to create purchase return")
+          });
+
+          return; // stop execution after create
+        }
+
+        // 🔵 EDIT
+        if (modalMode === "edit") {
+          if (!activePurchaseReturn?.id) {
+            toast.error("Cannot save: missing purchase return context");
+            return;
+          }
+
+          await updatePurchaseReturnMutation.mutateAsync(
+            { id: activePurchaseReturn.id, data: purchaseData },
+            {
+              onSuccess: () => {
+                toast.success("Purchase return updated successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to update purchase return")
+            }
+          );
+
+          return;
+        }
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong");
+      }
+    },
+    [
+      modalMode,
+      activePurchaseReturn,
+      createPurchaseReturnMutation,
+      updatePurchaseReturnMutation,
+      handleCancel
+    ]
+  );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -197,47 +203,46 @@ const PurchaseReturns = () => {
     });
   }, [selectedRows, deletePurchaseReturnMutation, openDialog, handleSelectionChange, refetch]);
 
-
   const handleDownload = useCallback(() => {
-        if (!selectedRows?.length) {
-          toast.error("No purchases returns selected");
-          return;
-        }
-    
-        openDialog({
-          title: "Download Selected Invoices",
-          message: `Download invoice for ${selectedRows.length} purchase return(s)?`,
-          onConfirm: async () => {
-            try {
-              const results = await Promise.allSettled(
-                selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
-              );
-    
-              const successCount = results.filter(r => r.status === "fulfilled").length;
-    
-              const failedCount = results.length - successCount;
-    
-              if (successCount > 0) {
-                toast.success(`${successCount} invoice(s) downloaded successfully`);
-              }
-    
-              if (failedCount > 0) {
-                toast.error(`${failedCount} invoice(s) failed to download`);
-              }
-            } catch (err) {
-              toast.error(err?.message || "Unexpected error during download");
-            }
+    if (!selectedRows?.length) {
+      toast.error("No purchases returns selected");
+      return;
+    }
+
+    openDialog({
+      title: "Download Selected Invoices",
+      message: `Download invoice for ${selectedRows.length} purchase return(s)?`,
+      onConfirm: async () => {
+        try {
+          const results = await Promise.allSettled(
+            selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+          );
+
+          const successCount = results.filter(r => r.status === "fulfilled").length;
+
+          const failedCount = results.length - successCount;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} invoice(s) downloaded successfully`);
           }
-        });
-      }, [selectedRows, downloadInvoiceMutation, openDialog]);
-    
-      const handlePrint = purchaseId => {
-        if (!purchaseId) return;
-    
-        const url = `${import.meta.env.VITE_API_BASE_URL}/purchase-returns/print/invoice/${purchaseId}`;
-    
-        window.open(url, "_blank");
-      };
+
+          if (failedCount > 0) {
+            toast.error(`${failedCount} invoice(s) failed to download`);
+          }
+        } catch (err) {
+          toast.error(err?.message || "Unexpected error during download");
+        }
+      }
+    });
+  }, [selectedRows, downloadInvoiceMutation, openDialog]);
+
+  const handlePrint = purchaseId => {
+    if (!purchaseId) return;
+
+    const url = `${import.meta.env.VITE_API_BASE_URL}/purchase-returns/print/invoice/${purchaseId}`;
+
+    window.open(url, "_blank");
+  };
 
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);

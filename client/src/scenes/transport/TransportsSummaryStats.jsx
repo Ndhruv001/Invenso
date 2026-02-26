@@ -6,6 +6,7 @@
 import React from "react";
 import { Users, User, DollarSign, TrendingUp } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 /**
  * @typedef {Object} TransportsSummaryStatsProps
@@ -40,19 +41,19 @@ const TransportsSummaryStats = ({ stats }) => {
     },
     {
       title: "Total Amount",
-      value: stats?.totalAmount?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.totalAmount) ?? 0,
       subtitle: "Total transport amount (₹)",
       icon: DollarSign,
       color: "warning"
     },
     {
       title: "Total Received",
-      value: stats?.totalReceived?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.totalReceived) ?? 0,
       subtitle: "Payments received (₹)",
       icon: TrendingUp,
       color: "success"
     }
-  ]; 
+  ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -13,7 +13,7 @@ function useExpenseFilterOptions() {
     () =>
       expenseCategories?.data?.map(cat => ({
         value: String(cat.id),
-        label: cat.name,
+        label: cat.name
       })) || [],
     [expenseCategories]
   );
@@ -26,7 +26,7 @@ function useExpenseFilterOptions() {
       type: "select",
       label: "Category",
       placeholder: "All Categories",
-      options: categoryOptions,
+      options: categoryOptions
     },
     {
       key: "dateFrom",
@@ -34,7 +34,7 @@ function useExpenseFilterOptions() {
       label: "From Date",
       placeholder: "Start Date",
       defaultValue: "",
-      max: currentDate,
+      max: currentDate
     },
     {
       key: "dateTo",
@@ -42,8 +42,8 @@ function useExpenseFilterOptions() {
       label: "To Date",
       placeholder: "End Date",
       defaultValue: "",
-      max: currentDate,
-    },
+      max: currentDate
+    }
   ];
 }
 

@@ -392,7 +392,7 @@ const SaleReturnModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "edit" ? "view" : "edit");
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
   }, [mode, setMode, isDirty, reset, defaultValues, openDialog]);
 

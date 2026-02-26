@@ -11,7 +11,7 @@ const mutationCache = new MutationCache({
   //& learn all the params here and why not fifth param - queryClient
   onSuccess: (data, variables, context, mutation) => {
     const mutationKey = mutation.options.mutationKey;
-    // queryClient.invalidateQueries(mutationKey); 
+    // queryClient.invalidateQueries(mutationKey);
     if (mutationKey?.includes("create")) {
       toast.success("Item created successfully!");
     } else if (mutationKey?.includes("update")) {
@@ -37,10 +37,10 @@ const queryClient = new QueryClient({
   queryCache,
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 30 * 60 * 1000, // 30 minutes
+      cacheTime: 60 * 60 * 1000, // 60 minutes
       retryOnMount: false,
-      refetchOnReconnect: true,
+      refetchOnReconnect: false,
       refetchOnWindowFocus: false,
       refetchOnMount: true,
       retry: (failureCount, error) => {

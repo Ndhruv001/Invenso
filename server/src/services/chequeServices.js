@@ -280,16 +280,6 @@ async function updateCheque(id, data, userId = null) {
       }
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* 🔴 REMOVED: Simple Direct Update Without Financial Sync               */
-    /* ---------------------------------------------------------------------- */
-    /*
-    const updatedCheque = await tx.cheque.update({
-      where: { id },
-      data: updateData
-    });
-    */
-
     /* -------------------- Build Update Data -------------------- */
 
     const updateData = {
@@ -330,16 +320,16 @@ async function updateCheque(id, data, userId = null) {
     ) {
       const paymentType = updatedCheque.type === "INWARD" ? "RECEIVED" : "PAID";
 
-      const payment = await tx.payment.create({
+      await tx.payment.create({
         data: {
           date: updatedCheque.clearDate ?? new Date(),
           type: paymentType,
           amount: newAmount,
-          referenceType: "SALE",
+          referenceType: `${paymentType === "PAID" ? "PURCHASE" : "SALE"}`,
           paymentMode: "CHEQUE",
+          paymentReference: `${paymentType} against Cheque: ${updatedCheque.id}`,
           partyId: newPartyId,
-          chequeId: updatedCheque.id,
-          paymentReference: updatedCheque.chequeNumber
+          referenceId: parseInt(updatedCheque.id)
         }
       });
 

@@ -8,10 +8,7 @@ import axiosInstance from "@/lib/config/axiosInstance";
 
 const handleAxiosError = (error, defaultMsg) => {
   const message =
-    error.response?.data?.message ||
-    error.response?.data?.error ||
-    error.message ||
-    defaultMsg;
+    error.response?.data?.message || error.response?.data?.error || error.message || defaultMsg;
 
   console.error(defaultMsg, error);
   throw new Error(message);
@@ -32,8 +29,7 @@ export const getCheques = async (filters = {}) => {
 
     if (filters.filterOptions) {
       for (const [key, value] of Object.entries(filters.filterOptions)) {
-        if (value !== undefined && value !== null && value !== "")
-          params.append(key, value);
+        if (value !== undefined && value !== null && value !== "") params.append(key, value);
       }
     }
 
@@ -54,21 +50,20 @@ export const getCheque = async id => {
     const { data } = await axiosInstance.get(`/cheques/${id}`);
     return data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error(`Cheque with ID ${id} not found`);
+    if (error.response?.status === 404) throw new Error(`Cheque with ID ${id} not found`);
 
     handleAxiosError(error, `Failed to fetch cheque ${id}`);
   }
 };
 
-export const createCheque = async (data) => {
+export const createCheque = async data => {
   if (!data) throw new Error("Cheque data is required");
 
   try {
     const { result } = await axiosInstance.post(`/cheques`, data);
     return result;
   } catch (error) {
-    console.log("🚀 ~ createCheque ~ error:", error)
+    console.log("🚀 ~ createCheque ~ error:", error);
     handleAxiosError(error, `Failed to create cheque`);
   }
 };
@@ -91,8 +86,7 @@ export const updateCheque = async (id, updateData) => {
     const { data } = await axiosInstance.put(`/cheques/${id}`, updateData);
     return data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error("Cheque not found or already deleted");
+    if (error.response?.status === 404) throw new Error("Cheque not found or already deleted");
 
     if (error.response?.status === 409)
       throw new Error("Cheque has been modified. Please refresh.");
@@ -115,8 +109,7 @@ export const deleteCheque = async id => {
     const { data } = await axiosInstance.delete(`/cheques/${id}`);
     return data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error("Cheque not found or already deleted");
+    if (error.response?.status === 404) throw new Error("Cheque not found or already deleted");
 
     handleAxiosError(error, `Failed to delete cheque ${id}`);
   }
@@ -126,7 +119,7 @@ export const chequesApi = {
   getCheques,
   getCheque,
   updateCheque,
-  deleteCheque, 
+  deleteCheque,
   createCheque
 };
 

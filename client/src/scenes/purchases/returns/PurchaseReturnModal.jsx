@@ -72,7 +72,7 @@ const PurchaseReturnModal = ({
   isLoading = false,
   initialData = null,
   mode = "view",
-  setMode = null,
+  setMode = null
 }) => {
   const isLinkedToPurchase = Boolean(initialData?.purchaseId);
   const { theme } = useTheme();
@@ -378,7 +378,7 @@ const PurchaseReturnModal = ({
       reset(defaultValues);
       onCancel();
     }
-  }, [initialData, mode, setMode,  isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   // Toggle edit mode with confirmation if dirty
   const handleToggleEditMode = useCallback(() => {
@@ -392,9 +392,9 @@ const PurchaseReturnModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "edit" ? "view" : "edit");
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
-  }, [mode, setMode,  isDirty, reset, defaultValues, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, openDialog]);
 
   // Disabled state
   const isDisabled = mode === "view" || isSubmitting || isLoading;

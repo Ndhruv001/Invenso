@@ -45,8 +45,8 @@ const TransportModal = ({
   onCancel,
   isLoading = false,
   initialData = null,
-  mode="view",
-  setMode=null
+  mode = "view",
+  setMode = null
 }) => {
   const { theme } = useTheme();
 
@@ -193,7 +193,7 @@ const TransportModal = ({
       }
       onCancel();
     }
-  }, [initialData, mode,setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [initialData, mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   const handleToggleEditMode = useCallback(() => {
     if (mode === "edit" && isDirty) {
@@ -207,9 +207,9 @@ const TransportModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "edit" ? "view" : "edit");
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
-  }, [mode,setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
   return (
     <>
@@ -232,7 +232,7 @@ const TransportModal = ({
                     : "Add Transport"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
-                  { mode === "view" && initialData
+                  {mode === "view" && initialData
                     ? "Transport details (read-only)"
                     : "Fill in the transport details below"}
                 </p>

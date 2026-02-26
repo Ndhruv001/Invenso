@@ -30,10 +30,7 @@ export const PARTY_KEYS = {
 export const useParties = (filters = {}) => {
   return useQuery({
     queryKey: PARTY_KEYS.list(filters),
-    queryFn: () => getParties(filters),
-    staleTime: 5 * 60 * 1000, // 5 mins fresh cache
-    cacheTime: 30 * 60 * 1000, // 30 mins kept in memory
-    keepPreviousData: true // Prevent flicker during pagination/filtering
+    queryFn: () => getParties(filters)
   });
 };
 
@@ -41,9 +38,7 @@ export const useParty = id =>
   useQuery({
     queryKey: PARTY_KEYS.detail(id),
     queryFn: () => getParty(id),
-    enabled: !!id, // Only fetch if ID is provided
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000
+    enabled: !!id // Only fetch if ID is provided
   });
 
 // --------------------------------------------------
@@ -94,7 +89,7 @@ export const usePartySuggestions = query => {
     queryKey: ["party-suggestions", query],
     queryFn: () => suggestParties(query),
     enabled: !!query && query.length >= 2, // ⬅ important
-    staleTime: 60 * 1000
+    staleTime: 30 * 60 * 1000
   });
 };
 

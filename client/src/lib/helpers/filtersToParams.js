@@ -11,9 +11,9 @@ function filtersToParams(filters) {
 
   // Handle top-level keys like search, sortBy, page, etc.
   for (const [key, value] of Object.entries(filters)) {
-    if (key === 'filterOptions') continue; // Skip the nested object, handle it below
+    if (key === "filterOptions") continue; // Skip the nested object, handle it below
 
-    if (value != null && value.toString().trim() !== '') {
+    if (value != null && value.toString().trim() !== "") {
       params.set(key, value.toString());
     }
   }
@@ -21,7 +21,7 @@ function filtersToParams(filters) {
   // Handle nested filterOptions
   if (filters.filterOptions) {
     for (const [key, value] of Object.entries(filters.filterOptions)) {
-      if (value != null && value.toString().trim() !== '') {
+      if (value != null && value.toString().trim() !== "") {
         params.set(key, value.toString());
       }
     }

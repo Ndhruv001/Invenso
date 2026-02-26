@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-} from "@tanstack/react-table";
+import { useReactTable, getCoreRowModel, flexRender } from "@tanstack/react-table";
 import {
   ChevronUp,
   ChevronDown,
@@ -11,7 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight,
+  ChevronsRight
 } from "lucide-react";
 
 import useTheme from "@/hooks/useTheme";
@@ -75,7 +71,7 @@ const DataTable = ({
   showSelection = false,
 
   onSelectionChange,
-  onRowDoubleClick,
+  onRowDoubleClick
 }) => {
   /* ---------------------------------------------------------------------------
    * Hooks and State
@@ -95,10 +91,10 @@ const DataTable = ({
    * Keyboard Shortcuts
    * -------------------------------------------------------------------------*/
   useEffect(() => {
-    const onKeyDown = (event) => {
+    const onKeyDown = event => {
       if (event.altKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        setSelectionVisible((visible) => !visible);
+        setSelectionVisible(visible => !visible);
       }
     };
 
@@ -109,9 +105,8 @@ const DataTable = ({
   /* ---------------------------------------------------------------------------
    * Row Selection Handler
    * -------------------------------------------------------------------------*/
-  const handleRowSelectionChange = (updater) => {
-    const newSelection =
-      typeof updater === "function" ? updater(rowSelection) : updater;
+  const handleRowSelectionChange = updater => {
+    const newSelection = typeof updater === "function" ? updater(rowSelection) : updater;
 
     setRowSelection(newSelection);
 
@@ -123,7 +118,7 @@ const DataTable = ({
       onSelectionChange({
         selectedRows,
         selectedIndices: newSelection,
-        count: selectedRows.length,
+        count: selectedRows.length
       });
     }
   };
@@ -138,7 +133,7 @@ const DataTable = ({
     state: {
       pagination,
       sorting,
-      rowSelection,
+      rowSelection
     },
     onPaginationChange,
     onSortingChange,
@@ -147,9 +142,8 @@ const DataTable = ({
     manualPagination,
     manualSorting,
     enableRowSelection,
-    enableSorting,
+    enableSorting
   });
-
 
   // Sorting icon for column headers
   const SortIcon = ({ column }) => {
@@ -196,7 +190,7 @@ const DataTable = ({
         <div className="flex-1 min-h-0 overflow-auto" role="table" aria-rowcount={totalRows}>
           <table className="w-full min-w-max table-fixed border-collapse" role="grid">
             {/* HEADER */}
-            <thead className={`${theme.border} ${theme.bg}  sticky top-0 z-20 shadow-md`} >
+            <thead className={`${theme.border} ${theme.bg}  sticky top-0 z-20 shadow-md`}>
               {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id} role="row">
                   {headerGroup.headers.map(header => {

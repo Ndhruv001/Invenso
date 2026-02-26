@@ -46,7 +46,6 @@ const PaymentModal = ({
   mode = "view", // "view" | "edit" | "create"
   setMode = null
 }) => {
-  
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */
@@ -171,7 +170,7 @@ const PaymentModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "edit" ? "view" : "edit");
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
   }, [mode, setMode, isDirty, reset, defaultValues, onCancel, openDialog]);
 
@@ -189,7 +188,11 @@ const PaymentModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (mode === "edit" ? "Edit Payment" : "View Payment") : "Add Payment"}
+                  {initialData
+                    ? mode === "edit"
+                      ? "Edit Payment"
+                      : "View Payment"
+                    : "Add Payment"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
                   {mode === "view" && initialData

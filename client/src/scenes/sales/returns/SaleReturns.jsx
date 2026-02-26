@@ -79,21 +79,21 @@ const SaleReturns = () => {
     setModalMode(mode);
   }, []);
 
-   // ---------------------------
-      // UIAction (CREATE only)
-      // ---------------------------
-      const { action, clearAction } = useUIAction();
-    
-      useEffect(() => {
-        if (!action) return;
-    
-        if (action.resource !== "saleReturn") return;
-    
-        if (action.type === "CREATE") {
-          openModalWith({}, "create");
-          clearAction();
-        }
-      }, [action, openModalWith, clearAction]);
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "saleReturn") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     saleReturn => {
@@ -117,47 +117,47 @@ const SaleReturns = () => {
   }, []);
 
   const handleSubmit = useCallback(
-     async purchaseData => {
-       try {
-         // 🟢 CREATE
-         if (modalMode === "create") {
-           await createSaleReturnMutation.mutateAsync(purchaseData, {
-             onSuccess: () => {
-               toast.success("Sale return created successfully");
-               handleCancel();
-             },
-             onError: err => toast.error(err?.message || "Failed to create sale return")
-           });
- 
-           return; // stop execution after create
-         }
- 
-         // 🔵 EDIT
-         if (modalMode === "edit") {
-           if (!activeSaleReturn?.id) {
-             toast.error("Cannot save: missing sale return context");
-             return;
-           }
- 
-           await updateSaleReturnMutation.mutateAsync(
-             { id: activeSaleReturn.id, data: purchaseData },
-             {
-               onSuccess: () => {
-                 toast.success("Sale return updated successfully");
-                 handleCancel();
-               },
-               onError: err => toast.error(err?.message || "Failed to update sale return")
-             }
-           );
- 
-           return;
-         }
-       } catch (error) {
-         toast.error(error?.message || "Something went wrong");
-       }
-     },
-     [modalMode, activeSaleReturn, createSaleReturnMutation, updateSaleReturnMutation, handleCancel]
-   );
+    async purchaseData => {
+      try {
+        // 🟢 CREATE
+        if (modalMode === "create") {
+          await createSaleReturnMutation.mutateAsync(purchaseData, {
+            onSuccess: () => {
+              toast.success("Sale return created successfully");
+              handleCancel();
+            },
+            onError: err => toast.error(err?.message || "Failed to create sale return")
+          });
+
+          return; // stop execution after create
+        }
+
+        // 🔵 EDIT
+        if (modalMode === "edit") {
+          if (!activeSaleReturn?.id) {
+            toast.error("Cannot save: missing sale return context");
+            return;
+          }
+
+          await updateSaleReturnMutation.mutateAsync(
+            { id: activeSaleReturn.id, data: purchaseData },
+            {
+              onSuccess: () => {
+                toast.success("Sale return updated successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to update sale return")
+            }
+          );
+
+          return;
+        }
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong");
+      }
+    },
+    [modalMode, activeSaleReturn, createSaleReturnMutation, updateSaleReturnMutation, handleCancel]
+  );
 
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
@@ -193,47 +193,46 @@ const SaleReturns = () => {
     });
   }, [selectedRows, deleteSaleReturnMutation, openDialog, handleSelectionChange, refetch]);
 
+  const handleDownload = useCallback(() => {
+    if (!selectedRows?.length) {
+      toast.error("No sales returns selected");
+      return;
+    }
 
-   const handleDownload = useCallback(() => {
-      if (!selectedRows?.length) {
-        toast.error("No sales returns selected");
-        return;
-      }
-  
-      openDialog({
-        title: "Download Selected Invoices",
-        message: `Download invoice for ${selectedRows.length} sale return(s)?`,
-        onConfirm: async () => {
-          try {
-            const results = await Promise.allSettled(
-              selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
-            );
-  
-            const successCount = results.filter(r => r.status === "fulfilled").length;
-  
-            const failedCount = results.length - successCount;
-  
-            if (successCount > 0) {
-              toast.success(`${successCount} invoice(s) downloaded successfully`);
-            }
-  
-            if (failedCount > 0) {
-              toast.error(`${failedCount} invoice(s) failed to download`);
-            }
-          } catch (err) {
-            toast.error(err?.message || "Unexpected error during download");
+    openDialog({
+      title: "Download Selected Invoices",
+      message: `Download invoice for ${selectedRows.length} sale return(s)?`,
+      onConfirm: async () => {
+        try {
+          const results = await Promise.allSettled(
+            selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+          );
+
+          const successCount = results.filter(r => r.status === "fulfilled").length;
+
+          const failedCount = results.length - successCount;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} invoice(s) downloaded successfully`);
           }
+
+          if (failedCount > 0) {
+            toast.error(`${failedCount} invoice(s) failed to download`);
+          }
+        } catch (err) {
+          toast.error(err?.message || "Unexpected error during download");
         }
-      });
-    }, [selectedRows, downloadInvoiceMutation, openDialog]);
-  
-    const handlePrint = saleReturnId => {
-      if (!saleReturnId) return;
-  
-      const url = `${import.meta.env.VITE_API_BASE_URL}/sale-returns/print/invoice/${saleReturnId}`;
-  
-      window.open(url, "_blank");
-    };
+      }
+    });
+  }, [selectedRows, downloadInvoiceMutation, openDialog]);
+
+  const handlePrint = saleReturnId => {
+    if (!saleReturnId) return;
+
+    const url = `${import.meta.env.VITE_API_BASE_URL}/sale-returns/print/invoice/${saleReturnId}`;
+
+    window.open(url, "_blank");
+  };
 
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);

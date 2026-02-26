@@ -120,23 +120,19 @@ export const getSaleSuggestionsByPartyId = async partyId => {
 };
 
 // Download Sale Invoice PDF
-export const downloadSaleInvoicePdf = async (id) => {
+export const downloadSaleInvoicePdf = async id => {
   if (!id) throw new Error("Sale ID is required");
 
   try {
-    const response = await axiosInstance.get(
-      `/sales/download/invoice/${id}`,
-      {
-        responseType: "blob" // 🔥 IMPORTANT for file download
-      }
-    );
+    const response = await axiosInstance.get(`/sales/download/invoice/${id}`, {
+      responseType: "blob" // 🔥 IMPORTANT for file download
+    });
 
     return response; // returns Blob
   } catch (error) {
     handleAxiosError(error, `Failed to download invoice for sale ${id}`);
   }
 };
-
 
 export const salesApi = {
   getSales,
@@ -145,7 +141,7 @@ export const salesApi = {
   updateSale,
   deleteSale,
   getSaleSuggestionsByPartyId,
-  downloadSaleInvoicePdf,
+  downloadSaleInvoicePdf
 };
 
 export default salesApi;

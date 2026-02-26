@@ -31,7 +31,7 @@ import {
   Ticket
 } from "lucide-react";
 import useTheme from "@/hooks/useTheme";
-import {useLogout} from "@/hooks/useAuth";
+import { useLogout } from "@/hooks/useAuth";
 // import {}
 
 const sidebarItems = [
@@ -44,7 +44,7 @@ const sidebarItems = [
     icon: Box,
     label: "Products",
     path: "/products",
-    hasSubmenu: false,
+    hasSubmenu: false
   },
   {
     icon: ShoppingCart,
@@ -75,7 +75,7 @@ const sidebarItems = [
       { label: "Parties", path: "/accounting/parties", icon: Users },
       { label: "Payments", path: "/accounting/payments", icon: CreditCard },
       { label: "Expenses", path: "/accounting/expenses", icon: Receipt },
-      { label: "Cheques", path: "/accounting/cheques", icon: Ticket },
+      { label: "Cheques", path: "/accounting/cheques", icon: Ticket }
     ]
   },
   {
@@ -130,7 +130,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
 
   const handleLogout = () => {
     logout();
-  }
+  };
 
   return (
     <>

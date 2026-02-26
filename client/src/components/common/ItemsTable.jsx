@@ -14,12 +14,13 @@ const ItemTable = ({
   CATEGORIES,
   SIZES,
   UNITS,
-  GST_RATES,
+  GST_RATES
 }) => {
-    const {theme} = useTheme();
+  const { theme } = useTheme();
 
   // Calculate total amount dynamically
-  const totalAmount = fields.reduce((sum, _, index) => { m
+  const totalAmount = fields.reduce((sum, _, index) => {
+    m;
     const item = watch(`purchaseItems.${index}`);
     const qty = parseFloat(item?.qty || 0);
     const price = parseFloat(item?.pricePerUnit || 0);
@@ -68,10 +69,7 @@ const ItemTable = ({
             ))
           ) : (
             <tr>
-              <td
-                colSpan={10}
-                className={`text-center py-4 text-sm ${theme.text.secondary}`}
-              >
+              <td colSpan={10} className={`text-center py-4 text-sm ${theme.text.secondary}`}>
                 No items added yet.
               </td>
             </tr>
@@ -105,7 +103,7 @@ const ItemTable = ({
                 unitId: "",
                 qty: "",
                 pricePerUnit: "",
-                gstPercentage: "",
+                gstPercentage: ""
               })
             }
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${theme.accent} hover:opacity-90`}

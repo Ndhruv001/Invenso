@@ -4,40 +4,36 @@
  */
 
 import React from "react";
-import { 
-  CheckCircle2, 
-  Banknote, 
-  Clock, 
-  Ticket 
-} from "lucide-react";
+import { CheckCircle2, Banknote, Clock, Ticket } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 const ChequesSummaryStats = ({ stats }) => {
   const items = [
     {
       title: "Total Cleared",
-      value: stats?.totalClearedAmount ?? 0,
+      value: formatCurrency(stats?.totalClearedAmount) ?? 0,
       subtitle: "Cleared Inward Cheques",
       icon: CheckCircle2,
       color: "success"
     },
     {
       title: "Total Encashed",
-      value: stats?.totalEncashedAmount ?? 0,
+      value: formatCurrency(stats?.totalEncashedAmount) ?? 0,
       subtitle: "Encashed Outward Cheques",
       icon: Banknote,
       color: "info"
     },
     {
       title: "Inward Pending",
-      value: stats?.inwardPending ?? 0,
+      value: formatCurrency(stats?.inwardPending) ?? 0,
       subtitle: "Cheques yet to be cleared",
       icon: Clock,
       color: "warning"
     },
     {
       title: "Outward Pending",
-      value: stats?.outwardPending ?? 0,
+      value: formatCurrency(stats?.outwardPending) ?? 0,
       subtitle: "Cheques yet to be encashed",
       icon: Ticket,
       color: "danger"

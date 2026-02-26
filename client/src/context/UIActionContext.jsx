@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
 
-
 /**
  * Action shape:
  * {
@@ -15,7 +14,7 @@ const UIActionContext = createContext(null);
 export const UIActionProvider = ({ children }) => {
   const [action, setAction] = useState({});
 
-  const fireAction = (actionObject) => {
+  const fireAction = actionObject => {
     setAction(actionObject);
   };
 

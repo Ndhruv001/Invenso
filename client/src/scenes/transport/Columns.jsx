@@ -9,7 +9,7 @@ const PaymentStatusBadge = ({ amount, receivedAmount }) => {
   const getPaymentStatus = (amount, receivedAmount) => {
     const total = Number(amount);
     const received = Number(receivedAmount);
-    
+
     if (received === 0) return { label: "Unpaid", color: "text-red-600" };
     if (received < total) return { label: "Partial", color: "text-amber-600" };
     return { label: "Paid", color: "text-green-600" };
@@ -23,12 +23,18 @@ const PaymentStatusBadge = ({ amount, receivedAmount }) => {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <span className={`text-xs font-medium ${status.color}`} aria-label={`Payment status: ${status.label}`}>
+        <span
+          className={`text-xs font-medium ${status.color}`}
+          aria-label={`Payment status: ${status.label}`}
+        >
           {status.label}
         </span>
       </div>
       {pending > 0 && (
-        <span className="text-xs text-gray-500" aria-label={`Pending amount: ${formatCurrency(pending)}`}>
+        <span
+          className="text-xs text-gray-500"
+          aria-label={`Pending amount: ${formatCurrency(pending)}`}
+        >
           Pending: {formatCurrency(pending)}
         </span>
       )}
@@ -40,8 +46,7 @@ const PaymentStatusBadge = ({ amount, receivedAmount }) => {
  * Badge to display payment mode.
  */
 const PaymentModeBadge = ({ paymentMode }) => {
-  
-  const getModeConfig = (mode) => {
+  const getModeConfig = mode => {
     switch (mode) {
       case "CASH":
         return { label: "Cash", color: "text-green-600" };
@@ -102,12 +107,12 @@ const Columns = (showSelection = false) => {
       cell: ({ getValue }) => (
         <div className="flex flex-col">
           <span className="font-semibold text-sm" style={{ color: theme.text.primary }}>
-            {formatDate(getValue())}
+            {formatDate(getValue(), "long")}
           </span>
           <span className="text-xs text-gray-400">
-            {new Date(getValue()).toLocaleTimeString('en-US', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
+            {new Date(getValue()).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit"
             })}
           </span>
         </div>
@@ -173,7 +178,11 @@ const Columns = (showSelection = false) => {
       accessorKey: "fromLocation",
       header: "From",
       cell: ({ getValue }) => (
-        <span className="text-sm font-medium truncate text-left max-w-[150px]" title={getValue()} style={{ color: theme.text.primary }}>
+        <span
+          className="text-sm font-medium truncate text-left max-w-[150px]"
+          title={getValue()}
+          style={{ color: theme.text.primary }}
+        >
           {getValue()}
         </span>
       ),
@@ -183,7 +192,11 @@ const Columns = (showSelection = false) => {
       accessorKey: "toLocation",
       header: "To",
       cell: ({ getValue }) => (
-        <span className="text-sm font-medium text-right truncate max-w-[150px]" title={getValue()} style={{ color: theme.text.primary }}>
+        <span
+          className="text-sm font-medium text-right truncate max-w-[150px]"
+          title={getValue()}
+          style={{ color: theme.text.primary }}
+        >
           {getValue()}
         </span>
       ),
@@ -215,9 +228,9 @@ const Columns = (showSelection = false) => {
       id: "payment_status",
       header: "Payment Status",
       cell: ({ row }) => (
-        <PaymentStatusBadge 
-          amount={row.original.amount} 
-          receivedAmount={row.original.receivedAmount} 
+        <PaymentStatusBadge
+          amount={row.original.amount}
+          receivedAmount={row.original.receivedAmount}
         />
       ),
       size: 130
@@ -260,9 +273,7 @@ const Columns = (showSelection = false) => {
       accessorKey: "updatedAt",
       header: "Last Updated",
       cell: ({ getValue }) => (
-        <span className="text-xs text-gray-400">
-          {formatDate(getValue())}
-        </span>
+        <span className="text-xs text-gray-400">{formatDate(getValue())}</span>
       ),
       size: 120
     }

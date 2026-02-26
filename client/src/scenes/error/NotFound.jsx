@@ -19,14 +19,10 @@ const NotFound = () => {
           >
             404
           </h1>
-          <h2
-            className={`text-xl sm:text-2xl md:text-3xl font-semibold ${theme.text.primary}`}
-          >
+          <h2 className={`text-xl sm:text-2xl md:text-3xl font-semibold ${theme.text.primary}`}>
             Page Not Found
           </h2>
-          <p
-            className={`${theme.text.secondary} max-w-md mx-auto text-sm sm:text-base`}
-          >
+          <p className={`${theme.text.secondary} max-w-md mx-auto text-sm sm:text-base`}>
             The page you're looking for doesn't exist or has been moved.
           </p>
         </div>

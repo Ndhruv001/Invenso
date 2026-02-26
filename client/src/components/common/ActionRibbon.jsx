@@ -8,7 +8,7 @@ import {
   ToggleRight,
   CheckSquare
 } from "lucide-react";
-import { toast } from "react-toastify"; 
+import { toast } from "react-toastify";
 import useTheme from "@/hooks/useTheme";
 
 const ICONS = {
@@ -36,7 +36,7 @@ const ActionRibbon = ({
 }) => {
   const { theme } = useTheme();
 
-  const handleActionClick = (action) => {
+  const handleActionClick = action => {
     const handler = handlers[action];
     const label = LABELS[action] || action;
 
@@ -65,19 +65,13 @@ const ActionRibbon = ({
           title={selectionOpen ? "Close selection" : "Open selection"}
           className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 transition"
         >
-          {selectionOpen ? (
-            <ToggleRight className="h-5 w-5" />
-          ) : (
-            <ToggleLeft className="h-5 w-5" />
-          )}
+          {selectionOpen ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
           <span className="text-sm font-medium hidden xs:inline">
             {selectionOpen ? "Selection On" : "Selection Off"}
           </span>
         </button>
 
-        <div
-          className={`ml-1 inline-flex items-center gap-1 text-xs sm:text-sm px-2 py-1`}
-        >
+        <div className={`ml-1 inline-flex items-center gap-1 text-xs sm:text-sm px-2 py-1`}>
           <CheckSquare className="h-4 w-4 opacity-80" />
           <span>{selectedCount}</span>
         </div>
@@ -85,7 +79,7 @@ const ActionRibbon = ({
 
       {/* Right side */}
       <div className="flex items-center gap-2 flex-wrap">
-        {actions.map((action) => {
+        {actions.map(action => {
           const Icon = ICONS[action];
           const label = LABELS[action];
 

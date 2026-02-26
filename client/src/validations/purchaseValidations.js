@@ -29,7 +29,7 @@ const purchaseItemSchema = Yup.object({
   gstRate: Yup.number()
     .typeError("GST rate must be a number")
     .min(0, "GST rate cannot be negative")
-    .required("GST rate is required"),
+    .required("GST rate is required")
 });
 
 /**

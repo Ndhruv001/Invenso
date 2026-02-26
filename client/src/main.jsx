@@ -15,10 +15,15 @@ createRoot(document.getElementById("root")).render(
       <ThemeProvider>
         <UIActionProvider>
           <HideScreenProvider>
-        <App />
+            <App />
           </HideScreenProvider>
-        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop />
-      </UIActionProvider>
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+          />
+        </UIActionProvider>
       </ThemeProvider>
     </QueryProvider>
   </Router>

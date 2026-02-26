@@ -1,7 +1,5 @@
 import axiosInstance from "@/lib/config/axiosInstance";
 
-
-
 export const sentInvoicesOnWhatsApp = async () => {
   try {
     await axiosInstance.post("/admin/run-whatsapp-invoices");
@@ -11,4 +9,4 @@ export const sentInvoicesOnWhatsApp = async () => {
   }
 };
 
-export default {sentInvoicesOnWhatsApp}
+export default { sentInvoicesOnWhatsApp };

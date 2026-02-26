@@ -68,7 +68,7 @@ const PurchaseModal = ({
   isLoading = false,
   initialData = null,
   mode = "view", // "create" | "edit" | "view"
-  setMode = null,
+  setMode = null
 }) => {
   const { theme } = useTheme();
 
@@ -89,7 +89,6 @@ const PurchaseModal = ({
   const [showProductSuggestions, setShowProductSuggestions] = useState(false);
   const [activeProductRowIndex, setActiveProductRowIndex] = useState(null);
   const [productSearchText, setProductSearchText] = useState({});
-
 
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
 
@@ -355,9 +354,9 @@ const PurchaseModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "edit" ? "view" : "edit");
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
-  }, [mode, setMode,  isDirty, reset, defaultValues, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, openDialog]);
 
   // Disabled state
   const isDisabled = mode === "view" || isSubmitting || isLoading;
@@ -376,7 +375,11 @@ const PurchaseModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (mode === "edit" ? "Edit Invoice" : "View Invoice") : "Create Invoice"}
+                  {initialData
+                    ? mode === "edit"
+                      ? "Edit Invoice"
+                      : "View Invoice"
+                    : "Create Invoice"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
                   {mode === "view" && initialData
@@ -433,7 +436,6 @@ const PurchaseModal = ({
                         if (selectedParty) {
                           setSelectedParty(null);
                           setValue("partyId", null, { shouldDirty: true });
-                          
                         }
 
                         setPartyInputValue(value);
@@ -457,8 +459,8 @@ const PurchaseModal = ({
                             onClick={() => {
                               setSelectedParty(party);
                               setPartyInputValue(party.name);
-                              
-                              setValue("partyId", null, { shouldDirty: true });
+
+                              setValue("partyId", party.id, { shouldDirty: true });
                               setShowPartySuggestions(false);
                             }}
                           >

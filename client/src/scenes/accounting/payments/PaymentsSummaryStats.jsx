@@ -6,7 +6,7 @@
 import React from "react";
 import { ArrowDownCircle, ArrowUpCircle, User } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
-
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 const PaymentsSummaryStats = ({ stats }) => {
   const items = [
@@ -19,14 +19,14 @@ const PaymentsSummaryStats = ({ stats }) => {
     },
     {
       title: "Total Received",
-      value: stats?.totalReceived ?? 0,
+      value: formatCurrency(stats?.totalReceived) ?? 0,
       subtitle: "Received payments (IN)",
       icon: ArrowDownCircle,
       color: "success"
     },
     {
       title: "Total Paid",
-      value: stats?.totalPaid ?? 0,
+      value: formatCurrency(stats?.totalPaid) ?? 0,
       subtitle: "Paid payments (OUT)",
       icon: ArrowUpCircle,
       color: "danger"

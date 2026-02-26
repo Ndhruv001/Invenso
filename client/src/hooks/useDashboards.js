@@ -42,7 +42,7 @@ export const useDashboardSummary = () => {
   return useQuery({
     queryKey: DASHBOARD_KEYS.summary(),
     queryFn: () => getDashboardSummary(),
-    staleTime: 2 * 60 * 1000, // KPIs change often
+    staleTime: 5 * 60 * 1000, // KPIs change often
     cacheTime: 10 * 60 * 1000
   });
 };
@@ -66,7 +66,7 @@ export const useLowStockProducts = () => {
   return useQuery({
     queryKey: DASHBOARD_KEYS.lowStock,
     queryFn: getLowStockProducts,
-    staleTime: 1 * 60 * 1000, // Stock can change quickly
+    staleTime: 5 * 60 * 1000, // Stock can change quickly
     cacheTime: 10 * 60 * 1000
   });
 };
@@ -90,8 +90,8 @@ export const useRecentPayments = (params = { limit: 5 }) => {
   return useQuery({
     queryKey: DASHBOARD_KEYS.recentPayments(params),
     queryFn: () => getRecentPayments(params),
-    staleTime: 30 * 1000, // Payments are live-ish
-    cacheTime: 5 * 60 * 1000
+    staleTime: 5 * 30 * 1000, // Payments are live-ish
+    cacheTime: 10 * 60 * 1000
   });
 };
 

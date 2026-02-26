@@ -4,7 +4,7 @@ import {
   getCategory,
   createCategory,
   updateCategory,
-  deleteCategory,
+  deleteCategory
 } from "@/services/categoryServices";
 
 // ---------------------------------------------
@@ -15,23 +15,23 @@ const QUERY_KEYS = {
   PRODUCTS: "products",
   PRODUCT: "product",
   CATEGORIES: "categories",
-  CATEGORY: "category",
+  CATEGORY: "category"
 };
 
-const useCategories = (type) => {
+const useCategories = type => {
   return useQuery({
     queryKey: [QUERY_KEYS.CATEGORIES, type],
     queryFn: () => getCategories(type),
     staleTime: 10 * 60 * 1000, // longer cache since categories change less frequently
-    cacheTime: 60 * 60 * 1000,
+    cacheTime: 60 * 60 * 1000
   });
 };
 
-const useCategory = (id) => {
+const useCategory = id => {
   return useQuery({
     queryKey: [QUERY_KEYS.CATEGORY, id],
     queryFn: () => getCategory(id),
-    enabled: !!id,
+    enabled: !!id
   });
 };
 
@@ -39,10 +39,10 @@ const useCreateCategory = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (categoryData) => createCategory(categoryData),
+    mutationFn: categoryData => createCategory(categoryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
-    },
+    }
   });
 };
 
@@ -54,7 +54,7 @@ const useUpdateCategory = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORY, id] });
-    },
+    }
   });
 };
 
@@ -62,11 +62,11 @@ const useDeleteCategory = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (categoryId) => deleteCategory(categoryId),
+    mutationFn: categoryId => deleteCategory(categoryId),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
       queryClient.removeQueries({ queryKey: [QUERY_KEYS.CATEGORY, id] });
-    },
+    }
   });
 };
 
@@ -75,15 +75,7 @@ export default {
   useCategory,
   useCreateCategory,
   useUpdateCategory,
-  useDeleteCategory,
-  
+  useDeleteCategory
 };
 
-export {
-  useCategories,
-  useCategory,
-  useCreateCategory,
-  useUpdateCategory,
-  useDeleteCategory,
-  
-};
+export { useCategories, useCategory, useCreateCategory, useUpdateCategory, useDeleteCategory };

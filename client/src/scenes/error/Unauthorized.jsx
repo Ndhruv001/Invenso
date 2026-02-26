@@ -19,14 +19,10 @@ const Unauthorized = () => {
           >
             403
           </h1>
-          <h2
-            className={`text-xl sm:text-2xl md:text-3xl font-semibold ${theme.text.primary}`}
-          >
+          <h2 className={`text-xl sm:text-2xl md:text-3xl font-semibold ${theme.text.primary}`}>
             Access Denied
           </h2>
-          <p
-            className={`${theme.text.secondary} max-w-md mx-auto text-sm sm:text-base`}
-          >
+          <p className={`${theme.text.secondary} max-w-md mx-auto text-sm sm:text-base`}>
             You don't have permission to access this resource.
           </p>
         </div>

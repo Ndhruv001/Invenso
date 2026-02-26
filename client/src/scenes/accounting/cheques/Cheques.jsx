@@ -1,12 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 
-import {
-  useCheques,
-  useUpdateCheque,
-  useDeleteCheque,
-  useCreateCheque
-} from "@/hooks/useCheques"; // Assuming these hooks exist
+import { useCheques, useUpdateCheque, useDeleteCheque, useCreateCheque } from "@/hooks/useCheques"; // Assuming these hooks exist
 
 import { useTableControls } from "@/hooks/useTableControls";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
@@ -33,7 +28,7 @@ function normalizeChequeForModal(cheque) {
   return {
     id: cheque.id ?? undefined,
     amount: cheque.amount ?? 0,
-    ...cheque,
+    ...cheque
   };
 }
 
@@ -43,7 +38,7 @@ const Cheques = () => {
   // Unified table controls
   const { filters, selection, tableState, handlers } = useTableControls({
     FILTER_KEYS,
-    resourceName: "Cheque",
+    resourceName: "Cheque"
   });
 
   const { showSelection, setShowSelection, selectedRows, handleSelectionChange } = selection;
@@ -95,7 +90,7 @@ const Cheques = () => {
   }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
-    (cheque) => {
+    cheque => {
       if (!cheque?.id) return toast.error("Unable to view: missing cheque info");
       openModalWith(cheque, "view");
     },
@@ -103,7 +98,7 @@ const Cheques = () => {
   );
 
   const handleEdit = useCallback(
-    (cheque) => {
+    cheque => {
       if (!cheque?.id) return toast.error("Unable to edit: missing cheque info");
       openModalWith(cheque, "edit");
     },
@@ -168,10 +163,10 @@ const Cheques = () => {
       onConfirm: async () => {
         try {
           const results = await Promise.allSettled(
-            selectedRows.map((c) => deleteChequeMutation.mutateAsync(c.id))
+            selectedRows.map(c => deleteChequeMutation.mutateAsync(c.id))
           );
 
-          const successCount = results.filter((r) => r.status === "fulfilled").length;
+          const successCount = results.filter(r => r.status === "fulfilled").length;
           const failedCount = results.length - successCount;
 
           if (successCount > 0) {
@@ -186,7 +181,7 @@ const Cheques = () => {
         } catch (err) {
           toast.error(err?.message || "Unexpected error during deletion");
         }
-      },
+      }
     });
   }, [selectedRows, deleteChequeMutation, openDialog, handleSelectionChange, refetch]);
 
@@ -214,12 +209,12 @@ const Cheques = () => {
         actions={["edit", "delete", "print", "download"]}
         selectionOpen={showSelection}
         selectedCount={selectedRows?.length}
-        onToggleSelection={() => setShowSelection((prev) => !prev)}
+        onToggleSelection={() => setShowSelection(prev => !prev)}
         handlers={{
           edit: () => handleEdit(selectedRows?.[0]),
           delete: handleDelete,
           print: null,
-          download: null,
+          download: null
         }}
       />
 

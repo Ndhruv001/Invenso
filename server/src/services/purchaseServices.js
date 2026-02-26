@@ -316,9 +316,9 @@ async function createPurchase(data, userId = null) {
           type: "PAID",
           amount: Number(paidAmount),
           referenceType: "PURCHASE",
-          purchaseId: purchase.id,
+          referenceId: parseInt(purchase.id),
           paymentMode,
-          paymentReference,
+          paymentReference: `Received for Purchase: ${purchase.id}`,
           remark: remarks
         }
       });
@@ -374,7 +374,6 @@ async function updatePurchase(purchaseId, data, userId = null) {
     if (data.invoiceNumber !== undefined) {
       purchaseUpdateData.invoiceNumber = Number(data.invoiceNumber);
     }
-
     if (data.paidAmount !== undefined) {
       purchaseUpdateData.paidAmount = Number(data.paidAmount);
     }
@@ -637,6 +636,48 @@ async function updatePurchase(purchaseId, data, userId = null) {
           data: { currentBalance: { increment: payableDiff } }
         });
       }
+    }
+
+    /* -------------------- Payment Handling -------------------- */
+
+    const existingPayment = await tx.payment.findFirst({
+      where: {
+        referenceType: "PURCHASE",
+        referenceId: parseInt(purchaseId)
+      }
+    });
+
+    if (newPaid > 0) {
+      const paymentData = {
+        partyId: newPartyId, // always follow updated party
+        amount: newPaid,
+        paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
+        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
+        remark: data.remark ?? existingPayment?.remark ?? null
+      };
+
+      if (existingPayment) {
+        // Update existing payment
+        await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: paymentData
+        });
+      } else {
+        // Create new payment
+        await tx.payment.create({
+          data: {
+            ...paymentData,
+            type: "PAID",
+            referenceType: "PURCHASE",
+            referenceId: parseInt(purchaseId)
+          }
+        });
+      }
+    } else if (existingPayment) {
+      // If received amount becomes 0 → delete payment
+      await tx.payment.delete({
+        where: { id: existingPayment.id }
+      });
     }
 
     /* ------------------------------

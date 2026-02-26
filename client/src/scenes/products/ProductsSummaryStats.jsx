@@ -6,6 +6,7 @@
 import React from "react";
 import { Package, Layers, Hash, DollarSign } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 /**
  * @typedef {Object} ProductsSummaryStatsProps
@@ -47,12 +48,12 @@ const ProductsSummaryStats = ({ stats }) => {
     },
     {
       title: "Total Stock Value",
-      value: stats?.totalStockValue?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.totalStockValue) ?? 0,
       subtitle: "Inventory worth (₹)",
       icon: DollarSign,
       color: "danger"
     }
-  ]; 
+  ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

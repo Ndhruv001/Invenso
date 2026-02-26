@@ -11,12 +11,11 @@ import { useTableControls } from "@/hooks/useTableControls";
 const FILTER_KEYS = []; // None
 
 const AuditLogs = () => {
-
   const { theme } = useTheme();
   // Table controls (pagination/sorting only)
   const { tableState, handlers, filters } = useTableControls({
     FILTER_KEYS,
-    resourceName: "AuditLog",
+    resourceName: "AuditLog"
   });
   const { pagination, sorting } = tableState;
   const { handlePaginationChange, handleSortingChange } = handlers;

@@ -1,5 +1,5 @@
 // src/hooks/useConfirmationDialog.js
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 function useConfirmationDialog() {
   const [dialogConfig, setDialogConfig] = useState({ isOpen: false });
@@ -19,7 +19,7 @@ function useConfirmationDialog() {
           console.error("Confirmation action failed:", error);
           setDialogConfig(prev => ({ ...prev, isLoading: false })); // Stop loading on error
         }
-      },
+      }
     });
   }, []);
 

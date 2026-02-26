@@ -93,42 +93,50 @@ async function listSales({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [sales, totalRows, groupedParties, aggregates] = await prisma.$transaction([
-    prisma.sale.findMany({
-      where,
-      skip,
-      take,
-      orderBy,
-      include: {
-        party: true,
-        saleItems: {
-          include: {
-            product: {
-              include: { category: true }
+  const [sales, totalRows, groupedParties, aggregates, paymentReceived] = await prisma.$transaction(
+    [
+      prisma.sale.findMany({
+        where,
+        skip,
+        take,
+        orderBy,
+        include: {
+          party: true,
+          saleItems: {
+            include: {
+              product: {
+                include: { category: true }
+              }
             }
           }
         }
-      }
-    }),
+      }),
 
-    prisma.sale.count({ where }),
+      prisma.sale.count({ where }),
 
-    prisma.sale.groupBy({
-      by: ["partyId"],
-      where
-    }),
+      prisma.sale.groupBy({
+        by: ["partyId"],
+        where
+      }),
 
-    prisma.sale.aggregate({
-      where,
-      _sum: {
-        totalAmount: true,
-        totalGstAmount: true,
-        totalTaxableAmount: true,
-        receivedAmount: true,
-        totalProfit: true
-      }
-    })
-  ]);
+      prisma.sale.aggregate({
+        where,
+        _sum: {
+          totalAmount: true,
+          totalGstAmount: true,
+          totalTaxableAmount: true,
+          receivedAmount: true,
+          totalProfit: true
+        }
+      }),
+      prisma.payment.aggregate({
+        where: { referenceType: "SALE" },
+        _sum: {
+          amount: true
+        }
+      })
+    ]
+  );
 
   /* -------------------- Stats -------------------- */
 
@@ -138,7 +146,8 @@ async function listSales({
     sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
     sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
     sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalReceived: Number(aggregates._sum.receivedAmount) || 0,
+    sumTotalReceived:
+      (Number(aggregates?._sum?.receivedAmount) || 0) + (Number(paymentReceived._sum?.amount) || 0),
     sumTotalProfit: Number(aggregates._sum.totalProfit) || 0
   };
 
@@ -329,9 +338,9 @@ async function createSale(data, userId = null) {
           type: "RECEIVED",
           amount: Number(receivedAmount),
           referenceType: "SALE",
-          saleId: sale.id,
+          referenceId: parseInt(sale.id),
           paymentMode,
-          paymentReference,
+          paymentReference: `Received for Sale: ${sale.id}`,
           remark: remarks
         }
       });
@@ -386,7 +395,7 @@ async function updateSale(saleId, data, userId = null) {
     }
 
     if (data.receivedAmount !== undefined) {
-      saleUpdateData.receivedAmount = Number(data.receivedAmount);
+      saleUpdateData.receivedAmount = data.receivedAmount;
     }
 
     if (data.paymentMode !== undefined) {
@@ -655,6 +664,48 @@ async function updateSale(saleId, data, userId = null) {
           data: { currentBalance: { decrement: receivableDiff } }
         });
       }
+    }
+
+    /* -------------------- Payment Handling -------------------- */
+
+    const existingPayment = await tx.payment.findFirst({
+      where: {
+        referenceType: "SALE",
+        referenceId: parseInt(saleId)
+      }
+    });
+
+    if (newReceived > 0) {
+      const paymentData = {
+        partyId: newPartyId, // always follow updated party
+        amount: newReceived,
+        paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
+        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
+        remark: data.remark ?? existingPayment?.remark ?? null
+      };
+
+      if (existingPayment) {
+        // Update existing payment
+        await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: paymentData
+        });
+      } else {
+        // Create new payment
+        await tx.payment.create({
+          data: {
+            ...paymentData,
+            type: "RECEIVED",
+            referenceType: "SALE",
+            referenceId: parseInt(saleId)
+          }
+        });
+      }
+    } else if (existingPayment) {
+      // If received amount becomes 0 → delete payment
+      await tx.payment.delete({
+        where: { id: existingPayment.id }
+      });
     }
 
     /* ------------------------------

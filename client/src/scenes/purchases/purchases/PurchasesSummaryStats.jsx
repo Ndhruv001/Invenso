@@ -6,6 +6,7 @@
 import React from "react";
 import { Users, CreditCard, DollarSign, FileText } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 /**
  * @typedef {Object} PurchasesSummaryStatsProps
@@ -33,21 +34,21 @@ const PurchasesSummaryStats = ({ stats }) => {
     },
     {
       title: "Total Purchase Amount",
-      value: stats?.sumTotalAmount?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.sumTotalAmount) ?? 0,
       subtitle: "Overall purchase value (₹)",
       icon: FileText,
       color: "primary"
     },
     {
       title: "Total GST",
-      value: stats?.sumTotalGst?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.sumTotalGst) ?? 0,
       subtitle: "Total GST paid (₹)",
       icon: DollarSign,
       color: "warning"
     },
     {
       title: "Total Paid Amount",
-      value: stats?.sumTotalPaid?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.sumTotalPaid) ?? 0,
       subtitle: "Total amount paid (₹)",
       icon: CreditCard,
       color: "info"

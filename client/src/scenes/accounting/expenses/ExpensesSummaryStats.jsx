@@ -6,6 +6,7 @@
 import React from "react";
 import { Layers, DollarSign } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 /**
  * @typedef {Object} ExpensesSummaryStatsProps
@@ -24,18 +25,18 @@ const ExpensesSummaryStats = ({ stats }) => {
   const items = [
     {
       title: "Total Expenses",
-      value: stats?.totalAmount ?? 0,
+      value: formatCurrency(stats?.totalAmount) ?? 0,
       subtitle: "Sum of all expenses",
       icon: DollarSign,
-      color: "danger",
+      color: "danger"
     },
     {
       title: "Expense Categories",
       value: stats?.totalCategories ?? 0,
       subtitle: "Distinct categories",
       icon: Layers,
-      color: "default",
-    },
+      color: "default"
+    }
   ];
 
   return (

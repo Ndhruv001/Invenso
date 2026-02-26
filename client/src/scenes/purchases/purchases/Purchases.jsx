@@ -81,21 +81,21 @@ const Purchases = () => {
     setModalMode(mode);
   }, []);
 
-    // ---------------------------
-    // UIAction (CREATE only)
-    // ---------------------------
-    const { action, clearAction } = useUIAction();
-  
-    useEffect(() => {
-      if (!action) return;
-  
-      if (action.resource !== "purchase") return;
-  
-      if (action.type === "CREATE") {
-        openModalWith({}, "create");
-        clearAction();
-      }
-    }, [action, openModalWith, clearAction]);
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "purchase") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
     purchase => {
@@ -195,48 +195,46 @@ const Purchases = () => {
     });
   }, [selectedRows, deletePurchaseMutation, openDialog, handleSelectionChange, refetch]);
 
+  const handleDownload = useCallback(() => {
+    if (!selectedRows?.length) {
+      toast.error("No purchases selected");
+      return;
+    }
 
-   const handleDownload = useCallback(() => {
-      if (!selectedRows?.length) {
-        toast.error("No purchases selected");
-        return;
-      }
-  
-      openDialog({
-        title: "Download Selected Invoices",
-        message: `Download invoice for ${selectedRows.length} purchase(s)?`,
-        onConfirm: async () => {
-          try {
-            const results = await Promise.allSettled(
-              selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
-            );
-  
-            const successCount = results.filter(r => r.status === "fulfilled").length;
-  
-            const failedCount = results.length - successCount;
-  
-            if (successCount > 0) {
-              toast.success(`${successCount} invoice(s) downloaded successfully`);
-            }
-  
-            if (failedCount > 0) {
-              toast.error(`${failedCount} invoice(s) failed to download`);
-            }
-          } catch (err) {
-            toast.error(err?.message || "Unexpected error during download");
+    openDialog({
+      title: "Download Selected Invoices",
+      message: `Download invoice for ${selectedRows.length} purchase(s)?`,
+      onConfirm: async () => {
+        try {
+          const results = await Promise.allSettled(
+            selectedRows.map(s => downloadInvoiceMutation.mutateAsync(s.id))
+          );
+
+          const successCount = results.filter(r => r.status === "fulfilled").length;
+
+          const failedCount = results.length - successCount;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} invoice(s) downloaded successfully`);
           }
+
+          if (failedCount > 0) {
+            toast.error(`${failedCount} invoice(s) failed to download`);
+          }
+        } catch (err) {
+          toast.error(err?.message || "Unexpected error during download");
         }
-      });
-    }, [selectedRows, downloadInvoiceMutation, openDialog]);
-  
-    const handlePrint = purchaseId => {
-      if (!purchaseId) return;
-  
-      const url = `${import.meta.env.VITE_API_BASE_URL}/purchases/print/invoice/${purchaseId}`;
-  
-      window.open(url, "_blank");
-    };
-  
+      }
+    });
+  }, [selectedRows, downloadInvoiceMutation, openDialog]);
+
+  const handlePrint = purchaseId => {
+    if (!purchaseId) return;
+
+    const url = `${import.meta.env.VITE_API_BASE_URL}/purchases/print/invoice/${purchaseId}`;
+
+    window.open(url, "_blank");
+  };
 
   // Memoized column definitions
   const columns = useMemo(() => Columns(showSelection), [showSelection]);

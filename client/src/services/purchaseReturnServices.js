@@ -113,16 +113,13 @@ export const deletePurchaseReturn = async id => {
 };
 
 // Download Sale Invoice PDF
-export const downloadPurchaseReturnInvoicePdf = async (id) => {
+export const downloadPurchaseReturnInvoicePdf = async id => {
   if (!id) throw new Error("Purchase return ID is required");
 
   try {
-    const response = await axiosInstance.get(
-      `/purchase-returns/download/invoice/${id}`,
-      {
-        responseType: "blob" // 🔥 IMPORTANT for file download
-      }
-    );
+    const response = await axiosInstance.get(`/purchase-returns/download/invoice/${id}`, {
+      responseType: "blob" // 🔥 IMPORTANT for file download
+    });
 
     return response; // returns Blob
   } catch (error) {

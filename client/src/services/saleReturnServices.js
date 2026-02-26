@@ -9,10 +9,7 @@ import axiosInstance from "@/lib/config/axiosInstance";
 // Helper for error handling
 const handleAxiosError = (error, defaultMsg) => {
   const message =
-    error.response?.data?.message ||
-    error.response?.data?.error ||
-    error.message ||
-    defaultMsg;
+    error.response?.data?.message || error.response?.data?.error || error.message || defaultMsg;
 
   console.error(defaultMsg, error);
   throw new Error(message);
@@ -116,16 +113,13 @@ export const deleteSaleReturn = async id => {
 };
 
 // Download Sale Invoice PDF
-export const downloadSaleReturnInvoicePdf = async (id) => {
+export const downloadSaleReturnInvoicePdf = async id => {
   if (!id) throw new Error("Sale return ID is required");
 
   try {
-    const response = await axiosInstance.get(
-      `/sale-returns/download/invoice/${id}`,
-      {
-        responseType: "blob" // 🔥 IMPORTANT for file download
-      }
-    );
+    const response = await axiosInstance.get(`/sale-returns/download/invoice/${id}`, {
+      responseType: "blob" // 🔥 IMPORTANT for file download
+    });
 
     return response; // returns Blob
   } catch (error) {

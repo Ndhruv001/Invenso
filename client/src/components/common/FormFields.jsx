@@ -37,7 +37,7 @@ export const TextField = React.memo(
     inputProps = {},
     errors = {},
     register,
-    mode,// "view" | "edit" | "create"
+    mode, // "view" | "edit" | "create"
     initialData,
     isDisabled = false,
     readOnly = false,
@@ -102,7 +102,7 @@ export const TextAreaField = React.memo(
     required = false,
     errors,
     register,
-    mode,// "view" | "edit" | "create"
+    mode, // "view" | "edit" | "create"
     initialData,
     isDisabled,
     theme
@@ -134,7 +134,9 @@ export const TextAreaField = React.memo(
                   : theme.border
             } ${theme.text.primary} ${theme.bg} placeholder:${theme.text.muted}
               outline-none transition-all ${
-                mode === "edit" && !isDisabled ? "focus:border-blue-500 cursor-text" : "cursor-default"
+                mode === "edit" && !isDisabled
+                  ? "focus:border-blue-500 cursor-text"
+                  : "cursor-default"
               }`}
           />
         </div>
@@ -155,7 +157,7 @@ export const SelectField = React.memo(
     placeholder = "Select",
     errors,
     register,
-    mode,// "view" | "edit" | "create"
+    mode, // "view" | "edit" | "create"
     isDisabled,
     initialData,
     theme
@@ -192,7 +194,9 @@ export const SelectField = React.memo(
                   : "cursor-default"
               }`}
           >
-            <option value="">{mode === "view" && initialData ? "Not Specified" : placeholder}</option>
+            <option value="">
+              {mode === "view" && initialData ? "Not Specified" : placeholder}
+            </option>
             {options?.map(opt =>
               typeof opt === "string" ? (
                 <option key={opt} value={opt}>

@@ -30,10 +30,7 @@ export const usePurchaseReturns = (filters = {}) => {
     queryKey: PURCHASE_RETURN_KEYS.list(filters),
     queryFn: () => {
       return getPurchaseReturns(filters);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    keepPreviousData: true
+    }
   });
 };
 
@@ -41,9 +38,7 @@ export const usePurchaseReturn = id =>
   useQuery({
     queryKey: PURCHASE_RETURN_KEYS.detail(id),
     queryFn: () => getPurchaseReturn(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000
+    enabled: !!id
   });
 
 // --------------------------------------------------
@@ -58,6 +53,9 @@ export const useCreatePurchaseReturn = () => {
       queryClient.invalidateQueries({
         queryKey: PURCHASE_RETURN_KEYS.all
       });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -75,6 +73,9 @@ export const useUpdatePurchaseReturn = () => {
       queryClient.invalidateQueries({
         queryKey: PURCHASE_RETURN_KEYS.detail(id)
       });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -92,6 +93,9 @@ export const useDeletePurchaseReturn = () => {
       queryClient.invalidateQueries({
         queryKey: PURCHASE_RETURN_KEYS.detail(id)
       });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -116,7 +120,6 @@ export const useDownloadPurchaseReturnInvoice = () => {
     }
   });
 };
-
 
 // --------------------------------------------------
 // Default export

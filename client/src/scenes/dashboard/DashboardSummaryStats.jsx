@@ -19,6 +19,7 @@ import StatCard from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/helpers/formatters";
 
 const DashboardSummaryStats = ({ stats }) => {
+  console.log("🚀 ~ DashboardSummaryStats ~ stats:", stats);
   const items = [
     {
       title: "Total Sales",
@@ -57,7 +58,7 @@ const DashboardSummaryStats = ({ stats }) => {
       color: "orange"
     },
     {
-      title: "Cash Received",
+      title: "Received",
       value: formatCurrency(stats?.received?.today ?? 0),
       secondaryValue: formatCurrency(stats?.received?.thisMonth ?? 0),
       secondaryLabel: "This Month",
@@ -66,7 +67,7 @@ const DashboardSummaryStats = ({ stats }) => {
       color: "info"
     },
     {
-      title: "Cash Paid",
+      title: "Paid",
       value: formatCurrency(stats?.paid?.today ?? 0),
       secondaryValue: formatCurrency(stats?.paid?.thisMonth ?? 0),
       secondaryLabel: "This Month",
@@ -75,19 +76,15 @@ const DashboardSummaryStats = ({ stats }) => {
       color: "red"
     },
     {
-      title: "Receivables",
-      value: formatCurrency(stats?.receivables?.allTime ?? 0),
-      secondaryValue: formatCurrency(stats?.receivables?.thisMonth ?? 0),
-      secondaryLabel: "This Month",
+      title: "Total Receivables",
+      value: formatCurrency(stats?.receivables?.total ?? 0),
       subtitle: "Amount to be received",
       icon: Wallet,
       color: "success"
     },
     {
-      title: "Payables",
-      value: formatCurrency(stats?.payables?.allTime ?? 0),
-      secondaryValue: formatCurrency(stats?.payables?.thisMonth ?? 0),
-      secondaryLabel: "This Month",
+      title: "Total Payables",
+      value: formatCurrency(stats?.payables?.total ?? 0),
       subtitle: "Amount to be paid",
       icon: CreditCard,
       color: "danger"

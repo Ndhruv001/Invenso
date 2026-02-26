@@ -17,10 +17,7 @@ const stockAdjustmentCreateSchema = Yup.object({
     .oneOf(INVENTORY_LOG_TYPES, "Invalid adjustment type")
     .required("Adjustment type is required"),
 
-  reason: Yup.string()
-    .trim()
-    .nullable()
-    .max(500, "Reason must be less than 500 characters"),
+  reason: Yup.string().trim().nullable().max(500, "Reason must be less than 500 characters")
 }).noUnknown(true);
 
 export { stockAdjustmentCreateSchema };

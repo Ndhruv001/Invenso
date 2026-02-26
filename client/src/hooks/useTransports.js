@@ -4,7 +4,7 @@ import {
   getTransport,
   createTransport,
   updateTransport,
-  deleteTransport,
+  deleteTransport
 } from "@/services/transportServices";
 
 /**
@@ -14,26 +14,21 @@ import {
 export const TRANSPORT_KEYS = {
   all: ["transports"],
   list: (filters = {}) => ["transports", "list", filters],
-  detail: (id) => ["transports", "detail", id],
+  detail: id => ["transports", "detail", id]
 };
 
 // QUERIES
 export const useTransports = (filters = {}) =>
   useQuery({
     queryKey: TRANSPORT_KEYS.list(filters),
-    queryFn: () => getTransports(filters),
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
-    keepPreviousData: true,
+    queryFn: () => getTransports(filters)
   });
 
-export const useTransport = (id) =>
+export const useTransport = id =>
   useQuery({
     queryKey: TRANSPORT_KEYS.detail(id),
     queryFn: () => getTransport(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
+    enabled: !!id
   });
 
 // MUTATIONS
@@ -44,7 +39,10 @@ export const useCreateTransport = () => {
     mutationFn: createTransport,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TRANSPORT_KEYS.all });
-    },
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
+    }
   });
 };
 
@@ -56,7 +54,10 @@ export const useUpdateTransport = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: TRANSPORT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: TRANSPORT_KEYS.detail(id) });
-    },
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
+    }
   });
 };
 
@@ -64,11 +65,14 @@ export const useDeleteTransport = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: ["delete-transport"],
-    mutationFn: (id) => deleteTransport(id),
+    mutationFn: id => deleteTransport(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: TRANSPORT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: TRANSPORT_KEYS.detail(id) });
-    },
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
+    }
   });
 };
 
@@ -78,5 +82,5 @@ export default {
   useTransport,
   useCreateTransport,
   useUpdateTransport,
-  useDeleteTransport,
+  useDeleteTransport
 };

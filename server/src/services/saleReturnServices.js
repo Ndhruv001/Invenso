@@ -348,9 +348,9 @@ async function createSaleReturn(data, userId = null) {
           type: "PAID",
           amount: Number(paidAmount),
           referenceType: "SALE_RETURN",
-          saleReturnId: saleReturn.id,
+          referenceId: parseInt(saleReturn.id),
           paymentMode,
-          paymentReference,
+          paymentReference: `Received for Sale Return: ${saleReturn.id}`,
           remark: reason
         }
       });
@@ -403,9 +403,8 @@ async function updateSaleReturn(saleReturnId, data, userId = null) {
     if (data.saleId !== undefined) {
       saleReturnUpdateData.saleId = data.saleId;
     }
-
     if (data.paidAmount !== undefined) {
-      saleReturnUpdateData.paidAmount = Number(data.paidAmount);
+      saleReturnUpdateData.paidAmount = data.paidAmount;
     }
 
     if (data.paymentMode !== undefined) {
@@ -665,6 +664,48 @@ async function updateSaleReturn(saleReturnId, data, userId = null) {
           data: { currentBalance: { increment: reductionDiff } }
         });
       }
+    }
+
+    /* -------------------- Payment Handling -------------------- */
+
+    const existingPayment = await tx.payment.findFirst({
+      where: {
+        referenceType: "SALE_RETURN",
+        referenceId: parseInt(saleReturnId)
+      }
+    });
+
+    if (newPaid > 0) {
+      const paymentData = {
+        partyId: newPartyId, // always follow updated party
+        amount: newPaid,
+        paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
+        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
+        remark: data.remark ?? existingPayment?.remark ?? null
+      };
+
+      if (existingPayment) {
+        // Update existing payment
+        await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: paymentData
+        });
+      } else {
+        // Create new payment
+        await tx.payment.create({
+          data: {
+            ...paymentData,
+            type: "PAID",
+            referenceType: "SALE_RETURN",
+            referenceId: parseInt(saleReturnId)
+          }
+        });
+      }
+    } else if (existingPayment) {
+      // If received amount becomes 0 → delete payment
+      await tx.payment.delete({
+        where: { id: existingPayment.id }
+      });
     }
 
     /* ------------------------------

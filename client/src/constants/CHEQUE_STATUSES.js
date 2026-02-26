@@ -4,12 +4,12 @@ export const CHEQUE_STATUSES = [
   "CLEARED",
   "BOUNCED",
   "ISSUED",
-  "ENCASHED",
+  "ENCASHED"
 ];
 
 export const CHEQUE_STATUS_OPTIONS = CHEQUE_STATUSES.map(v => ({
   value: v,
-  label: v.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+  label: v.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }));
 
 export default CHEQUE_STATUSES;

@@ -11,11 +11,7 @@ const LoadingPage = ({ message = "Loading...", fullscreen = true }) => {
     : `flex items-center space-x-3`;
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`${containerClass}`}
-    >
+    <div role="status" aria-live="polite" className={`${containerClass}`}>
       <div
         className={`inline-flex items-center ${theme.card} ${theme.border} rounded-lg p-4 shadow-sm`}
         style={{ gap: "0.75rem" }}
@@ -31,4 +27,4 @@ const LoadingPage = ({ message = "Loading...", fullscreen = true }) => {
 };
 
 export default LoadingPage;
-export {LoadingPage}
+export { LoadingPage };

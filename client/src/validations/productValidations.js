@@ -15,14 +15,9 @@ const productCreateSchema = Yup.object({
     .positive("Category must be valid")
     .required("Category is required"),
 
-  hsnCode: Yup.string()
-    .trim()
-    .nullable()
-    .max(20, "HSN code must be less than 20 characters"),
+  hsnCode: Yup.string().trim().nullable().max(20, "HSN code must be less than 20 characters"),
 
-  unit: Yup.string()
-    .oneOf(UNIT_TYPES, "Invalid unit type")
-    .required("Unit is required"),
+  unit: Yup.string().oneOf(UNIT_TYPES, "Invalid unit type").required("Unit is required"),
 
   openingStock: Yup.number()
     .transform((value, originalValue) =>
@@ -43,7 +38,7 @@ const productCreateSchema = Yup.object({
   description: Yup.string()
     .trim()
     .nullable()
-    .max(500, "Description must be less than 500 characters"),
+    .max(500, "Description must be less than 500 characters")
 }).noUnknown(true);
 
 const productUpdateSchema = Yup.object({
@@ -64,9 +59,7 @@ const productUpdateSchema = Yup.object({
     .max(20, "HSN code must be less than 20 characters")
     .notRequired(),
 
-  unit: Yup.string()
-    .oneOf(UNIT_TYPES, "Invalid unit type")
-    .notRequired(),
+  unit: Yup.string().oneOf(UNIT_TYPES, "Invalid unit type").notRequired(),
 
   openingStock: Yup.number()
     .transform((value, originalValue) =>
@@ -88,7 +81,7 @@ const productUpdateSchema = Yup.object({
     .trim()
     .nullable()
     .max(500, "Description must be less than 500 characters")
-    .notRequired(),
+    .notRequired()
 }).noUnknown(true);
 
 export { productCreateSchema, productUpdateSchema };

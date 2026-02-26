@@ -31,19 +31,13 @@ export const PRODUCT_KEYS = {
 export const useHsnCodes = () =>
   useQuery({
     queryKey: PRODUCT_KEYS.list("hsn-codes"),
-    queryFn: () => getHsnCodes(),
-    staleTime: 5 * 60 * 1000, // 5 mins fresh cache
-    cacheTime: 30 * 60 * 1000, // 30 mins kept in memory
-    keepPreviousData: true // Prevent flicker during pagination/filtering
+    queryFn: () => getHsnCodes()
   });
 
 export const useProducts = (filters = {}) => {
   return useQuery({
     queryKey: PRODUCT_KEYS.list(filters),
-    queryFn: () => getProducts(filters),
-    staleTime: 5 * 60 * 1000, // 5 mins fresh cache
-    cacheTime: 30 * 60 * 1000, // 30 mins kept in memory
-    keepPreviousData: true // Prevent flicker during pagination/filtering
+    queryFn: () => getProducts(filters)
   });
 };
 
@@ -51,9 +45,7 @@ export const useProduct = id =>
   useQuery({
     queryKey: PRODUCT_KEYS.detail(id),
     queryFn: () => getProduct(id),
-    enabled: !!id, // Only fetch if ID is provided
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000
+    enabled: !!id // Only fetch if ID is provided
   });
 
 // --------------------------------------------------
@@ -104,7 +96,7 @@ export const useProductSuggestions = (query, partyId, type = "sale") => {
     queryKey: ["product-suggestions", query, partyId, type],
     queryFn: () => suggestProducts(query, partyId, type),
     enabled: !!query && query.length >= 2, // ⬅ important
-    staleTime: 60 * 1000
+    staleTime: 30 * 60 * 1000
   });
 };
 
@@ -117,5 +109,5 @@ export default {
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
-  useProductSuggestions,
+  useProductSuggestions
 };

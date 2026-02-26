@@ -27,16 +27,16 @@ const handleAxiosError = (error, defaultMsg) => {
  * @returns {Promise<Object>} Paginated { data, pagination, stats }
  */
 
-  // ---------------------- GET: All Categories ----------------------
-  export const getHsnCodes = async () => {
-    try {
-      const response = await axiosInstance.get("/products/hsn-codes");
-      return response.data;
-    } catch (error) {
-      console.error("Failed to fetch categories:", error);
-      throw new Error(error.message || "Failed to fetch categories");
-    }
-  };
+// ---------------------- GET: All Categories ----------------------
+export const getHsnCodes = async () => {
+  try {
+    const response = await axiosInstance.get("/products/hsn-codes");
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    throw new Error(error.message || "Failed to fetch categories");
+  }
+};
 
 export const getProducts = async (filters = {}) => {
   try {
@@ -142,7 +142,7 @@ export const suggestProducts = async (query, partyId, type = "sale") => {
 
   try {
     const { data } = await axiosInstance.get(`/products/suggest`, {
-      params: { q: query, partyId, type },
+      params: { q: query, partyId, type }
     });
     return data;
   } catch (error) {
@@ -157,7 +157,7 @@ export const productsApi = {
   getProduct,
   createProduct,
   updateProduct,
-  deleteProduct,
+  deleteProduct
 };
 
 export default productsApi;

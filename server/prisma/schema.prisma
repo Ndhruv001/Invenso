@@ -101,13 +101,6 @@ enum CategoryType {
   EXPENSE
 }
 
-enum TransactionStatus {
-  PAID
-  PARTIAL
-  UNPAID
-  CANCELLED
-  DRAFT
-}
 
 enum ChequeType {
   INWARD
@@ -154,6 +147,7 @@ model Category {
   expenses Expense[]
 
   @@map("categories")
+  @@index([type])
 }
 
 model Product {
@@ -181,6 +175,7 @@ model Product {
 
   @@unique([name, categoryId])
   @@map("products")
+  @@index([name])
 }
 
 model Party {
@@ -207,6 +202,8 @@ model Party {
   cheques        Cheque[]
 
   @@map("parties")
+  @@index([name])
+  @@index([type])
 }
 
 model Purchase {
@@ -224,13 +221,17 @@ model Purchase {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  party           Party             @relation(fields: [partyId], references: [id])
+  party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   purchaseItems   PurchaseItem[]
   purchaseReturns PurchaseReturn[]
-  payments       Payment[]          @relation("PurchasePayments")
+  payments       Payment[]          @relation("PurchasePayments",)
   inventoryLogs  InventoryLog[]     @relation("PurchaseInventoryLogs")
 
   @@map("purchases")
+  @@index([partyId])
+@@index([date])
+@@index([createdAt])
+@@index([invoiceNumber])
 }
 
 model PurchaseItem {
@@ -247,9 +248,11 @@ model PurchaseItem {
   updatedAt     DateTime      @updatedAt
 
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product  Product  @relation(fields: [productId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@map("purchase_items")
+  @@index([purchaseId])
+@@index([productId])
 }
 
 model PurchaseReturn {
@@ -267,13 +270,17 @@ model PurchaseReturn {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  party           Party             @relation(fields: [partyId], references: [id])
+  party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   purchase        Purchase?         @relation(fields: [purchaseId], references: [id])
   purchaseReturnItems PurchaseReturnItem[]
   payments        Payment[]          @relation("PurchaseReturnPayments")
   inventoryLogs   InventoryLog[]     @relation("PurchaseReturnInventoryLogs")
 
   @@map("purchase_returns")
+  @@index([partyId])
+@@index([date])
+@@index([createdAt])
+@@index([purchaseId])
 }
 
 model PurchaseReturnItem {
@@ -290,9 +297,11 @@ model PurchaseReturnItem {
   updatedAt     DateTime      @updatedAt
 
   purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
-  product     Product          @relation(fields: [productId], references: [id])
+  product     Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@map("purchase_return_items")
+  @@index([purchaseReturnId])
+@@index([productId])
 }
 
 model Sale {
@@ -315,13 +324,17 @@ model Sale {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  party         Party             @relation(fields: [partyId], references: [id])
+  party         Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   saleItems    SaleItem[]
   saleReturns SaleReturn[]
   payments    Payment[]          @relation("SalePayments")
   inventoryLogs InventoryLog[]   @relation("SaleInventoryLogs")
 
   @@map("sales")
+  @@index([partyId])
+@@index([date])
+@@index([createdAt])
+@@index([invoiceNumber])
 }
 
 model SaleItem {
@@ -339,9 +352,11 @@ model SaleItem {
   updatedAt     DateTime      @updatedAt
 
   sale      Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product   Product       @relation(fields: [productId], references: [id])
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@map("sale_items")
+  @@index([saleId])
+@@index([productId])
 }
 
 model SaleReturn {
@@ -364,13 +379,17 @@ model SaleReturn {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  party           Party             @relation(fields: [partyId], references: [id])
+  party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   sale            Sale              @relation(fields: [saleId], references: [id])
   saleReturnItems SaleReturnItem[]
   payments       Payment[]          @relation("SaleReturnPayments")
   inventoryLogs  InventoryLog[]     @relation("SaleReturnInventoryLogs")
 
   @@map("sale_returns")
+  @@index([partyId])
+@@index([date])
+@@index([createdAt])
+@@index([saleId])
 }
 
 model SaleReturnItem {
@@ -388,9 +407,11 @@ model SaleReturnItem {
   updatedAt    DateTime       @updatedAt
 
   saleReturn SaleReturn        @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
-  product    Product           @relation(fields: [productId], references: [id])
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@map("sale_return_items")
+  @@index([saleReturnId])
+@@index([productId])
 }
 
 model Payment {
@@ -401,29 +422,20 @@ model Payment {
   amount           Decimal              @db.Decimal(15, 2)
   paymentReference String?
   remark           String?
+  referenceId      Int?
   referenceType    PaymentReferenceType
   paymentMode      PaymentMode          @default(CASH)
-  
-  // Separate foreign keys for each reference type
-  purchaseId       Int?
-  saleId           Int?
-  purchaseReturnId Int?
-  saleReturnId     Int?
-  transportId      Int?
-  chequeId         Int?
   
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
-  party           Party?             @relation(fields: [partyId], references: [id])
-  purchase        Purchase?          @relation("PurchasePayments", fields: [purchaseId], references: [id])
-  sale            Sale?              @relation("SalePayments", fields: [saleId], references: [id])
-  purchaseReturn  PurchaseReturn?    @relation("PurchaseReturnPayments", fields: [purchaseReturnId], references: [id])
-  saleReturn      SaleReturn?        @relation("SaleReturnPayments", fields: [saleReturnId], references: [id])
-  transport       Transport?         @relation("TransportPayments", fields: [transportId], references: [id])
-  cheque          Cheque?            @relation("ChequePayments", fields: [chequeId], references: [id])
+  party           Party?             @relation(fields: [partyId], references: [id], onDelete: Restrict)
 
   @@map("payments")
+  @@index([partyId])
+@@index([date])
+@@index([referenceType])
+@@index([referenceId])
 }
 
 model Expense {
@@ -440,6 +452,7 @@ model Expense {
   category        Category          @relation(fields: [categoryId], references: [id])
 
   @@map("expenses")
+  @@index([date])
 }
 
 model Transport {
@@ -458,11 +471,15 @@ model Transport {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  party           Party             @relation("TransportParty", fields: [partyId], references: [id])
-  driver          Party             @relation("TransportDriver", fields: [driverId], references: [id])
+  party           Party             @relation("TransportParty", fields: [partyId], references: [id], onDelete: Restrict)
+  driver          Party             @relation("TransportDriver", fields: [driverId], references: [id], onDelete: Restrict)
   payments        Payment[]         @relation("TransportPayments")
 
   @@map("transports")
+  @@index([partyId])
+  @@index([date])
+  @@index([driverId])
+  @@index([createdAt])
 }
 
 model InventoryLog {
@@ -482,12 +499,16 @@ model InventoryLog {
   saleReturnId     Int?
 
   product         Product         @relation(fields: [productId], references: [id])
-  purchase        Purchase?       @relation("PurchaseInventoryLogs", fields: [purchaseId], references: [id])
-  sale            Sale?           @relation("SaleInventoryLogs", fields: [saleId], references: [id])
-  purchaseReturn  PurchaseReturn? @relation("PurchaseReturnInventoryLogs", fields: [purchaseReturnId], references: [id])
-  saleReturn      SaleReturn?     @relation("SaleReturnInventoryLogs", fields: [saleReturnId], references: [id])
+  purchase        Purchase?       @relation("PurchaseInventoryLogs", fields: [purchaseId], references: [id], onDelete: Cascade)
+  sale            Sale?           @relation("SaleInventoryLogs", fields: [saleId], references: [id], onDelete: Cascade)
+  purchaseReturn  PurchaseReturn? @relation("PurchaseReturnInventoryLogs", fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  saleReturn      SaleReturn?     @relation("SaleReturnInventoryLogs", fields: [saleReturnId], references: [id], onDelete: Cascade)
 
   @@map("inventory_logs")
+  @@index([productId])
+@@index([createdAt])
+@@index([referenceType])
+@@index([type])
 }
 
 model AuditLog {
@@ -540,5 +561,6 @@ model Cheque {
   @@index([type])
   @@index([status])
   @@index([partyId])
+  @@index([chequeDate])
   @@map("cheques")
 }

@@ -29,7 +29,7 @@ const saleItemSchema = Yup.object({
   gstRate: Yup.number()
     .typeError("GST rate must be a number")
     .min(0, "GST rate cannot be negative")
-    .required("GST rate is required"),
+    .required("GST rate is required")
 });
 
 /**
@@ -39,21 +39,9 @@ const saleItemSchema = Yup.object({
  * -------------------------
  */
 const saleCreateSchema = Yup.object({
-  date: Yup.date()
-    .typeError("Invalid date")
-    .required("Date is required"),
+  date: Yup.date().typeError("Invalid date").required("Date is required"),
 
-  partyId: Yup.number()
-    .typeError("Party is required")
-    .integer()
-    .positive()
-    .required(),
-
-  invoiceNumber: Yup.number()
-    .typeError("Invoice number is required")
-    .integer()
-    .positive()
-    .required(),
+  partyId: Yup.number().typeError("Party is required").integer().positive().required(),
 
   receivedAmount: Yup.number()
     .transform((value, originalValue) =>
@@ -62,24 +50,13 @@ const saleCreateSchema = Yup.object({
     .min(0)
     .nullable(),
 
-  paymentMode: Yup.string()
-    .oneOf(PAYMENT_MODES)
-    .required(),
+  paymentMode: Yup.string().oneOf(PAYMENT_MODES).required(),
 
-  paymentReference: Yup.string()
-    .trim()
-    .nullable()
-    .max(100),
+  paymentReference: Yup.string().trim().nullable().max(100),
 
-  remarks: Yup.string()
-    .trim()
-    .nullable()
-    .max(300),
+  remarks: Yup.string().trim().nullable().max(300),
 
-  items: Yup.array()
-    .of(saleItemSchema)
-    .min(1)
-    .required()
+  items: Yup.array().of(saleItemSchema).min(1).required()
 }).noUnknown(true); // 🔥 prevents sneaky fields
 
 /**
@@ -89,19 +66,9 @@ const saleCreateSchema = Yup.object({
  * -------------------------
  */
 const saleUpdateSchema = Yup.object({
-  date: Yup.date()
-    .typeError("Invalid date")
-    .notRequired(),
+  date: Yup.date().typeError("Invalid date").notRequired(),
 
-  partyId: Yup.number()
-    .integer()
-    .positive()
-    .notRequired(),
-
-  invoiceNumber: Yup.number()
-    .integer()
-    .positive()
-    .notRequired(),
+  partyId: Yup.number().integer().positive().notRequired(),
 
   receivedAmount: Yup.number()
     .transform((value, originalValue) =>
@@ -111,33 +78,16 @@ const saleUpdateSchema = Yup.object({
     .nullable()
     .notRequired(),
 
-  paymentMode: Yup.string()
-    .oneOf(PAYMENT_MODES)
-    .notRequired(),
+  paymentMode: Yup.string().oneOf(PAYMENT_MODES).notRequired(),
 
-  paymentReference: Yup.string()
-    .trim()
-    .nullable()
-    .max(100)
-    .notRequired(),
+  paymentReference: Yup.string().trim().nullable().max(100).notRequired(),
 
-  remarks: Yup.string()
-    .trim()
-    .nullable()
-    .max(300)
-    .notRequired(),
+  remarks: Yup.string().trim().nullable().max(300).notRequired(),
 
-  items: Yup.array()
-    .of(saleItemSchema)
-    .min(1)
-    .required()
+  items: Yup.array().of(saleItemSchema).min(1).required()
 }).noUnknown(true);
 
-export {
-  saleItemSchema,
-  saleCreateSchema,
-  saleUpdateSchema
-};
+export { saleItemSchema, saleCreateSchema, saleUpdateSchema };
 
 export default {
   saleItemSchema,

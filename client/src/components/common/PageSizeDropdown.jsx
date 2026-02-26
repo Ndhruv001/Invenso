@@ -22,13 +22,13 @@ function PageSizeDropdown({ pageSize, onChange }) {
     };
   }, []);
 
- const handleChange = (newPageSize) => {
-  onChange(({
-    pageIndex: 0,
-    pageSize: +newPageSize
-  }));
-  setIsOpen(false);
-};
+  const handleChange = newPageSize => {
+    onChange({
+      pageIndex: 0,
+      pageSize: +newPageSize
+    });
+    setIsOpen(false);
+  };
 
   return (
     <div ref={dropdownRef} className="relative inline-block text-left">

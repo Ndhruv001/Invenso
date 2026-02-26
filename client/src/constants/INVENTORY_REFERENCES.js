@@ -7,12 +7,12 @@ export const INVENTORY_REFERENCE_TYPES = [
   "ADJUSTMENT",
   "DAMAGE",
   "TRANSFER",
-  "OTHER",
+  "OTHER"
 ];
 
 export const INVENTORY_REFERENCE_TYPE_OPTIONS = INVENTORY_REFERENCE_TYPES.map(v => ({
   value: v,
-  label: v.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+  label: v.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }));
 
 export default INVENTORY_REFERENCE_TYPES;

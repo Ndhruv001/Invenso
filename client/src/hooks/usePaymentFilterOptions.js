@@ -6,7 +6,6 @@ import { PAYMENT_TYPE_OPTIONS } from "@/constants/PAYMENT_TYPES";
  * Based on backend filters: type, dateFrom, dateTo.
  */
 function usePaymentFilterOptions() {
-
   // Static date placeholder options for UI components that handle date pickers
   // The actual value bindings (dateFrom, dateTo) will be managed by form state in the page component
   const currentDate = format(new Date(), "yyyy-MM-dd");
@@ -17,7 +16,7 @@ function usePaymentFilterOptions() {
       type: "select",
       label: "Payment Type",
       placeholder: "All Types",
-      options: PAYMENT_TYPE_OPTIONS,
+      options: PAYMENT_TYPE_OPTIONS
     },
     {
       key: "dateFrom",
@@ -25,7 +24,7 @@ function usePaymentFilterOptions() {
       label: "From Date",
       placeholder: "Start Date",
       defaultValue: "",
-      max: currentDate, // prevent future dates
+      max: currentDate // prevent future dates
     },
     {
       key: "dateTo",
@@ -33,8 +32,8 @@ function usePaymentFilterOptions() {
       label: "To Date",
       placeholder: "End Date",
       defaultValue: "",
-      max: currentDate,
-    },
+      max: currentDate
+    }
   ];
 }
 

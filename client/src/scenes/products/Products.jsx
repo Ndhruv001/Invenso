@@ -106,7 +106,6 @@ const Products = () => {
       openModalWith({}, "create");
       clearAction();
     }
-
   }, [action, openModalWith, clearAction]);
 
   // ---------------------------

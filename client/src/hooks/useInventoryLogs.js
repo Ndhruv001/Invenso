@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  getInventoryLogs,
-} from "@/services/inventoryLogServices";
+import { getInventoryLogs } from "@/services/inventoryLogServices";
 
 /**
  * For inventory logs: only read/list and single detail view.
@@ -16,7 +14,6 @@ export const useInventoryLogs = (params = {}) =>
     keepPreviousData: true
   });
 
-
 export default {
-  useInventoryLogs,
+  useInventoryLogs
 };

@@ -30,10 +30,7 @@ export const useSaleReturns = (filters = {}) => {
     queryKey: SALE_RETURN_KEYS.list(filters),
     queryFn: () => {
       return getSaleReturns(filters);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    keepPreviousData: true
+    }
   });
 };
 
@@ -41,9 +38,7 @@ export const useSaleReturn = id =>
   useQuery({
     queryKey: SALE_RETURN_KEYS.detail(id),
     queryFn: () => getSaleReturn(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000
+    enabled: !!id
   });
 
 // --------------------------------------------------
@@ -58,6 +53,9 @@ export const useCreateSaleReturn = () => {
       queryClient.invalidateQueries({
         queryKey: SALE_RETURN_KEYS.all
       });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -75,6 +73,9 @@ export const useUpdateSaleReturn = () => {
       queryClient.invalidateQueries({
         queryKey: SALE_RETURN_KEYS.detail(id)
       });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -92,6 +93,9 @@ export const useDeleteSaleReturn = () => {
       queryClient.invalidateQueries({
         queryKey: SALE_RETURN_KEYS.detail(id)
       });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };

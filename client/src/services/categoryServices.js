@@ -78,14 +78,7 @@ export const categoriesApi = {
   getCategory,
   createCategory,
   updateCategory,
-  deleteCategory,
-  
+  deleteCategory
 };
 
-export {
-  getCategories,
-  getCategory,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-};
+export { getCategories, getCategory, createCategory, updateCategory, deleteCategory };

@@ -37,7 +37,6 @@ const partyCreateSchema = Yup.object({
       originalValue === "" || originalValue === null ? 0 : value
     )
     .typeError("Opening balance must be a number")
-    .min(0, "Opening balance cannot be negative")
     .nullable(),
 
   remark: Yup.string().trim().nullable().max(300, "Remark must be less than 300 characters"),
@@ -85,7 +84,6 @@ const partyUpdateSchema = Yup.object({
     .transform((value, originalValue) =>
       originalValue === "" || originalValue === null ? 0 : value
     )
-    .min(0, "Opening balance cannot be negative")
     .nullable()
     .notRequired(),
 

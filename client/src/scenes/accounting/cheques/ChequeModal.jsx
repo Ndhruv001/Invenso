@@ -84,7 +84,7 @@ const ChequeModal = ({
   } = useForm({
     defaultValues,
     resolver: initialData ? yupResolver(chequeUpdateSchema) : yupResolver(chequeCreateSchema),
-    mode: "onSubmit",
+    mode: "onSubmit"
   });
 
   useEffect(() => {
@@ -130,6 +130,7 @@ const ChequeModal = ({
       }
     },
     errors => {
+      console.log("🚀 ~ ChequeModal ~ errors:", errors);
       if (Object.keys(errors).length > 0) {
         toast.error("Please fix validation errors before submitting.");
       }

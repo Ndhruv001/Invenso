@@ -68,9 +68,11 @@ const Columns = (showSelection = false) => {
       accessorKey: "type",
       header: "Type",
       cell: ({ getValue }) => (
-        <span className={`rounded px-2 py-0.5 text-xs font-bold ${
-          getValue() === 'INWARD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-        }`}>
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-bold ${
+            getValue() === "INWARD" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+          }`}
+        >
           {getValue()}
         </span>
       ),
@@ -94,7 +96,7 @@ const Columns = (showSelection = false) => {
       header: "Cheque Date",
       cell: ({ getValue }) => (
         <span className="text-sm" style={{ color: theme.text.primary }}>
-          {formatDate(getValue())}
+          {formatDate(getValue(), "long")}
         </span>
       ),
       size: 120

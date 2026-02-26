@@ -10,12 +10,16 @@ const DataErrorPage = ({ errorMessage = "Something went wrong.", isFetching, onR
 
   return (
     <div className={`min-h-[40vh] flex items-center justify-center p-4 sm:p-6 lg:p-8`}>
-      <div className={`w-full max-w-sm sm:max-w-md lg:max-w-xl rounded-lg p-4 sm:p-6 ${theme.card} ${theme.border} shadow-lg border transition-all duration-300`}>
+      <div
+        className={`w-full max-w-sm sm:max-w-md lg:max-w-xl rounded-lg p-4 sm:p-6 ${theme.card} ${theme.border} shadow-lg border transition-all duration-300`}
+      >
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-6">
           <AlertCircle className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 text-red-500`} />
           <div className="flex-1 text-center sm:text-left">
             <h3 className={`text-xl font-semibold ${theme.text.primary}`}>Unable to load data</h3>
-            <p className={`text-sm sm:text-base ${theme.text.secondary} mb-2 sm:mb-2`}>{errorMessage}</p>
+            <p className={`text-sm sm:text-base ${theme.text.secondary} mb-2 sm:mb-2`}>
+              {errorMessage}
+            </p>
 
             <div className="flex flex-col sm:flex-row justify-center sm:justify-start gap-2 sm:gap-4">
               <button

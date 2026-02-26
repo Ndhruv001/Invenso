@@ -125,9 +125,25 @@ async function listParties({
     return bal > 0 ? sum + bal : sum;
   }, 0);
 
-  const totalOpeningBalance = balanceRows.reduce((sum, p) => {
-    return sum + Number(p.openingBalance || 0);
-  }, 0);
+  const result = balanceRows.reduce(
+    (acc, p) => {
+      const balance = Number(p.openingBalance || 0);
+
+      if (balance < 0) {
+        // Receivable (party owes us)
+        acc.receivable += Math.abs(balance);
+      } else if (balance > 0) {
+        // Payable (we owe party)
+        acc.payable += balance;
+      }
+
+      return acc;
+    },
+    { receivable: 0, payable: 0 }
+  );
+
+  const receivableOpeningBalance = result.receivable;
+  const payableOpeningBalance = result.payable;
 
   /* -------------------- Response -------------------- */
 
@@ -143,7 +159,7 @@ async function listParties({
       totalParties: totalRows,
       totalReceivable,
       totalPayable,
-      totalOpeningBalance
+      openingBalance: { receivableOpeningBalance, payableOpeningBalance }
     }
   };
 }
@@ -172,10 +188,12 @@ async function createParty(data, userId = null) {
       data.openingBalance !== undefined ? Number(data.openingBalance) : undefined;
 
     const partyData = {
-      name: data.name,
+      name: String(data.name).trim().toLowerCase(),
       type: data.type,
 
-      ...(data.identifier !== undefined && { identifier: data.identifier }),
+      ...(data.identifier !== undefined && {
+        identifier: String(data.identifier).trim().toLowerCase()
+      }),
       ...(data.phone !== undefined && { phone: data.phone }),
       ...(data.gstNumber !== undefined && { gstNumber: data.gstNumber }),
       ...(data.remark !== undefined && { remark: data.remark }),
@@ -222,7 +240,7 @@ async function updateParty(id, data, userId = null) {
     const updateData = {};
 
     if (data.name !== undefined && data.name !== existing.name) {
-      updateData.name = data.name;
+      updateData.name = String(data.name).trim().toLowerCase();
     }
 
     if (data.type !== undefined && data.type !== existing.type) {
@@ -230,7 +248,7 @@ async function updateParty(id, data, userId = null) {
     }
 
     if (data.identifier !== undefined && data.identifier !== existing.identifier) {
-      updateData.identifier = data.identifier;
+      updateData.identifier = String(data.identifier).trim().toLowerCase();
     }
 
     if (data.phone !== undefined && data.phone !== existing.phone) {

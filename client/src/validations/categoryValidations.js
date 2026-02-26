@@ -9,14 +9,12 @@ const categoryCreateSchema = Yup.object({
     .min(2, "Category name must be at least 2 characters")
     .max(100, "Category name must be less than 100 characters"),
 
-  type: Yup.string()
-    .oneOf(CATEGORY_TYPES, "Invalid category type")
-    .notRequired(),
+  type: Yup.string().oneOf(CATEGORY_TYPES, "Invalid category type").notRequired(),
 
   description: Yup.string()
     .trim()
     .nullable()
-    .max(500, "Description must be less than 500 characters"),
+    .max(500, "Description must be less than 500 characters")
 }).noUnknown(true);
 
 const categoryUpdateSchema = Yup.object({
@@ -26,9 +24,7 @@ const categoryUpdateSchema = Yup.object({
     .max(100, "Category name must be less than 100 characters")
     .notRequired(),
 
-  type: Yup.string()
-    .oneOf(CATEGORY_TYPES, "Invalid category type")
-    .notRequired(),
+  type: Yup.string().oneOf(CATEGORY_TYPES, "Invalid category type").notRequired(),
 
   description: Yup.string()
     .trim()
@@ -36,9 +32,7 @@ const categoryUpdateSchema = Yup.object({
     .max(500, "Description must be less than 500 characters")
     .notRequired(),
 
-  isActive: Yup.boolean()
-    .typeError("isActive must be true or false")
-    .notRequired(),
+  isActive: Yup.boolean().typeError("isActive must be true or false").notRequired()
 }).noUnknown(true);
 
 export { categoryCreateSchema, categoryUpdateSchema };

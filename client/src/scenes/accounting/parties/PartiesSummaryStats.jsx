@@ -6,6 +6,7 @@
 import React from "react";
 import { Users, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
+import { formatCurrency } from "@/lib/helpers/formatters";
 
 /**
  * @typedef {Object} PartySummaryStatsProps
@@ -29,29 +30,31 @@ const PartySummaryStats = ({ stats }) => {
       value: stats?.totalParties ?? 0,
       subtitle: "Active registered parties",
       icon: Users,
-      color: "default",
+      color: "default"
     },
     {
       title: "Total Receivable",
-      value: stats?.totalReceivable?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.totalReceivable) ?? 0,
       subtitle: "Balance type: RECEIVABLE",
       icon: ArrowDownRight,
-      color: "success",
+      color: "success"
     },
     {
       title: "Total Payable",
-      value: stats?.totalPayable?.toLocaleString() ?? 0,
+      value: formatCurrency(stats?.totalPayable) ?? 0,
       subtitle: "Balance type: PAYABLE",
       icon: ArrowUpRight,
-      color: "danger",
+      color: "danger"
     },
     {
       title: "Opening Balance",
-      value: stats?.totalOpeningBalance?.toLocaleString() ?? 0,
-      subtitle: "Sum of all opening balances",
+      value: formatCurrency(stats?.openingBalance?.receivableOpeningBalance) ?? 0,
+      secondaryValue: formatCurrency(stats?.openingBalance?.payableOpeningBalance) ?? 0,
+      secondaryLabel: "Payable",
+      subtitle: "Sum of opening balances",
       icon: Wallet,
-      color: "warning",
-    },
+      color: "warning"
+    }
   ];
 
   return (

@@ -29,7 +29,6 @@ const StockBadge = ({ stock, threshold }) => {
   );
 };
 
-
 /**
  * Badge to display category name and type.
  * Uses theme colors; truncates long text for layout.
@@ -55,7 +54,7 @@ const CategoryBadge = ({ category }) => {
  * `onView`, `onEdit`, `onDelete` callbacks are passed from parent.
  * `showSelection` toggles visibility of row selection checkbox column.
  */
-const Columns = ( showSelection = false ) => {
+const Columns = (showSelection = false) => {
   const { theme } = useTheme();
 
   // Common colors abstracted for reuse
@@ -210,12 +209,12 @@ const Columns = ( showSelection = false ) => {
       },
       size: 120,
       meta: { align: "right" }
-    },
+    }
   ];
 
   // Prepend a selection checkbox column if selection is enabled
   if (showSelection) {
-    baseColumns.unshift({ 
+    baseColumns.unshift({
       id: "select",
       header: ({ table }) => (
         <input

@@ -23,4 +23,4 @@ function debounce(func, delay = 1000) {
 }
 
 export default debounce;
-export { debounce }
+export { debounce };

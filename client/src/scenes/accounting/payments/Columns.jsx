@@ -75,7 +75,7 @@ const Columns = (showSelection = false) => {
       header: "Date",
       cell: ({ getValue }) => (
         <span className="font-medium text-sm" style={{ color: theme.text.primary }}>
-          {formatDate(getValue())}
+          {formatDate(getValue(), "long")}
         </span>
       ),
       size: 100
@@ -121,7 +121,9 @@ const Columns = (showSelection = false) => {
       header: "Reference",
       cell: ({ getValue }) =>
         getValue() ? (
-          <span className="text-sm block text-center" style={{ color: theme.text.primary }}>{getValue()}</span>
+          <span className="text-sm block text-center" style={{ color: theme.text.primary }}>
+            {getValue()}
+          </span>
         ) : (
           <span className="text-xs block text-center text-gray-400">N/A</span>
         ),

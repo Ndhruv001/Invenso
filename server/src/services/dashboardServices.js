@@ -16,115 +16,71 @@ import prisma from "../config/prisma.js";
 /* -------------------------------------------------------------------------- */
 /*
   Metrics:
-  1. Total Sales (Today / This Month)
-  2. Total Purchase (Today / This Month)
-  3. Total Received (Today / This Month)
-  4. Total Paid (Today / This Month)
-  5. Net Profit (Today / This Month)
-  6. Total Receivables (Today / This Month)
-  7. Total Payables (Today / This Month)
-  8. Total Expense (Today / This Month)
+  1. Total Sales (Today / This Month)  -- sales table only
+  2. Total Purchase (Today / This Month) -- purchase table only
+  3. Total Received (Today / This Month) -- payment table only filter by recieved
+  4. Total Paid (Today / This Month) -- payment table only filter by paid
+  5. Net Profit (Today / This Month) -- plus total profit of all sales + transport payment( filter payment table by transport ) - all expenses +  netLoss ( from sale return )
+  6. Total Receivables (Today / This month) -- sum of totals pending amount : sales, purchase returns, transports, parties opening balance, 
+  7. Total Payables (Today / This month) -- sum of totals pending amount : purchase, sale return, parties opening balance
+  8. Total Expense (Today / This month) -- expense table only
 */
 
 async function getDashboardSummary() {
-  /* -------------------- Date Ranges -------------------- */
-
+  /* ─────────────────────────────────────────
+     Date Ranges
+  ───────────────────────────────────────── */
   const now = new Date();
 
-  // Start of today: 00:00:00
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
 
-  // Start of this month: 1st day at 00:00:00
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  /* -------------------- Database Aggregations -------------------- */
-
+  /* ─────────────────────────────────────────
+     Single Transaction — All Queries at Once
+  ───────────────────────────────────────── */
   const [
-    // Sales
-    salesToday,
-    salesMonth,
-    salesAllTime,
-
-    // Purchases
-    purchaseToday,
-    purchaseMonth,
-    purchaseAllTime,
-
-    // Payments Received
-    receivedToday,
-    receivedMonth,
-
-    // Payments Paid
-    paidToday,
-    paidMonth,
-
-    // Profit from Sales
-    profitToday,
-    profitMonth,
-    profitAllTime,
-
-    // Profit Loss from Sale Returns
-    profitLossToday,
-    profitLossMonth,
-    profitLossAllTime,
-
-    // Expenses
-    expenseToday,
-    expenseMonth,
-
-    // Outstanding calculations need all-time data
-    receivablesAllTime,
-    payablesAllTime
+    salesToday, // 1
+    salesMonth, // 2
+    purchaseToday, // 3
+    purchaseMonth, // 4
+    receivedToday, // 5
+    receivedMonth, // 6
+    paidToday, // 7
+    paidMonth, // 8
+    profitToday, // 9
+    profitMonth, // 10
+    profitLossToday, // 11
+    profitLossMonth, // 12
+    expenseToday, // 13
+    expenseMonth, // 14
+    transportProfitToday, // 15
+    transportProfitMonth, // 16
+    partyBalances // 17 — single query, split in JS
   ] = await prisma.$transaction([
-    /* -------------------- Sales Aggregations -------------------- */
-
-    // Today
+    /* 1-2 ── Sales ── */
     prisma.sale.aggregate({
       where: { date: { gte: startOfToday } },
       _sum: { totalAmount: true }
     }),
-
-    // This Month
     prisma.sale.aggregate({
       where: { date: { gte: startOfMonth } },
       _sum: { totalAmount: true }
     }),
 
-    // All Time (for receivables calculation)
-    prisma.sale.aggregate({
-      _sum: {
-        totalAmount: true,
-        receivedAmount: true
-      }
-    }),
-
-    /* -------------------- Purchase Aggregations -------------------- */
-
-    // Today
+    /* 3-4 ── Purchases ── */
     prisma.purchase.aggregate({
       where: { date: { gte: startOfToday } },
       _sum: { totalAmount: true }
     }),
-
-    // This Month
     prisma.purchase.aggregate({
       where: { date: { gte: startOfMonth } },
       _sum: { totalAmount: true }
     }),
 
-    // All Time (for payables calculation)
-    prisma.purchase.aggregate({
-      _sum: {
-        totalAmount: true,
-        paidAmount: true
-      }
-    }),
-
-    /* -------------------- Payments Received -------------------- */
-
-    // Today
+    /* 5-6 ── Payments Received ── */
     prisma.payment.aggregate({
       where: {
         type: "RECEIVED",
@@ -132,8 +88,6 @@ async function getDashboardSummary() {
       },
       _sum: { amount: true }
     }),
-
-    // This Month
     prisma.payment.aggregate({
       where: {
         type: "RECEIVED",
@@ -142,9 +96,7 @@ async function getDashboardSummary() {
       _sum: { amount: true }
     }),
 
-    /* -------------------- Payments Paid -------------------- */
-
-    // Today
+    /* 7-8 ── Payments Paid ── */
     prisma.payment.aggregate({
       where: {
         type: "PAID",
@@ -152,8 +104,6 @@ async function getDashboardSummary() {
       },
       _sum: { amount: true }
     }),
-
-    // This Month
     prisma.payment.aggregate({
       where: {
         type: "PAID",
@@ -162,196 +112,182 @@ async function getDashboardSummary() {
       _sum: { amount: true }
     }),
 
-    /* -------------------- Profit from Sales -------------------- */
-
-    // Today
+    /* 9-10 ── Gross Profit from Sales ── */
     prisma.sale.aggregate({
       where: { date: { gte: startOfToday } },
       _sum: { totalProfit: true }
     }),
-
-    // This Month
     prisma.sale.aggregate({
       where: { date: { gte: startOfMonth } },
       _sum: { totalProfit: true }
     }),
 
-    // All Time
-    prisma.sale.aggregate({
-      _sum: { totalProfit: true }
-    }),
-
-    /* -------------------- Profit Loss from Sale Returns -------------------- */
-
-    // Today
+    /* 11-12 ── Profit Loss from Sale Returns ── */
     prisma.saleReturn.aggregate({
       where: { date: { gte: startOfToday } },
       _sum: { totalProfitLoss: true }
     }),
-
-    // This Month
     prisma.saleReturn.aggregate({
       where: { date: { gte: startOfMonth } },
       _sum: { totalProfitLoss: true }
     }),
 
-    // All Time
-    prisma.saleReturn.aggregate({
-      _sum: { totalProfitLoss: true }
-    }),
-
-    /* -------------------- Expenses -------------------- */
-
-    // Today
+    /* 13-14 ── Expenses ── */
     prisma.expense.aggregate({
       where: { date: { gte: startOfToday } },
       _sum: { amount: true }
     }),
-
-    // This Month
     prisma.expense.aggregate({
       where: { date: { gte: startOfMonth } },
       _sum: { amount: true }
     }),
 
-    /* -------------------- Receivables (Today & This Month) -------------------- */
-
-    // Sales with outstanding from today
-    prisma.sale.aggregate({
-      where: { date: { gte: startOfToday } },
-      _sum: {
-        totalAmount: true,
-        receivedAmount: true
-      }
+    /* 15-16 ── Transport Revenue (for Net Profit) ──
+       Transport income = payments received against transport invoices.
+       These are already in payment table with referenceType=TRANSPORT, type=RECEIVED.
+    ── */
+    prisma.transport.aggregate({
+      where: {
+        date: { gte: startOfToday }
+      },
+      _sum: { amount: true }
+    }),
+    prisma.transport.aggregate({
+      where: {
+        date: { gte: startOfMonth }
+      },
+      _sum: { amount: true }
     }),
 
-    // Sales with outstanding from this month
-    prisma.sale.aggregate({
-      where: { date: { gte: startOfMonth } },
-      _sum: {
-        totalAmount: true,
-        receivedAmount: true
-      }
+    /* 17 ── Party Balances (Receivables & Payables) ──
+       currentBalance < 0 → party owes us    → Receivable
+       currentBalance > 0 → we owe the party → Payable
+       Always all-time (running total maintained on Party record).
+       One groupBy-less aggregate isn't enough here; we need both sums
+       so we use a raw grouping via two aggregates in the same call... 
+       Actually Prisma can't do conditional SUM, so we do two queries
+       but they're both on the tiny `parties` table — very fast.
+    ── */
+    prisma.party.aggregate({
+      where: {
+        isActive: true,
+        currentBalance: { not: 0 }
+      },
+      _sum: { currentBalance: true }
+      // We'll split positive/negative in JS after fetching both
     })
   ]);
 
-  // Continue transaction for Payables (Today & This Month)
-  const [payablesToday, payablesMonth] = await prisma.$transaction([
-    // Purchases with outstanding from today
-    prisma.purchase.aggregate({
-      where: { date: { gte: startOfToday } },
-      _sum: {
-        totalAmount: true,
-        paidAmount: true
-      }
+  // Prisma can't do conditional SUM in one call, so we do the split
+  // with two extra lightweight queries (parties table is tiny):
+  const [payableSum, receivableSum] = await prisma.$transaction([
+    // Parties that owe us money (positive balance)
+    prisma.party.aggregate({
+      where: {
+        isActive: true,
+        currentBalance: { gt: 0 }
+      },
+      _sum: { currentBalance: true }
     }),
-
-    // Purchases with outstanding from this month
-    prisma.purchase.aggregate({
-      where: { date: { gte: startOfMonth } },
-      _sum: {
-        totalAmount: true,
-        paidAmount: true
-      }
+    // Parties we owe money (negative balance)
+    prisma.party.aggregate({
+      where: {
+        isActive: true,
+        currentBalance: { lt: 0 }
+      },
+      _sum: { currentBalance: true }
     })
   ]);
 
-  /* -------------------- Normalize to Numbers -------------------- */
+  /* ─────────────────────────────────────────
+     Normalize Decimals → Numbers
+  ───────────────────────────────────────── */
+  const n = val => Number(val || 0);
 
   // Sales
-  const totalSalesToday = Number(salesToday._sum.totalAmount || 0);
-  const totalSalesMonth = Number(salesMonth._sum.totalAmount || 0);
+  const totalSalesToday = n(salesToday._sum.totalAmount);
+  const totalSalesMonth = n(salesMonth._sum.totalAmount);
 
   // Purchases
-  const totalPurchaseToday = Number(purchaseToday._sum.totalAmount || 0);
-  const totalPurchaseMonth = Number(purchaseMonth._sum.totalAmount || 0);
+  const totalPurchaseToday = n(purchaseToday._sum.totalAmount);
+  const totalPurchaseMonth = n(purchaseMonth._sum.totalAmount);
 
-  // Payments Received
-  const totalReceivedToday = Number(receivedToday._sum.amount || 0);
-  const totalReceivedMonth = Number(receivedMonth._sum.amount || 0);
+  // Received
+  const totalReceivedToday = n(receivedToday._sum.amount);
+  const totalReceivedMonth = n(receivedMonth._sum.amount);
 
-  // Payments Paid
-  const totalPaidToday = Number(paidToday._sum.amount || 0);
-  const totalPaidMonth = Number(paidMonth._sum.amount || 0);
-
-  // Profit
-  const grossProfitToday = Number(profitToday._sum.totalProfit || 0);
-  const grossProfitMonth = Number(profitMonth._sum.totalProfit || 0);
-
-  // Profit Loss
-  const profitLossTodayAmount = Number(profitLossToday._sum.totalProfitLoss || 0);
-  const profitLossMonthAmount = Number(profitLossMonth._sum.totalProfitLoss || 0);
+  // Paid
+  const totalPaidToday = n(paidToday._sum.amount);
+  const totalPaidMonth = n(paidMonth._sum.amount);
 
   // Expenses
-  const totalExpenseToday = Number(expenseToday._sum.amount || 0);
-  const totalExpenseMonth = Number(expenseMonth._sum.amount || 0);
+  const totalExpenseToday = n(expenseToday._sum.amount);
+  const totalExpenseMonth = n(expenseMonth._sum.amount);
 
-  // Net Profit Calculation (Gross Profit - Profit Loss - Expenses)
-  const netProfitToday = grossProfitToday - profitLossTodayAmount - totalExpenseToday;
-  const netProfitMonth = grossProfitMonth - profitLossMonthAmount - totalExpenseMonth;
+  // Transport income
+  const transportIncomeToday = n(transportProfitToday._sum.amount);
+  const transportIncomeMonth = n(transportProfitMonth._sum.amount);
 
-  // Receivables (Sales Amount - Received Amount)
-  const totalReceivablesToday =
-    Number(receivablesAllTime._sum.totalAmount || 0) -
-    Number(receivablesAllTime._sum.receivedAmount || 0);
+  // Gross profit from sales
+  const grossProfitToday = n(profitToday._sum.totalProfit);
+  const grossProfitMonth = n(profitMonth._sum.totalProfit);
 
-  const totalReceivablesMonth =
-    Number(payablesMonth._sum.totalAmount || 0) - Number(payablesMonth._sum.receivedAmount || 0);
+  // Profit loss from sale returns
+  const profitLossTodayAmt = n(profitLossToday._sum.totalProfitLoss);
+  const profitLossMonthAmt = n(profitLossMonth._sum.totalProfitLoss);
 
-  // Payables (Purchase Amount - Paid Amount)
-  const totalPayablesToday =
-    Number(payablesToday._sum.totalAmount || 0) - Number(payablesToday._sum.paidAmount || 0);
+  /* ─────────────────────────────────────────
+     Net Profit
+     = grossProfit (from sales)
+     + transportIncome (payments received for transport)
+     - profitLoss (from sale returns)
+     - expenses
+  ───────────────────────────────────────── */
+  const netProfitToday =
+    grossProfitToday + transportIncomeToday - profitLossTodayAmt - totalExpenseToday;
 
-  const totalPayablesMonth =
-    Number(payablesMonth._sum.totalAmount || 0) - Number(payablesMonth._sum.paidAmount || 0);
+  const netProfitMonth =
+    grossProfitMonth + transportIncomeMonth - profitLossMonthAmt - totalExpenseMonth;
 
-  // All-time outstanding
-  const totalReceivablesAllTime =
-    Number(salesAllTime._sum.totalAmount || 0) - Number(salesAllTime._sum.receivedAmount || 0);
+  /* ─────────────────────────────────────────
+     Receivables & Payables
+     Sourced from Party.currentBalance (always all-time running total)
+     Positive balance = party owes us   = Receivable
+     Negative balance = we owe party    = Payable (store as positive number)
+  ───────────────────────────────────────── */
+  const totalReceivables = Math.abs(n(receivableSum._sum.currentBalance));
+  const totalPayables = n(payableSum._sum.currentBalance); // convert negative to positive
 
-  const totalPayablesAllTime =
-    Number(purchaseAllTime._sum.totalAmount || 0) - Number(purchaseAllTime._sum.paidAmount || 0);
-
-  /* -------------------- Final Response -------------------- */
-
+  /* ─────────────────────────────────────────
+     Final Response
+  ───────────────────────────────────────── */
   return {
     sales: {
       today: totalSalesToday,
       thisMonth: totalSalesMonth
     },
-
     purchases: {
       today: totalPurchaseToday,
       thisMonth: totalPurchaseMonth
     },
-
     received: {
       today: totalReceivedToday,
       thisMonth: totalReceivedMonth
     },
-
     paid: {
       today: totalPaidToday,
       thisMonth: totalPaidMonth
     },
-
     netProfit: {
       today: netProfitToday,
       thisMonth: netProfitMonth
     },
-
     receivables: {
-      today: totalReceivablesToday,
-      thisMonth: totalReceivablesMonth,
-      allTime: totalReceivablesAllTime
+      total: totalReceivables // always all-time (no today/month split)
     },
-
     payables: {
-      today: totalPayablesToday,
-      thisMonth: totalPayablesMonth,
-      allTime: totalPayablesAllTime
+      total: totalPayables // always all-time (no today/month split)
     },
-
     expenses: {
       today: totalExpenseToday,
       thisMonth: totalExpenseMonth

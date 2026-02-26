@@ -50,7 +50,7 @@ const Columns = (showSelection = false) => {
       header: "Date",
       cell: ({ getValue }) => (
         <span className="text-sm" style={{ color: theme.text.primary }}>
-          {formatDate(getValue())}
+          {formatDate(getValue(), "long")}
         </span>
       ),
       size: 120

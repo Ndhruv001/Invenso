@@ -4,7 +4,7 @@ import {
   getCheque,
   createCheque,
   updateCheque,
-  deleteCheque,
+  deleteCheque
 } from "@/services/chequeServices";
 
 /**
@@ -14,7 +14,7 @@ import {
 export const CHEQUE_KEYS = {
   all: ["cheques"],
   list: (filters = {}) => ["cheques", "list", filters],
-  detail: (id) => ["cheques", "detail", id],
+  detail: id => ["cheques", "detail", id]
 };
 
 // QUERIES
@@ -22,27 +22,22 @@ export const CHEQUE_KEYS = {
 export const useCheques = (filters = {}) =>
   useQuery({
     queryKey: CHEQUE_KEYS.list(filters),
-    queryFn: () => getCheques(filters),
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
-    keepPreviousData: true,
+    queryFn: () => getCheques(filters)
   });
 
-export const useCheque = (id) =>
+export const useCheque = id =>
   useQuery({
     queryKey: CHEQUE_KEYS.detail(id),
     queryFn: () => getCheque(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
+    enabled: !!id
   });
 
-  export const useCreateCheque = () => {
+export const useCreateCheque = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: ["create-cheque"],
-    mutationFn: ( data) => createCheque(data),
+    mutationFn: data => createCheque(data),
 
     onSuccess: () => {
       // 🔥 IMPORTANT: Because cheque clearing affects payments + party balance
@@ -51,10 +46,9 @@ export const useCheque = (id) =>
       // 🔥 NEW — invalidate related systems
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       queryClient.invalidateQueries({ queryKey: ["parties"] });
-    },
+    }
   });
 };
-
 
 // MUTATIONS
 
@@ -73,7 +67,7 @@ export const useUpdateCheque = () => {
       // 🔥 NEW — invalidate related systems
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       queryClient.invalidateQueries({ queryKey: ["parties"] });
-    },
+    }
   });
 };
 
@@ -82,7 +76,7 @@ export const useDeleteCheque = () => {
 
   return useMutation({
     mutationKey: ["delete-cheque"],
-    mutationFn: (id) => deleteCheque(id),
+    mutationFn: id => deleteCheque(id),
 
     onSuccess: (_, id) => {
       // Cheque list refresh
@@ -92,10 +86,9 @@ export const useDeleteCheque = () => {
       // 🔥 Because delete may revert balance + delete payment
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       queryClient.invalidateQueries({ queryKey: ["parties"] });
-    },
+    }
   });
 };
-
 
 // Default export
 export default {
@@ -103,5 +96,5 @@ export default {
   useCheque,
   useCreateCheque,
   useUpdateCheque,
-  useDeleteCheque,
+  useDeleteCheque
 };

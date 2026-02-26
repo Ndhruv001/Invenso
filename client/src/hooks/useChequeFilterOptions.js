@@ -7,7 +7,6 @@ import { CHEQUE_STATUS_OPTIONS } from "@/constants/CHEQUE_STATUSES";
  * Based on backend filters: type, dateFrom, dateTo.
  */
 function useChequeFilterOptions() {
-
   // Static date placeholder options for UI components that handle date pickers
   // The actual value bindings (dateFrom, dateTo) will be managed by form state in the page component
   const currentDate = format(new Date(), "yyyy-MM-dd");
@@ -18,14 +17,14 @@ function useChequeFilterOptions() {
       type: "select",
       label: "Cheque Status",
       placeholder: "All Types",
-      options: CHEQUE_STATUS_OPTIONS,
+      options: CHEQUE_STATUS_OPTIONS
     },
     {
       key: "type",
       type: "select",
       label: "Cheque Type",
       placeholder: "All Types",
-      options: CHEQUE_TYPE_OPTIONS,
+      options: CHEQUE_TYPE_OPTIONS
     },
     {
       key: "dateFrom",
@@ -33,7 +32,7 @@ function useChequeFilterOptions() {
       label: "From Date",
       placeholder: "Start Date",
       defaultValue: "",
-      max: currentDate, // prevent future dates
+      max: currentDate // prevent future dates
     },
     {
       key: "dateTo",
@@ -41,8 +40,8 @@ function useChequeFilterOptions() {
       label: "To Date",
       placeholder: "End Date",
       defaultValue: "",
-      max: currentDate,
-    },
+      max: currentDate
+    }
   ];
 }
 

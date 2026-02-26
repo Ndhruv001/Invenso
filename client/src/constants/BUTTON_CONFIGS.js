@@ -38,7 +38,7 @@ const BUTTON_CONFIGS = {
       payload: null,
       icon: "Package2",
       label: "Add Product"
-    },
+    }
   },
 
   // ===============================
@@ -184,7 +184,7 @@ const BUTTON_CONFIGS = {
       payload: null,
       icon: "Receipt",
       label: "Add Expense"
-    },
+    }
   },
   cheques: {
     primary: {
@@ -194,7 +194,7 @@ const BUTTON_CONFIGS = {
       payload: null,
       icon: "Ticket",
       label: "Add Cheque"
-    },
+    }
   },
 
   // ===============================

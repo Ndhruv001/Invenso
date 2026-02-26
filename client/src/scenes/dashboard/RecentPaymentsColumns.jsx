@@ -13,7 +13,7 @@ const RecentPaymentsColumns = () => {
       cell: ({ getValue }) => (
         <div className="flex items-center gap-1 text-sm">
           <Calendar className="w-3 h-3" style={{ color: theme.text.muted }} />
-          <span style={{ color: theme.text.muted }}>{formatDate(getValue())}</span>
+          <span style={{ color: theme.text.muted }}>{formatDate(getValue(), "long")}</span>
         </div>
       )
     },

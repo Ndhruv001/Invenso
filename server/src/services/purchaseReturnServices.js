@@ -320,9 +320,9 @@ async function createPurchaseReturn(data, userId = null) {
           type: "RECEIVED",
           amount: Number(receivedAmount),
           referenceType: "PURCHASE_RETURN",
-          purchaseReturnId: purchaseReturn.id,
+          referenceId: parseInt(purchaseReturn.id),
           paymentMode,
-          paymentReference,
+          paymentReference: `Received for Purchase Return: ${purchaseReturn.id}`,
           remark: reason
         }
       });
@@ -375,9 +375,8 @@ async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
     if (data.purchaseId !== undefined) {
       purchaseReturnUpdateData.purchaseId = data.purchaseId;
     }
-
     if (data.receivedAmount !== undefined) {
-      purchaseReturnUpdateData.receivedAmount = Number(data.receivedAmount);
+      purchaseReturnUpdateData.receivedAmount = data.receivedAmount;
     }
 
     if (data.paymentMode !== undefined) {
@@ -623,6 +622,48 @@ async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
           data: { currentBalance: { decrement: reductionDiff } }
         });
       }
+    }
+
+    /* -------------------- Payment Handling -------------------- */
+
+    const existingPayment = await tx.payment.findFirst({
+      where: {
+        referenceType: "PURCHASE_RETURN",
+        referenceId: parseInt(purchaseReturnId)
+      }
+    });
+
+    if (newReceived > 0) {
+      const paymentData = {
+        partyId: newPartyId, // always follow updated party
+        amount: newReceived,
+        paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
+        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
+        remark: data.remark ?? existingPayment?.remark ?? null
+      };
+
+      if (existingPayment) {
+        // Update existing payment
+        await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: paymentData
+        });
+      } else {
+        // Create new payment
+        await tx.payment.create({
+          data: {
+            ...paymentData,
+            type: "RECEIVED", // purchase return = money received
+            referenceType: "PURCHASE_RETURN",
+            referenceId: parseInt(purchaseReturnId)
+          }
+        });
+      }
+    } else if (existingPayment) {
+      // If received amount becomes 0 → delete payment
+      await tx.payment.delete({
+        where: { id: existingPayment.id }
+      });
     }
 
     /* ------------------------------

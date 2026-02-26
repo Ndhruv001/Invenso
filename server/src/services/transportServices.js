@@ -193,26 +193,16 @@ async function createTransport(data, userId = null) {
 
     /* -------------------- Payment -------------------- */
     if (receivedAmount > 0) {
-      const payment = await tx.payment.create({
+      await tx.payment.create({
         data: {
           partyId: data.partyId,
           type: "RECEIVED",
           amount: receivedAmount,
           referenceType: "TRANSPORT",
-          transportId: parseInt(transport.id),
+          referenceId: parseInt(transport.id),
           paymentMode: data.paymentMode ?? "NONE",
-          paymentReference: data.paymentReference ?? null,
+          paymentReference: `Received for Transport: ${transport.id}`,
           remark: data.remark ?? null
-        }
-      });
-
-      await tx.auditLog.create({
-        data: {
-          tableName: "payments",
-          recordId: String(payment.id),
-          action: "CREATE",
-          newValue: JSON.stringify(payment),
-          userId
         }
       });
     }
@@ -283,7 +273,7 @@ async function updateTransport(id, data, userId = null) {
 
     /* -------------------- Payment Handling -------------------- */
     const existingPayment = await tx.payment.findFirst({
-      where: { referenceType: "TRANSPORT", transportId: parseInt(id) }
+      where: { referenceType: "TRANSPORT", referenceId: parseInt(id) }
     });
 
     if (newReceived > 0) {
@@ -306,7 +296,7 @@ async function updateTransport(id, data, userId = null) {
             ...paymentData,
             type: "RECEIVED",
             referenceType: "TRANSPORT",
-            transportId: parseInt(id)
+            referenceId: parseInt(id)
           }
         });
       }

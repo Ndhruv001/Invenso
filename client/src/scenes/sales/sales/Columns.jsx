@@ -61,7 +61,7 @@ const Columns = (showSelection = false) => {
       cell: ({ getValue }) => {
         return (
           <span className="text-sm" style={{ color: theme.text.primary }}>
-            {formatDate(getValue())}
+            {formatDate(getValue(), "long")}
           </span>
         );
       },

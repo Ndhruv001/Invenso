@@ -10,10 +10,12 @@ export const getInventoryLogs = async (params = {}) => {
     const response = await axiosInstance.get("/inventories", { params });
     return response.data;
   } catch (error) {
-    throw new Error(error?.response?.data?.error || error?.message || "Failed to fetch inventory logs");
+    throw new Error(
+      error?.response?.data?.error || error?.message || "Failed to fetch inventory logs"
+    );
   }
 };
 
 export default {
-  getInventoryLogs,
+  getInventoryLogs
 };

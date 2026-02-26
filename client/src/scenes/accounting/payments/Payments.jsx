@@ -33,7 +33,7 @@ function normalizePaymentForModal(payment) {
   return {
     id: payment.id ?? undefined,
     amount: payment.amount ?? 0,
-    ...payment,
+    ...payment
   };
 }
 
@@ -43,7 +43,7 @@ const Payments = () => {
   // Unified table controls
   const { filters, selection, tableState, handlers } = useTableControls({
     FILTER_KEYS,
-    resourceName: "Payment",
+    resourceName: "Payment"
   });
 
   const { showSelection, setShowSelection, selectedRows, handleSelectionChange } = selection;
@@ -78,24 +78,24 @@ const Payments = () => {
     setModalMode(mode);
   }, []);
 
-   // ---------------------------
-      // UIAction (CREATE only)
-      // ---------------------------
-      const { action, clearAction } = useUIAction();
-    
-      useEffect(() => {
-        if (!action) return;
-    
-        if (action.resource !== "payment") return;
-    
-        if (action.type === "CREATE") {
-          openModalWith({}, "create");
-          clearAction();
-        }
-      }, [action, openModalWith, clearAction]);
+  // ---------------------------
+  // UIAction (CREATE only)
+  // ---------------------------
+  const { action, clearAction } = useUIAction();
+
+  useEffect(() => {
+    if (!action) return;
+
+    if (action.resource !== "payment") return;
+
+    if (action.type === "CREATE") {
+      openModalWith({}, "create");
+      clearAction();
+    }
+  }, [action, openModalWith, clearAction]);
 
   const handleView = useCallback(
-    (payment) => {
+    payment => {
       if (!payment?.id) return toast.error("Unable to view: missing payment info");
       openModalWith(payment, "view");
     },
@@ -103,7 +103,7 @@ const Payments = () => {
   );
 
   const handleEdit = useCallback(
-    (payment) => {
+    payment => {
       if (!payment?.id) return toast.error("Unable to edit: missing payment info");
       openModalWith(payment, "edit");
     },
@@ -115,48 +115,48 @@ const Payments = () => {
     setModalMode(null);
   }, []);
 
- const handleSubmit = useCallback(
-     async purchaseData => {
-       try {
-         // 🟢 CREATE
-         if (modalMode === "create") {
-           await createPaymentMutation.mutateAsync(purchaseData, {
-             onSuccess: () => {
-               toast.success("Payment created successfully");
-               handleCancel();
-             },
-             onError: err => toast.error(err?.message || "Failed to create payment")
-           });
- 
-           return; // stop execution after create
-         }
- 
-         // 🔵 EDIT
-         if (modalMode === "edit") {
-           if (!activePayment?.id) {
-             toast.error("Cannot save: missing payment context");
-             return;
-           }
+  const handleSubmit = useCallback(
+    async purchaseData => {
+      try {
+        // 🟢 CREATE
+        if (modalMode === "create") {
+          await createPaymentMutation.mutateAsync(purchaseData, {
+            onSuccess: () => {
+              toast.success("Payment created successfully");
+              handleCancel();
+            },
+            onError: err => toast.error(err?.message || "Failed to create payment")
+          });
 
-           await updatePaymentMutation.mutateAsync(
-             { id: activePayment.id, data: purchaseData },
-             {
-               onSuccess: () => {
-                 toast.success("Payment updated successfully");
-                 handleCancel();
-               },
-               onError: err => toast.error(err?.message || "Failed to update payment")
-             }
-           );
- 
-           return;
-         }
-       } catch (error) {
-         toast.error(error?.message || "Something went wrong");
-       }
-     },
-     [modalMode, activePayment, createPaymentMutation, updatePaymentMutation, handleCancel]
-   );
+          return; // stop execution after create
+        }
+
+        // 🔵 EDIT
+        if (modalMode === "edit") {
+          if (!activePayment?.id) {
+            toast.error("Cannot save: missing payment context");
+            return;
+          }
+
+          await updatePaymentMutation.mutateAsync(
+            { id: activePayment.id, data: purchaseData },
+            {
+              onSuccess: () => {
+                toast.success("Payment updated successfully");
+                handleCancel();
+              },
+              onError: err => toast.error(err?.message || "Failed to update payment")
+            }
+          );
+
+          return;
+        }
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong");
+      }
+    },
+    [modalMode, activePayment, createPaymentMutation, updatePaymentMutation, handleCancel]
+  );
   const handleDelete = useCallback(() => {
     if (!selectedRows?.length) {
       toast.error("No payments selected");
@@ -169,10 +169,10 @@ const Payments = () => {
       onConfirm: async () => {
         try {
           const results = await Promise.allSettled(
-            selectedRows.map((p) => deletePaymentMutation.mutateAsync(p.id))
+            selectedRows.map(p => deletePaymentMutation.mutateAsync(p.id))
           );
 
-          const successCount = results.filter((r) => r.status === "fulfilled").length;
+          const successCount = results.filter(r => r.status === "fulfilled").length;
           const failedCount = results.length - successCount;
 
           if (successCount > 0) {
@@ -187,7 +187,7 @@ const Payments = () => {
         } catch (err) {
           toast.error(err?.message || "Unexpected error during deletion");
         }
-      },
+      }
     });
   }, [selectedRows, deletePaymentMutation, openDialog, handleSelectionChange, refetch]);
 
@@ -215,12 +215,12 @@ const Payments = () => {
         actions={["edit", "delete", "print", "download"]}
         selectionOpen={showSelection}
         selectedCount={selectedRows?.length}
-        onToggleSelection={() => setShowSelection((prev) => !prev)}
+        onToggleSelection={() => setShowSelection(prev => !prev)}
         handlers={{
           edit: () => handleEdit(selectedRows?.[0]),
           delete: handleDelete,
           print: null,
-          download: null,
+          download: null
         }}
       />
 

@@ -8,8 +8,9 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed": "node prisma/seed.js",
-    "seedUser": "node prisma/seedUser.js",
-    "dropSchema": "node prisma/dropSchema.js",
+    "seed:user": "node prisma/seedUser.js",
+    "seed:categories": "node prisma/seedCategories.js",
+    "drop:schema": "node prisma/dropSchema.js",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "format": "prettier --write .",
@@ -49,6 +50,7 @@
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.34.6",
     "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0",
     "xss-clean": "^0.1.4"
   }
 }

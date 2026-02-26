@@ -84,9 +84,18 @@ const chequeUpdateSchema = Yup.object({
 
   chequeDate: Yup.date().typeError("Invalid cheque date").notRequired(),
 
-  depositDate: Yup.date().typeError("Invalid deposit date").nullable().notRequired(),
+  // Optional dates based on status
+  depositDate: Yup.date()
+    .nullable()
+    .transform((value, originalValue) => (originalValue === "" ? null : value))
+    .typeError("Invalid deposit date")
+    .notRequired(),
 
-  clearDate: Yup.date().typeError("Invalid clear date").nullable().notRequired(),
+  clearDate: Yup.date()
+    .nullable()
+    .transform((value, originalValue) => (originalValue === "" ? null : value))
+    .typeError("Invalid clear date")
+    .notRequired(),
 
   bounceReason: Yup.string().trim().nullable().max(255).notRequired()
 }).noUnknown(true);

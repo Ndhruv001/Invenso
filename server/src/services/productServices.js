@@ -186,7 +186,7 @@ async function createProduct(data, userId = null) {
 
     // Build product data safely
     const productData = {
-      name: data.name,
+      name: String(data.name).trim().toLowerCase(),
 
       // Relations
       category: {
@@ -270,7 +270,7 @@ async function updateProduct(id, data, userId = null) {
 
     // 3. Name
     if (data.name !== undefined && data.name !== existing.name) {
-      updateData.name = data.name;
+      updateData.name = String(data.name).trim().toLowerCase();
     }
 
     // 4. Category

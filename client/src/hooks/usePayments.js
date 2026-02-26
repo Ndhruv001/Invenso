@@ -4,7 +4,7 @@ import {
   getPayment,
   createPayment,
   updatePayment,
-  deletePayment,
+  deletePayment
 } from "@/services/paymentServices";
 
 /**
@@ -14,26 +14,21 @@ import {
 export const PAYMENT_KEYS = {
   all: ["payments"],
   list: (filters = {}) => ["payments", "list", filters],
-  detail: (id) => ["payments", "detail", id],
+  detail: id => ["payments", "detail", id]
 };
 
 // QUERIES
 export const usePayments = (filters = {}) =>
   useQuery({
     queryKey: PAYMENT_KEYS.list(filters),
-    queryFn: () => getPayments(filters),
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
-    keepPreviousData: true,
+    queryFn: () => getPayments(filters)
   });
 
-export const usePayment = (id) =>
+export const usePayment = id =>
   useQuery({
     queryKey: PAYMENT_KEYS.detail(id),
     queryFn: () => getPayment(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
+    enabled: !!id
   });
 
 // MUTATIONS
@@ -44,7 +39,7 @@ export const useCreatePayment = () => {
     mutationFn: createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.all });
-    },
+    }
   });
 };
 
@@ -56,7 +51,7 @@ export const useUpdatePayment = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.detail(id) });
-    },
+    }
   });
 };
 
@@ -64,11 +59,11 @@ export const useDeletePayment = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: ["delete-payment"],
-    mutationFn: (id) => deletePayment(id),
+    mutationFn: id => deletePayment(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.detail(id) });
-    },
+    }
   });
 };
 
@@ -78,5 +73,5 @@ export default {
   usePayment,
   useCreatePayment,
   useUpdatePayment,
-  useDeletePayment,
+  useDeletePayment
 };

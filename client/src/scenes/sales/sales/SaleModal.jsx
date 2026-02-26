@@ -70,7 +70,7 @@ const SaleModal = ({
   mode = "view", // "view" | "edit" | "create"
   setMode = null
 }) => {
-  console.log("🚀 ~ SaleModal ~ initialData:", initialData)
+  console.log("🚀 ~ SaleModal ~ initialData:", initialData);
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */
@@ -98,7 +98,6 @@ const SaleModal = ({
   const defaultValues = useMemo(
     () => ({
       partyId: initialData?.partyId ?? "",
-      invoiceNumber: initialData?.invoiceNumber ?? "",
       date: initialData?.date
         ? toDateInputValue(initialData.date)
         : new Date().toISOString().slice(0, 10),
@@ -186,7 +185,11 @@ const SaleModal = ({
   }, [partySuggestionsData]);
 
   /* --------------------- PRODUCT SUGGESTIONS ---------------------- */
-  const { data: productSuggestionsData } = useProductSuggestions(productSearchQuery.query, selectedParty?.id, "sale");
+  const { data: productSuggestionsData } = useProductSuggestions(
+    productSearchQuery.query,
+    selectedParty?.id,
+    "sale"
+  );
 
   const debouncedProductSearch = useMemo(
     () =>
@@ -356,9 +359,9 @@ const SaleModal = ({
         }
       });
     } else {
-      setMode(prev => prev === "edit" ? "view" : "edit");
+      setMode(prev => (prev === "edit" ? "view" : "edit"));
     }
-  }, [mode, setMode,  isDirty, reset, defaultValues, openDialog]);
+  }, [mode, setMode, isDirty, reset, defaultValues, openDialog]);
 
   // Disabled state
   const isDisabled = !mode || isSubmitting || isLoading;
@@ -377,7 +380,11 @@ const SaleModal = ({
               </div>
               <div>
                 <h2 className={`text-lg font-semibold ${theme.text.primary}`}>
-                  {initialData ? (mode === "edit" ? "Edit Invoice" : "View Invoice") : "Create Invoice"}
+                  {initialData
+                    ? mode === "edit"
+                      ? "Edit Invoice"
+                      : "View Invoice"
+                    : "Create Invoice"}
                 </h2>
                 <p className={`text-sm ${theme.text.muted}`}>
                   {mode === "view" && initialData
@@ -434,7 +441,6 @@ const SaleModal = ({
                         if (selectedParty) {
                           setSelectedParty(null);
                           setValue("partyId", null, { shouldDirty: true });
-                          
                         }
 
                         setPartyInputValue(value);
@@ -458,7 +464,7 @@ const SaleModal = ({
                             onClick={() => {
                               setSelectedParty(party);
                               setPartyInputValue(party.name);
-                              
+
                               setValue("partyId", party.id, { shouldDirty: true });
                               setShowPartySuggestions(false);
                             }}
@@ -491,17 +497,11 @@ const SaleModal = ({
                     </label>
                     <input
                       type="text"
-                      {...register("invoiceNumber")}
-                      disabled={isDisabled}
-                      className={`w-full px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
+                      value={initialData?.invoiceNumber}
+                      readOnly
+                      className={`w-full px-3 cursor-not-allowed py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
                       placeholder="INV-001"
                     />
-                    {errors.invoiceNumber && (
-                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {errors.invoiceNumber.message}
-                      </p>
-                    )}
                   </div>
 
                   {/* Invoice Date */}
@@ -586,7 +586,9 @@ const SaleModal = ({
                                     // clear selected product
                                     setValue(`items.${index}.productId`, "", { shouldDirty: true });
                                     setValue(`items.${index}.product`, null, { shouldDirty: true });
-                                    setValue(`items.${index}.pricePerUnit`, 0, { shouldDirty: true });
+                                    setValue(`items.${index}.pricePerUnit`, 0, {
+                                      shouldDirty: true
+                                    });
 
                                     debouncedProductSearch(value, index);
                                   }}

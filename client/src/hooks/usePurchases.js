@@ -32,10 +32,7 @@ export const usePurchases = (filters = {}) => {
     queryKey: PURCHASE_KEYS.list(filters),
     queryFn: () => {
       return getPurchases(filters);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    keepPreviousData: true
+    }
   });
 };
 
@@ -43,9 +40,7 @@ export const usePurchase = id =>
   useQuery({
     queryKey: PURCHASE_KEYS.detail(id),
     queryFn: () => getPurchase(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000
+    enabled: !!id
   });
 
 // --------------------------------------------------
@@ -58,6 +53,9 @@ export const useCreatePurchase = () => {
     mutationFn: createPurchase,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PURCHASE_KEYS.all });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -71,6 +69,9 @@ export const useUpdatePurchase = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: PURCHASE_KEYS.all });
       queryClient.invalidateQueries({ queryKey: PURCHASE_KEYS.detail(id) });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -84,6 +85,9 @@ export const useDeletePurchase = () => {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: PURCHASE_KEYS.all });
       queryClient.invalidateQueries({ queryKey: PURCHASE_KEYS.detail(id) });
+      // 🔥 Because delete may revert balance + delete payment
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["parties"] });
     }
   });
 };
@@ -93,7 +97,7 @@ export const usePurchaseSuggestionsbyPartyId = (partyId, options = {}) => {
     queryKey: PURCHASE_KEYS.byParty(partyId),
     queryFn: () => getPurchaseSuggestionsByPartyId(partyId),
     enabled: !!partyId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
     ...options
   });
 };

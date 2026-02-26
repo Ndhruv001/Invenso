@@ -13,9 +13,9 @@ const ItemRow = ({
   CATEGORIES,
   SIZES,
   UNITS,
-  GST_RATES,
+  GST_RATES
 }) => {
-    const {theme} = useTheme();
+  const { theme } = useTheme();
 
   const qty = parseFloat(watchedItem?.qty || 0);
   const price = parseFloat(watchedItem?.pricePerUnit || 0);
@@ -26,9 +26,7 @@ const ItemRow = ({
 
   return (
     <tr className={theme.tableRow}>
-      <td className={`border ${theme.border} px-2 py-2 text-center text-sm`}>
-        {index + 1}
-      </td>
+      <td className={`border ${theme.border} px-2 py-2 text-center text-sm`}>{index + 1}</td>
 
       {/* Item Name */}
       <td className={`border ${theme.border} px-2 py-2`}>
@@ -62,7 +60,9 @@ const ItemRow = ({
         >
           <option value="">None</option>
           {CATEGORIES.map(cat => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
           ))}
         </select>
       </td>
@@ -76,7 +76,9 @@ const ItemRow = ({
         >
           <option value="">None</option>
           {SIZES.map(size => (
-            <option key={size.id} value={size.id}>{size.name}</option>
+            <option key={size.id} value={size.id}>
+              {size.name}
+            </option>
           ))}
         </select>
       </td>
@@ -102,7 +104,9 @@ const ItemRow = ({
         >
           <option value="">None</option>
           {UNITS.map(unit => (
-            <option key={unit.id} value={unit.name}>{unit.name}</option>
+            <option key={unit.id} value={unit.name}>
+              {unit.name}
+            </option>
           ))}
         </select>
       </td>
@@ -128,7 +132,9 @@ const ItemRow = ({
             className={`w-full px-1 py-1 text-xs border-0 outline-none bg-transparent ${theme.text.primary}`}
           >
             {GST_RATES.map(rate => (
-              <option key={rate.id} value={rate.id}>{rate.name}</option>
+              <option key={rate.id} value={rate.id}>
+                {rate.name}
+              </option>
             ))}
           </select>
           <div className={`px-1 py-1 text-xs text-right ${theme.text.primary}`}>
@@ -138,7 +144,9 @@ const ItemRow = ({
       </td>
 
       {/* Amount */}
-      <td className={`border ${theme.border} px-2 py-2 text-right text-sm font-medium ${theme.text.primary}`}>
+      <td
+        className={`border ${theme.border} px-2 py-2 text-right text-sm font-medium ${theme.text.primary}`}
+      >
         ₹{totalAmount.toFixed(2)}
       </td>
 

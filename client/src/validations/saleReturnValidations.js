@@ -43,11 +43,7 @@ const saleReturnCreateSchema = Yup.object({
 
   partyId: Yup.number().typeError("Party is required").integer().positive().required(),
 
-  saleId: Yup.number()
-    .typeError("Sale ID is required")
-    .integer()
-    .positive()
-    .notRequired(),
+  saleId: Yup.number().typeError("Sale ID is required").integer().positive().notRequired(),
 
   paidAmount: Yup.number()
     .transform((value, originalValue) =>

@@ -79,10 +79,7 @@ const SearchBar = ({
           disabled:cursor-not-allowed
         `}
         style={{
-          "--tw-ring-color": theme.accent
-            .replace("from-", "")
-            .replace("to-", "")
-            .split(" ")[0]
+          "--tw-ring-color": theme.accent.replace("from-", "").replace("to-", "").split(" ")[0]
         }}
         {...props}
       />

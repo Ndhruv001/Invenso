@@ -29,5 +29,5 @@ const me = async () => {
   }
 };
 
-export default {login, logout, me}
-export {login, logout, me}
+export default { login, logout, me };
+export { login, logout, me };

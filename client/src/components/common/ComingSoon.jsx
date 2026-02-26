@@ -19,16 +19,12 @@ const ComingSoon = () => {
           >
             SOON
           </h1>
-          <h2
-            className={`text-xl sm:text-2xl md:text-3xl font-semibold ${theme.text.primary}`}
-          >
+          <h2 className={`text-xl sm:text-2xl md:text-3xl font-semibold ${theme.text.primary}`}>
             We're Building Something New
           </h2>
-          <p
-            className={`${theme.text.secondary} max-w-md mx-auto text-sm sm:text-base`}
-          >
-            This feature is currently under construction. We'll be launching
-            soon, please check back later!
+          <p className={`${theme.text.secondary} max-w-md mx-auto text-sm sm:text-base`}>
+            This feature is currently under construction. We'll be launching soon, please check back
+            later!
           </p>
         </div>
 
