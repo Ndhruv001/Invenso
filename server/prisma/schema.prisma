@@ -224,7 +224,6 @@ model Purchase {
   party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   purchaseItems   PurchaseItem[]
   purchaseReturns PurchaseReturn[]
-  payments       Payment[]          @relation("PurchasePayments",)
   inventoryLogs  InventoryLog[]     @relation("PurchaseInventoryLogs")
 
   @@map("purchases")
@@ -273,7 +272,6 @@ model PurchaseReturn {
   party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   purchase        Purchase?         @relation(fields: [purchaseId], references: [id])
   purchaseReturnItems PurchaseReturnItem[]
-  payments        Payment[]          @relation("PurchaseReturnPayments")
   inventoryLogs   InventoryLog[]     @relation("PurchaseReturnInventoryLogs")
 
   @@map("purchase_returns")
@@ -327,7 +325,6 @@ model Sale {
   party         Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   saleItems    SaleItem[]
   saleReturns SaleReturn[]
-  payments    Payment[]          @relation("SalePayments")
   inventoryLogs InventoryLog[]   @relation("SaleInventoryLogs")
 
   @@map("sales")
@@ -382,7 +379,6 @@ model SaleReturn {
   party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
   sale            Sale              @relation(fields: [saleId], references: [id])
   saleReturnItems SaleReturnItem[]
-  payments       Payment[]          @relation("SaleReturnPayments")
   inventoryLogs  InventoryLog[]     @relation("SaleReturnInventoryLogs")
 
   @@map("sale_returns")
@@ -473,7 +469,6 @@ model Transport {
 
   party           Party             @relation("TransportParty", fields: [partyId], references: [id], onDelete: Restrict)
   driver          Party             @relation("TransportDriver", fields: [driverId], references: [id], onDelete: Restrict)
-  payments        Payment[]         @relation("TransportPayments")
 
   @@map("transports")
   @@index([partyId])
@@ -554,8 +549,6 @@ model Cheque {
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-
-  payments  Payment[] @relation("ChequePayments")
 
   @@unique([chequeNumber, bankName])
   @@index([type])
