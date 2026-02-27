@@ -93,7 +93,7 @@ async function listSaleReturns({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [saleReturns, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+  const [saleReturns, totalRows, groupedParties, aggregates, paidAmount] = await prisma.$transaction([
     prisma.saleReturn.findMany({
       where,
       skip,
@@ -128,7 +128,17 @@ async function listSaleReturns({
         paidAmount: true,
         totalProfitLoss: true
       }
-    })
+    }),
+     prisma.payment.aggregate({
+          where: {
+            ...(filters?.partyId && { partyId: filters.partyId }),
+            type: "PAID",
+            referenceType: "SALE_RETURN"
+          },
+          _sum: {
+            amount: true
+          }
+        })
   ]);
 
   /* -------------------- Stats -------------------- */
@@ -139,7 +149,7 @@ async function listSaleReturns({
     sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
     sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
     sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalPaid: Number(aggregates._sum.paidAmount) || 0,
+    sumTotalPaid: Number(paidAmount._sum.amount) || 0,
     sumTotalProfitLoss: Number(aggregates._sum.totalProfitLoss) || 0
   };
 

@@ -2,11 +2,21 @@
 
 import React, { useState, useCallback } from "react";
 import { toast } from "react-toastify";
+import {
+  Send,
+  Trash2,
+  BarChart3,
+  Database,
+  Bell,
+  MessageCircle,
+  Archive,
+  ClipboardList
+} from "lucide-react";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
-import { useSentInvoicesOnWhatsApp } from "@/hooks/useAdmin";
+import { useDeleteOldAuditLogs, useSentInvoicesOnWhatsApp } from "@/hooks/useAdmin";
 
 // ---------------------------
 // Config
@@ -17,16 +27,24 @@ const CRON_JOBS = [
     key: "pendingInvoices",
     label: "Pending Invoices",
     description: "Dispatch all unsent invoices to parties via WhatsApp",
-    icon: "📨",
+    icon: Send,
     confirmTitle: "Send Pending Invoices",
     confirmMessage:
       "This will dispatch all pending invoices to their respective parties via WhatsApp. Continue?"
   },
   {
+    key: "deleteOldAuditLogs",
+    label: "Delete Old Audit Logs",
+    description: "Delete all audit logs which are older than 14 days.",
+    icon: Trash2,
+    confirmTitle: "Delete Old Audit Logs",
+    confirmMessage: "This will delete all audit logs which are older than 14 days. Continue?"
+  },
+  {
     key: "weeklyLedger",
     label: "Weekly Ledger",
     description: "Send the weekly ledger summary to all active parties",
-    icon: "📊",
+    icon: BarChart3,
     confirmTitle: "Send Weekly Ledger",
     confirmMessage: "This will send the weekly ledger to all active parties. Continue?"
   },
@@ -34,7 +52,7 @@ const CRON_JOBS = [
     key: "backup",
     label: "Database Backup",
     description: "Trigger a full snapshot backup of the database",
-    icon: "🗄️",
+    icon: Database,
     confirmTitle: "Run Database Backup",
     confirmMessage: "This will initiate a full database backup. It may take a few minutes."
   }
@@ -45,25 +63,25 @@ const SETTINGS_ITEMS = [
     key: "notifications",
     label: "Notification Preferences",
     description: "Configure alerts for invoices, ledgers and system events",
-    icon: "🔔"
+    icon: Bell
   },
   {
     key: "whatsapp",
     label: "WhatsApp Integration",
     description: "Manage WhatsApp API credentials and templates",
-    icon: "💬"
+    icon: MessageCircle
   },
   {
     key: "retention",
     label: "Data Retention",
     description: "Set how long records and logs are kept before purging",
-    icon: "🗂️"
+    icon: Archive
   },
   {
     key: "auditLog",
     label: "Audit Log",
     description: "View a full trail of system and user activity",
-    icon: "📋"
+    icon: ClipboardList
   }
 ];
 
@@ -94,6 +112,7 @@ const System = () => {
   const [loading, setLoading] = useState({});
 
   const sentInvoicesOnWhatsAppMutation = useSentInvoicesOnWhatsApp();
+  const deleteOldAuditLogsMutation = useDeleteOldAuditLogs();
 
   const handleRun = useCallback(
     job => {
@@ -106,6 +125,9 @@ const System = () => {
             if (job.key === "pendingInvoices") {
               await sentInvoicesOnWhatsAppMutation.mutateAsync();
             }
+            if (job.key === "deleteOldAuditLogs") {
+              await deleteOldAuditLogsMutation.mutateAsync();
+            }
             toast.success(`${job.label} completed successfully`);
           } catch (err) {
             toast.error(err?.message || `${job.label} failed`);
@@ -115,7 +137,7 @@ const System = () => {
         }
       });
     },
-    [openDialog, sentInvoicesOnWhatsAppMutation]
+    [openDialog, sentInvoicesOnWhatsAppMutation, deleteOldAuditLogsMutation]
   );
 
   // TODO: wire individual setting handlers
@@ -140,7 +162,7 @@ const System = () => {
               className={`flex items-center justify-between gap-4 px-4 py-3 ${theme.card}`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-base shrink-0">{job.icon}</span>
+                <span className="text-base shrink-0">{React.createElement(job.icon, { size: 20 })}</span>
                 <div className="min-w-0">
                   <p className={`text-sm font-medium leading-snug ${theme.text.primary}`}>
                     {job.label}
@@ -194,7 +216,7 @@ const System = () => {
               `}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-base shrink-0">{item.icon}</span>
+                <span className="text-base shrink-0">{React.createElement(item.icon, { size: 20 })}</span>
                 <div className="min-w-0">
                   <p className={`text-sm font-medium leading-snug ${theme.text.primary}`}>
                     {item.label}

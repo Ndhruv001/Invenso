@@ -101,7 +101,7 @@ async function listPurchases({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [purchases, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+  const [purchases, totalRows, groupedParties, aggregates, paidAmount] = await prisma.$transaction([
     prisma.purchase.findMany({
       where,
       skip,
@@ -134,6 +134,16 @@ async function listPurchases({
         totalTaxableAmount: true,
         paidAmount: true
       }
+    }),
+    prisma.payment.aggregate({
+      where: {
+        ...(filters?.partyId && { partyId: filters.partyId }),
+        type: "PAID",
+        referenceType: "PURCHASE"
+      },
+      _sum: {
+        amount: true
+      }
     })
   ]);
 
@@ -145,7 +155,7 @@ async function listPurchases({
     sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
     sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
     sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalPaid: Number(aggregates._sum.paidAmount) || 0
+    sumTotalPaid: Number(paidAmount._sum.amount) || 0
   };
 
   /* -------------------- Response -------------------- */

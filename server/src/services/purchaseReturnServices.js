@@ -97,7 +97,7 @@ async function listPurchaseReturns({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [purchaseReturns, totalRows, groupedParties, aggregates] = await prisma.$transaction([
+  const [purchaseReturns, totalRows, groupedParties, aggregates, receivedAmount] = await prisma.$transaction([
     prisma.purchaseReturn.findMany({
       where,
       skip,
@@ -133,6 +133,17 @@ async function listPurchaseReturns({
         totalTaxableAmount: true,
         receivedAmount: true
       }
+    }),
+
+    prisma.payment.aggregate({
+      where: {
+        ...(filters?.partyId && { partyId: filters.partyId }),
+        type: "RECEIVED",
+        referenceType: "PURCHASE_RETURN"
+      },
+      _sum: {
+        amount: true
+      }
     })
   ]);
 
@@ -144,7 +155,7 @@ async function listPurchaseReturns({
     sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
     sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
     sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalReceived: Number(aggregates._sum.receivedAmount) || 0
+    sumTotalReceived: Number(receivedAmount._sum.amount) || 0
   };
 
   /* -------------------- Response -------------------- */

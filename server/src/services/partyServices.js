@@ -125,26 +125,6 @@ async function listParties({
     return bal > 0 ? sum + bal : sum;
   }, 0);
 
-  const result = balanceRows.reduce(
-    (acc, p) => {
-      const balance = Number(p.openingBalance || 0);
-
-      if (balance < 0) {
-        // Receivable (party owes us)
-        acc.receivable += Math.abs(balance);
-      } else if (balance > 0) {
-        // Payable (we owe party)
-        acc.payable += balance;
-      }
-
-      return acc;
-    },
-    { receivable: 0, payable: 0 }
-  );
-
-  const receivableOpeningBalance = result.receivable;
-  const payableOpeningBalance = result.payable;
-
   /* -------------------- Response -------------------- */
 
   return {
@@ -159,7 +139,6 @@ async function listParties({
       totalParties: totalRows,
       totalReceivable,
       totalPayable,
-      openingBalance: { receivableOpeningBalance, payableOpeningBalance }
     }
   };
 }

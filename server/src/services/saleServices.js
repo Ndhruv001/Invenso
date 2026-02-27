@@ -93,7 +93,7 @@ async function listSales({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [sales, totalRows, groupedParties, aggregates, paymentReceived] = await prisma.$transaction(
+  const [sales, totalRows, groupedParties, aggregates, receivedAmount] = await prisma.$transaction(
     [
       prisma.sale.findMany({
         where,
@@ -129,12 +129,16 @@ async function listSales({
           totalProfit: true
         }
       }),
-      prisma.payment.aggregate({
-        where: { referenceType: "SALE" },
-        _sum: {
-          amount: true
-        }
-      })
+       prisma.payment.aggregate({
+            where: {
+              ...(filters?.partyId && { partyId: filters.partyId }),
+              type: "RECEIVED",
+              referenceType: "SALE"
+            },
+            _sum: {
+              amount: true
+            }
+          })
     ]
   );
 
@@ -146,8 +150,8 @@ async function listSales({
     sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
     sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
     sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalReceived:
-      (Number(aggregates?._sum?.receivedAmount) || 0) + (Number(paymentReceived._sum?.amount) || 0),
+    sumTotalReceived:Number(receivedAmount._sum.amount) || 0,
+     
     sumTotalProfit: Number(aggregates._sum.totalProfit) || 0
   };
 

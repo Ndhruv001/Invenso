@@ -58,3 +58,39 @@ ${invoice.type === "sale" ? "कृपया अटैच किया हुआ
 
   return { success: true };
 }
+
+/**
+ * Send summary message to host/admin after invoices are sent
+ * @param {Number} totalInvoices - Total invoices sent successfully
+ */
+export async function sendInvoiceSummaryToHost(totalInvoices = 0) {
+  console.log("📊 Preparing host summary message...");
+
+  // 🔹 YOUR HOST NUMBER (CHANGE THIS)
+  let hostPhone = "918882362297"; // <-- put your WhatsApp number here
+
+  // Clean number
+  hostPhone = hostPhone.replace(/\D/g, "");
+
+  const chatId = `${hostPhone}@c.us`;
+
+  if (!client.info) {
+    throw new Error("WhatsApp client not ready");
+  }
+
+  const message = `✅ Invoice Sending Completed
+
+📦 Total Invoices Sent Successfully: ${totalInvoices}
+
+🕒 Time: ${new Date().toLocaleString()}
+
+System Notification`;
+
+  console.log("📨 Sending summary to host...");
+
+  await client.sendMessage(chatId, message);
+
+  console.log("✅ Host summary sent");
+
+  return { success: true };
+}

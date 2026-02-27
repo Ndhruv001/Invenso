@@ -5,7 +5,7 @@ import {
 } from "../services/invoiceAutomationServices.js";
 import { getSaleInvoicePdf } from "../services/saleServices.js";
 import { getSaleReturnInvoicePdf } from "../services/saleReturnServices.js";
-import { sendInvoiceOnWhatsApp } from "./whatsappSender.js";
+import { sendInvoiceOnWhatsApp, sendInvoiceSummaryToHost } from "./whatsappSender.js";
 
 let isProcessing = false;
 
@@ -90,6 +90,7 @@ export const processDailyWhatsAppInvoices = async () => {
     console.error("🔥 Critical Automation Failure:", error);
   } finally {
     isProcessing = false;
+    await sendInvoiceSummaryToHost(limitedBatch?.length);
     console.log("🔓 Automation lock released, due to end of all invoices.");
   }
 };

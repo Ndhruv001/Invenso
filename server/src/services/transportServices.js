@@ -104,7 +104,7 @@ async function listTransports({
   const orderBy =
     safeSortBy === "party" ? { party: { name: sortOrder } } : { [safeSortBy]: sortOrder };
 
-  const [data, totalRows, partyGroups, driverGroups, sums] = await prisma.$transaction([
+  const [data, totalRows, partyGroups, driverGroups, sums, receivedAmount] = await prisma.$transaction([
     prisma.transport.findMany({
       where,
       skip,
@@ -119,7 +119,16 @@ async function listTransports({
       where,
       _sum: {
         amount: true,
-        receivedAmount: true
+      }
+    }), 
+     prisma.payment.aggregate({
+      where: {
+        ...(filters?.partyId && { partyId: filters.partyId }),
+        type: "RECEIVED",
+        referenceType: "TRANSPORT"
+      },
+      _sum: {
+        amount: true
       }
     })
   ]);
@@ -136,7 +145,7 @@ async function listTransports({
       totalDistinctParty: partyGroups.length,
       totalDistinctDriver: driverGroups.length,
       totalAmount: Number(sums._sum.amount) || 0,
-      totalReceived: Number(sums._sum.receivedAmount) || 0
+      totalReceived: Number(receivedAmount._sum.amount) || 0
     }
   };
 }

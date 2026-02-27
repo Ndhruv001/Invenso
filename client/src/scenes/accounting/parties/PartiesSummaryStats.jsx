@@ -46,19 +46,10 @@ const PartySummaryStats = ({ stats }) => {
       icon: ArrowUpRight,
       color: "danger"
     },
-    {
-      title: "Opening Balance",
-      value: formatCurrency(stats?.openingBalance?.receivableOpeningBalance) ?? 0,
-      secondaryValue: formatCurrency(stats?.openingBalance?.payableOpeningBalance) ?? 0,
-      secondaryLabel: "Payable",
-      subtitle: "Sum of opening balances",
-      icon: Wallet,
-      color: "warning"
-    }
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item, idx) => (
         <StatCard key={idx} {...item} />
       ))}
