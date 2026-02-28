@@ -827,7 +827,7 @@ async function deleteSaleReturn(saleReturnId, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "SALE_RETURN",
-        saleReturnId: Number(saleReturnId)
+        referenceId: Number(saleReturnId),
       }
     });
 

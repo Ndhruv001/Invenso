@@ -25,6 +25,20 @@ function buildDateFilter({ from, to }) {
   return Object.keys(cond).length ? cond : undefined;
 }
 
+const CHEQUE_STATUS_TRANSITIONS = {
+  INWARD: {
+    RECEIVED: ["DEPOSITED", "BOUNCED"],
+    DEPOSITED: ["CLEARED", "BOUNCED"],
+    CLEARED: [],
+    BOUNCED: []
+  },
+  OUTWARD: {
+    ISSUED: ["ENCASHED", "BOUNCED"],
+    ENCASHED: [],
+    BOUNCED: []
+  }
+};
+
 /* -------------------------------------------------------------------------- */
 /*                               List Cheques                                 */
 /* -------------------------------------------------------------------------- */
@@ -239,6 +253,19 @@ async function updateCheque(id, data, userId = null) {
     const oldStatus = existing.status;
     const newStatus = data.status ?? oldStatus;
 
+    if (newStatus !== oldStatus) {
+      const chequeType = existing.type;
+
+      const allowedTransitions = CHEQUE_STATUS_TRANSITIONS[chequeType]?.[oldStatus] || [];
+
+      if (!allowedTransitions.includes(newStatus)) {
+        throw new AppError(
+          `Invalid status transition from ${oldStatus} to ${newStatus} for ${chequeType} cheque`,
+          400
+        );
+      }
+    }
+
     const oldPartyId = existing.partyId;
     const newPartyId = data.partyId !== undefined ? data.partyId : oldPartyId;
 
@@ -255,7 +282,8 @@ async function updateCheque(id, data, userId = null) {
     ) {
       const linkedPayment = await tx.payment.findFirst({
         where: {
-          chequeId: existing.id
+          referenceId : existing.id,
+          paymentMode: "CHEQUE"
         }
       });
 
@@ -384,7 +412,7 @@ async function deleteCheque(id, userId = null) {
       (existing.status === "ENCASHED" && existing.type === "OUTWARD")
     ) {
       const linkedPayment = await tx.payment.findFirst({
-        where: { chequeId: existing.id }
+        where: { referenceId : existing.id, paymentMode: "CHEQUE" }
       });
 
       if (linkedPayment) {

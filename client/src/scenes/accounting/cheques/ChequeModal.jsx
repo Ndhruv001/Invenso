@@ -37,6 +37,43 @@ const extractModifiedFields = (currentFormValues, fieldsUserModified) => {
   return updatePayload;
 };
 
+export const CHEQUE_STATUS_TRANSITIONS = {
+  INWARD: {
+    RECEIVED: ["DEPOSITED", "BOUNCED"],
+    DEPOSITED: ["CLEARED", "BOUNCED"],
+    CLEARED: [],
+    BOUNCED: []
+  },
+  OUTWARD: {
+    ISSUED: ["ENCASHED", "BOUNCED"],
+    ENCASHED: [],
+    BOUNCED: []
+  }
+};
+
+function validateChequeTransition(existingCheque, payload) {
+  const oldStatus = existingCheque.status;
+  const newStatus = payload.status ?? oldStatus;
+  const chequeType = existingCheque.type;
+
+  // If status not changing → valid
+  if (newStatus === oldStatus) {
+    return { valid: true };
+  }
+
+  const allowedTransitions =
+    CHEQUE_STATUS_TRANSITIONS[chequeType]?.[oldStatus] || [];
+
+  if (!allowedTransitions.includes(newStatus)) {
+    return {
+      valid: false,
+      message: `Invalid status transition from ${oldStatus} to ${newStatus}`
+    };
+  }
+
+  return { valid: true };
+}
+
 const ChequeModal = ({
   onSubmit,
   onCancel,
@@ -121,6 +158,12 @@ const ChequeModal = ({
       let payload = values;
       if (initialData) {
         payload = extractModifiedFields(values, dirtyFields);
+        const validateCheque = validateChequeTransition(initialData, payload);
+        if(!validateCheque.valid){
+          toast.error(validateCheque.message);
+          return;
+        }
+
       }
       onSubmit(payload);
       if (!initialData) reset(defaultValues);
@@ -130,7 +173,6 @@ const ChequeModal = ({
       }
     },
     errors => {
-      console.log("🚀 ~ ChequeModal ~ errors:", errors);
       if (Object.keys(errors).length > 0) {
         toast.error("Please fix validation errors before submitting.");
       }

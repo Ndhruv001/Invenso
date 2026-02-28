@@ -8,6 +8,7 @@ import { getSaleReturnInvoicePdf } from "../services/saleReturnServices.js";
 import { sendInvoiceOnWhatsApp, sendInvoiceSummaryToHost } from "./whatsappSender.js";
 
 let isProcessing = false;
+let limitedBatch = 0;
 
 // Random delay helper (1–7 sec)
 const delayRandom = async () => {
@@ -35,7 +36,7 @@ export const processDailyWhatsAppInvoices = async () => {
     }
 
     // 3️⃣ Strict global limit (50 total)
-    const limitedBatch = invoices.slice(0, 50);
+    limitedBatch = invoices.slice(0, 50);
 
     console.log(`📦 Processing ${limitedBatch.length} invoices (Global Limit Applied)`);
 
