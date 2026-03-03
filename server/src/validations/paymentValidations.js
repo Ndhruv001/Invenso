@@ -53,23 +53,8 @@ const validateCreatePayment = [
     .isIn(REFERENCE_TYPES)
     .withMessage(`Reference type must be one of: ${REFERENCE_TYPES.join(", ")}`),
 
-  body("paymentReference").optional().isString().trim(),
-
   body("remark").optional().isString().trim(),
 
-  // --------------------
-  // Reference IDs (only validated as integers here)
-  // Business logic validation belongs in service/controller
-  // --------------------
-  body("purchaseId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("saleId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("purchaseReturnId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("saleReturnId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("transportId").optional().isInt({ gt: 0 }).toInt()
 ];
 
 // --------------------
@@ -88,19 +73,8 @@ const validateUpdatePayment = [
 
   body("referenceType").optional().isIn(REFERENCE_TYPES),
 
-  body("paymentReference").optional().isString().trim(),
-
   body("remark").optional().isString().trim(),
 
-  body("purchaseId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("saleId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("purchaseReturnId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("saleReturnId").optional().isInt({ gt: 0 }).toInt(),
-
-  body("transportId").optional().isInt({ gt: 0 }).toInt()
 ];
 
 // --------------------

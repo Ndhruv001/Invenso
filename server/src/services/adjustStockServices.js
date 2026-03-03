@@ -38,7 +38,7 @@ async function createAdjustStock(data, userId = null) {
       where: { id: data.productId }
     });
 
-    if (!product || !product.isActive) throw new AppError("Product not found", 404);
+    if (!product) throw new AppError("Product not found", 404);
 
     const balanceBefore = Number(product.currentStock) || 0;
     let balanceAfter = balanceBefore;

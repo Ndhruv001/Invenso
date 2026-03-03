@@ -4,59 +4,51 @@
  */
 
 import React from "react";
-import { Users, CreditCard, DollarSign, FileText } from "lucide-react";
+import {
+  FileText,
+  Users,
+  DollarSign,
+  CreditCard,
+  Wallet,
+  TrendingDown
+} from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/helpers/formatters";
 
-/**
- * @typedef {Object} PurchasesSummaryStatsProps
- * @property {Object} stats - API stats object.
- * @property {number} stats.totalParties
- * @property {number} stats.sumTotalAmount
- * @property {number} stats.sumTotalGst
- * @property {number} stats.sumTotalPaid
- */
-
-/**
- * PurchasesSummaryStats - Renders a responsive grid of StatCards.
- *
- * @param {PurchasesSummaryStatsProps} props
- * @returns {JSX.Element}
- */
 const PurchasesSummaryStats = ({ stats }) => {
   const items = [
     {
-      title: "Total Parties",
-      value: stats?.totalParties ?? 0,
-      subtitle: "Vendors and suppliers",
-      icon: Users,
-      color: "success"
-    },
-    {
-      title: "Total Purchase Amount",
-      value: formatCurrency(stats?.sumTotalAmount) ?? 0,
-      subtitle: "Overall purchase value (₹)",
-      icon: FileText,
-      color: "primary"
-    },
-    {
-      title: "Total GST",
-      value: formatCurrency(stats?.sumTotalGst) ?? 0,
-      subtitle: "Total GST paid (₹)",
+      title: "Gross Purchases",
+      value: formatCurrency(stats?.grossPurchases ?? 0),
+      subtitle: "Total billed purchase amount (₹)",
       icon: DollarSign,
+      color: "info"
+    },
+    {
+      title: "Net Purchases",
+      value: formatCurrency(stats?.netPurchases ?? 0),
+      subtitle: "After purchase returns (₹)",
+      icon: TrendingDown,
       color: "warning"
     },
     {
-      title: "Total Paid Amount",
-      value: formatCurrency(stats?.sumTotalPaid) ?? 0,
-      subtitle: "Total amount paid (₹)",
+      title: "Total Paid",
+      value: formatCurrency(stats?.totalPaid ?? 0),
+      subtitle: "Amount paid to suppliers (₹)",
       icon: CreditCard,
-      color: "info"
+      color: "success"
+    },
+    {
+      title: "Outstanding Payable",
+      value: formatCurrency(stats?.outstandingPayable ?? 0),
+      subtitle: "Pending supplier payments (₹)",
+      icon: Wallet,
+      color: "danger"
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item, idx) => (
         <StatCard key={idx} {...item} />
       ))}

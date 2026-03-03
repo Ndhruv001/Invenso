@@ -34,8 +34,6 @@ const validateCreateSaleReturn = [
     .isIn(PAYMENT_MODES)
     .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
 
-  body("paymentReference").optional().isString().trim(),
-
   body("reason").optional().isString().trim(),
 
   body("paidAmount").optional().isDecimal().toFloat(),
@@ -73,8 +71,6 @@ const validateUpdateSaleReturn = [
   body("date").optional().isISO8601(),
 
   body("paymentMode").optional().isIn(PAYMENT_MODES),
-
-  body("paymentReference").optional().isString().trim(),
 
   body("reason").optional().isString().trim(),
 

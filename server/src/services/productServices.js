@@ -26,7 +26,6 @@ import AppError from "../utils/appErrorUtils.js";
 // List all distinct HSN Codes from Product table (only active products)
 async function listHsnCodes() {
   return await prisma.product.findMany({
-    where: { isActive: true },
     distinct: ["hsnCode"],
     orderBy: { hsnCode: "asc" },
     select: {
@@ -165,7 +164,7 @@ async function getProductById(id) {
     include: { category: true }
   });
 
-  if (!product || !product.isActive) throw new AppError("Product not found", 404);
+  if (!product) throw new AppError("Product not found", 404);
 
   return product;
 }
@@ -261,7 +260,7 @@ async function updateProduct(id, data, userId = null) {
       where: { id }
     });
 
-    if (!existing || !existing.isActive) {
+    if (!existing) {
       throw new AppError("Product not found", 404);
     }
 
@@ -361,25 +360,34 @@ async function deleteProduct(id, userId = null) {
   if (!id) throw new AppError("Product ID is required", 400);
 
   return await prisma.$transaction(async tx => {
-    const existing = await tx.product.findUnique({ where: { id } });
-    if (!existing || !existing.isActive) throw new AppError("Product not found", 404);
+    try {
+      const existing = await tx.product.findUnique({ where: { id } });
+      if (!existing) throw new AppError("Product not found", 404);
 
-    await tx.product.update({
-      where: { id },
-      data: { isActive: false }
-    });
+      await tx.product.delete({
+        where: { id }
+      });
 
-    await tx.auditLog.create({
-      data: {
-        tableName: "products",
-        recordId: String(id),
-        action: "DELETE",
-        oldValue: JSON.stringify(existing),
-        userId
+      await tx.auditLog.create({
+        data: {
+          tableName: "products",
+          recordId: String(id),
+          action: "DELETE",
+          oldValue: JSON.stringify(existing),
+          userId
+        }
+      });
+
+      return true;
+    } catch (error) {
+      if (error.code === "P2003") {
+        throw new AppError(
+          "Cannot delete party: existing sales, purchases, or transactions are linked to it.",
+          P2003
+        );
       }
-    });
-
-    return true;
+      throw new AppError("Something went wrong when deleting product", 501);
+    }
   });
 }
 
@@ -393,7 +401,6 @@ async function suggestProductNames(query, partyId, type = "sale") {
 
   const products = await prisma.product.findMany({
     where: {
-      isActive: true,
       name: {
         contains: query.trim(),
         mode: "insensitive"

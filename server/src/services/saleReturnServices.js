@@ -93,65 +93,76 @@ async function listSaleReturns({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [saleReturns, totalRows, groupedParties, aggregates, paidAmount] = await prisma.$transaction([
-    prisma.saleReturn.findMany({
-      where,
-      skip,
-      take,
-      orderBy,
-      include: {
-        party: true,
-        sale: true,
-        saleReturnItems: {
-          include: {
-            product: {
-              include: { category: true }
-            }
+  const [
+  saleReturns,
+  totalRows,
+  groupedParties,
+  returnAggregates,
+  refundAggregates
+] = await prisma.$transaction([
+
+  prisma.saleReturn.findMany({
+    where,
+    skip,
+    take,
+    orderBy,
+    include: {
+      party: true,
+      sale: true,
+      saleReturnItems: {
+        include: {
+          product: {
+            include: { category: true }
           }
         }
       }
-    }),
+    }
+  }),
 
-    prisma.saleReturn.count({ where }),
+  prisma.saleReturn.count({ where }),
 
-    prisma.saleReturn.groupBy({
-      by: ["partyId"],
-      where
-    }),
+  prisma.saleReturn.groupBy({
+    by: ["partyId"],
+    where
+  }),
 
-    prisma.saleReturn.aggregate({
-      where,
-      _sum: {
-        totalAmount: true,
-        totalGstAmount: true,
-        totalTaxableAmount: true,
-        paidAmount: true,
-        totalProfitLoss: true
-      }
-    }),
-     prisma.payment.aggregate({
-          where: {
-            ...(filters?.partyId && { partyId: filters.partyId }),
-            type: "PAID",
-            referenceType: "SALE_RETURN"
-          },
-          _sum: {
-            amount: true
-          }
-        })
-  ]);
+  // 🔴 Return Activity
+  prisma.saleReturn.aggregate({
+    where,
+    _sum: {
+      totalAmount: true,
+      totalProfitLoss: true
+    }
+  }),
+
+  // 🔵 Refund Payments (do NOT restrict strictly by referenceType)
+  prisma.payment.aggregate({
+    where: {
+      ...(filters?.partyId && { partyId: filters.partyId }),
+      referenceType: "SALE_RETURN",
+      type: "PAID"
+    },
+    _sum: {
+      amount: true
+    }
+  })
+]);
 
   /* -------------------- Stats -------------------- */
 
-  const stats = {
-    totalSaleReturns: totalRows,
-    totalParties: groupedParties.length,
-    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
-    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
-    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalPaid: Number(paidAmount._sum.amount) || 0,
-    sumTotalProfitLoss: Number(aggregates._sum.totalProfitLoss) || 0
-  };
+  const grossReturns = Number(returnAggregates._sum.totalAmount) || 0;
+const totalRefunded = Number(refundAggregates._sum.amount) || 0;
+
+const pendingRefund = grossReturns - totalRefunded;
+
+const stats = {
+  totalSaleReturns: totalRows,
+  totalParties: groupedParties.length,
+  grossReturns,
+  totalRefunded,
+  pendingRefund,
+  totalProfitLoss: Number(returnAggregates._sum.totalProfitLoss) || 0
+};
 
   /* -------------------- Response -------------------- */
 
@@ -199,7 +210,6 @@ async function createSaleReturn(data, userId = null) {
     saleId,
     paidAmount = 0,
     paymentMode,
-    paymentReference,
     reason,
     items
   } = data;
@@ -241,7 +251,7 @@ async function createSaleReturn(data, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found`, 404);
       }
 
@@ -292,7 +302,6 @@ async function createSaleReturn(data, userId = null) {
       totalProfitLoss,
       paidAmount: Number(paidAmount),
       ...(paymentMode && { paymentMode }),
-      ...(paymentReference && { paymentReference }),
       ...(reason && { reason })
     };
 
@@ -360,7 +369,6 @@ async function createSaleReturn(data, userId = null) {
           referenceType: "SALE_RETURN",
           referenceId: parseInt(saleReturn.id),
           paymentMode,
-          paymentReference: `Received for Sale Return: ${saleReturn.id}`,
           remark: reason
         }
       });
@@ -419,10 +427,6 @@ async function updateSaleReturn(saleReturnId, data, userId = null) {
 
     if (data.paymentMode !== undefined) {
       saleReturnUpdateData.paymentMode = data.paymentMode;
-    }
-
-    if (data.paymentReference !== undefined) {
-      saleReturnUpdateData.paymentReference = data.paymentReference;
     }
 
     if (data.reason !== undefined) {
@@ -497,7 +501,7 @@ async function updateSaleReturn(saleReturnId, data, userId = null) {
             where: { id: existingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product ) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -557,7 +561,7 @@ async function updateSaleReturn(saleReturnId, data, userId = null) {
             where: { id: incomingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product ) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -690,7 +694,6 @@ async function updateSaleReturn(saleReturnId, data, userId = null) {
         partyId: newPartyId, // always follow updated party
         amount: newPaid,
         paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
-        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
         remark: data.remark ?? existingPayment?.remark ?? null
       };
 
@@ -772,7 +775,7 @@ async function deleteSaleReturn(saleReturnId, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found or inactive`, 404);
       }
 
@@ -827,7 +830,7 @@ async function deleteSaleReturn(saleReturnId, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "SALE_RETURN",
-        referenceId: Number(saleReturnId),
+        referenceId: parseInt(saleReturnId),
       }
     });
 
@@ -907,7 +910,6 @@ async function getSaleReturnInvoicePdf(saleReturnId) {
     paid_amount: saleReturn.paidAmount.toString(),
     pending_amount: pending.toFixed(2),
     payment_mode: saleReturn.paymentMode,
-    payment_reference: saleReturn.paymentReference ?? "",
     reason: saleReturn.reason ?? "",
     generated_at: new Date().toLocaleString("en-IN"),
     item_rows: itemRowsHtml // 🔥 Inject rows here

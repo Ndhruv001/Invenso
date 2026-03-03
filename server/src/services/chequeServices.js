@@ -282,7 +282,7 @@ async function updateCheque(id, data, userId = null) {
     ) {
       const linkedPayment = await tx.payment.findFirst({
         where: {
-          referenceId : existing.id,
+          referenceId : parseInt(existing.id),
           paymentMode: "CHEQUE"
         }
       });
@@ -355,7 +355,6 @@ async function updateCheque(id, data, userId = null) {
           amount: newAmount,
           referenceType: `${paymentType === "PAID" ? "PURCHASE" : "SALE"}`,
           paymentMode: "CHEQUE",
-          paymentReference: `${paymentType} against Cheque: ${updatedCheque.id}`,
           partyId: newPartyId,
           referenceId: parseInt(updatedCheque.id)
         }
@@ -412,7 +411,7 @@ async function deleteCheque(id, userId = null) {
       (existing.status === "ENCASHED" && existing.type === "OUTWARD")
     ) {
       const linkedPayment = await tx.payment.findFirst({
-        where: { referenceId : existing.id, paymentMode: "CHEQUE" }
+        where: { referenceId : parseInt(existing.id), paymentMode: "CHEQUE" }
       });
 
       if (linkedPayment) {

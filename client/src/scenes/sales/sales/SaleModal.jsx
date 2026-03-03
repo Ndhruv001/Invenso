@@ -70,7 +70,6 @@ const SaleModal = ({
   mode = "view", // "view" | "edit" | "create"
   setMode = null
 }) => {
-  console.log("🚀 ~ SaleModal ~ initialData:", initialData);
   const { theme } = useTheme();
 
   /* ----------------------- PARTY INPUT ------------------------ */
@@ -103,7 +102,6 @@ const SaleModal = ({
         : new Date().toISOString().slice(0, 10),
 
       paymentMode: initialData?.paymentMode ?? "NONE",
-      paymentReference: initialData?.paymentReference ?? "",
       receivedAmount: Number(initialData?.receivedAmount ?? 0),
       remarks: initialData?.remarks ?? "",
       totalAmount: Number(initialData?.totalAmount ?? 0),
@@ -364,7 +362,7 @@ const SaleModal = ({
   }, [mode, setMode, isDirty, reset, defaultValues, openDialog]);
 
   // Disabled state
-  const isDisabled = !mode || isSubmitting || isLoading;
+  const isDisabled = mode === "view" || isSubmitting || isLoading;
 
   return (
     <>
@@ -753,18 +751,6 @@ const SaleModal = ({
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Payment Reference
-                      </label>
-                      <input
-                        type="text"
-                        {...register("paymentReference")}
-                        disabled={isDisabled}
-                        className={`w-48 px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                        placeholder="Payment reference"
-                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>

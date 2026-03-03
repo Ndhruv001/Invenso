@@ -34,8 +34,6 @@ const validateCreatePurchase = [
     .isIn(PAYMENT_MODES)
     .withMessage(`Payment mode must be one of: ${PAYMENT_MODES.join(", ")}`),
 
-  body("paymentReference").optional().isString().trim(),
-
   body("remarks").optional().isString().trim(),
 
   body("paidAmount").optional().isDecimal().toFloat(),
@@ -70,8 +68,6 @@ const validateUpdatePurchase = [
   body("date").optional().isISO8601(),
 
   body("paymentMode").optional().isIn(PAYMENT_MODES),
-
-  body("paymentReference").optional().isString().trim(),
 
   body("remarks").optional().isString().trim(),
 

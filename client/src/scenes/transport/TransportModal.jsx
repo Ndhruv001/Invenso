@@ -79,7 +79,7 @@ const TransportModal = ({
       toLocation: initialData?.toLocation || "",
       amount: initialData?.amount ?? "",
       receivedAmount: initialData?.receivedAmount ?? "",
-      paymentMode: initialData?.paymentMode || "",
+      paymentMode: initialData?.paymentMode || "NONE",
       paymentReference: initialData?.paymentReference || "",
       remark: initialData?.remark || ""
     }),
@@ -160,7 +160,6 @@ const TransportModal = ({
         payload = extractModifiedFields(values, dirtyFields);
       }
       onSubmit(payload);
-      console.log("🚀 ~ TransportModal ~ payload:", payload);
       if (!initialData) reset(defaultValues);
       if (initialData && mode === "edit") {
         onCancel();

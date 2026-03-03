@@ -67,7 +67,8 @@ export async function sendInvoiceSummaryToHost(totalInvoices = 0) {
   console.log("📊 Preparing host summary message...");
 
   // 🔹 YOUR HOST NUMBER (CHANGE THIS)
-  let hostPhone = "918882362297"; // <-- put your WhatsApp number here
+  let hostPhone = process.env.HOST_MOBILE_NUMBER || "" // <-- put your WhatsApp number here
+
 
   // Clean number
   hostPhone = hostPhone.replace(/\D/g, "");
@@ -84,7 +85,7 @@ export async function sendInvoiceSummaryToHost(totalInvoices = 0) {
 
 🕒 Time: ${new Date().toLocaleString()}
 
-System Notification`;
+Powered by Invenso`;
 
   console.log("📨 Sending summary to host...");
 

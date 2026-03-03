@@ -93,67 +93,89 @@ async function listSales({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [sales, totalRows, groupedParties, aggregates, receivedAmount] = await prisma.$transaction(
-    [
-      prisma.sale.findMany({
-        where,
-        skip,
-        take,
-        orderBy,
+  const [
+  sales,
+  totalRows,
+  groupedParties,
+  saleAggregates,
+  saleReturnAggregates,
+  receivedAggregates
+] = await prisma.$transaction([
+  
+  prisma.sale.findMany({
+    where,
+    skip,
+    take,
+    orderBy,
+    include: {
+      party: true,
+      saleItems: {
         include: {
-          party: true,
-          saleItems: {
-            include: {
-              product: {
-                include: { category: true }
-              }
-            }
+          product: {
+            include: { category: true }
           }
         }
-      }),
+      }
+    }
+  }),
 
-      prisma.sale.count({ where }),
+  prisma.sale.count({ where }),
 
-      prisma.sale.groupBy({
-        by: ["partyId"],
-        where
-      }),
+  prisma.sale.groupBy({
+    by: ["partyId"],
+    where
+  }),
 
-      prisma.sale.aggregate({
-        where,
-        _sum: {
-          totalAmount: true,
-          totalGstAmount: true,
-          totalTaxableAmount: true,
-          receivedAmount: true,
-          totalProfit: true
-        }
-      }),
-       prisma.payment.aggregate({
-            where: {
-              ...(filters?.partyId && { partyId: filters.partyId }),
-              type: "RECEIVED",
-              referenceType: "SALE"
-            },
-            _sum: {
-              amount: true
-            }
-          })
-    ]
-  );
+  // Gross Sales Aggregates
+  prisma.sale.aggregate({
+    where,
+    _sum: {
+      totalAmount: true,
+      totalProfit: true
+    }
+  }),
+
+  // 🔴 Sale Returns Aggregates
+  prisma.saleReturn.aggregate({
+    where,
+    _sum: {
+      totalAmount: true,
+      totalProfitLoss: true
+    }
+  }),
+
+  // 🔵 Total Received (DO NOT filter by referenceType)
+  prisma.payment.aggregate({
+    where: {
+      ...(filters?.partyId && { partyId: filters.partyId }),
+      type: "RECEIVED",
+      referenceType: "SALE"
+    },
+    _sum: {
+      amount: true
+    }
+  })
+]);
 
   /* -------------------- Stats -------------------- */
 
-  const stats = {
-    totalSales: totalRows,
-    totalParties: groupedParties.length,
-    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
-    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
-    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalReceived:Number(receivedAmount._sum.amount) || 0,
-     
-    sumTotalProfit: Number(aggregates._sum.totalProfit) || 0
-  };
+ const grossSales = Number(saleAggregates._sum.totalAmount) || 0;
+const totalReturns = Number(saleReturnAggregates._sum.totalAmount) || 0;
+const totalReceived = Number(receivedAggregates._sum.amount) || 0;
+
+const netSales = grossSales - totalReturns;
+const outstandingReceivable = netSales - totalReceived;
+
+const stats = {
+  totalInvoices: totalRows,
+  totalParties: groupedParties.length,
+  grossSales,
+  totalReturns,
+  netSales,
+  totalReceived,
+  outstandingReceivable,
+  totalProfit: (Number(saleAggregates._sum.totalProfit) - Number(saleReturnAggregates._sum.totalProfitLoss )) || 0
+};
 
   /* -------------------- Response -------------------- */
 
@@ -200,7 +222,6 @@ async function createSale(data, userId = null) {
     invoiceNumber,
     receivedAmount = 0,
     paymentMode,
-    paymentReference,
     remarks,
     items
   } = data;
@@ -230,7 +251,7 @@ async function createSale(data, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found`, 404);
       }
 
@@ -272,7 +293,6 @@ async function createSale(data, userId = null) {
       totalProfit,
       receivedAmount: Number(receivedAmount),
       ...(paymentMode && { paymentMode }),
-      ...(paymentReference && { paymentReference }),
       ...(remarks && { remarks })
     };
 
@@ -344,7 +364,6 @@ async function createSale(data, userId = null) {
           referenceType: "SALE",
           referenceId: parseInt(sale.id),
           paymentMode,
-          paymentReference: `Received for Sale: ${sale.id}`,
           remark: remarks
         }
       });
@@ -404,10 +423,6 @@ async function updateSale(saleId, data, userId = null) {
 
     if (data.paymentMode !== undefined) {
       saleUpdateData.paymentMode = data.paymentMode;
-    }
-
-    if (data.paymentReference !== undefined) {
-      saleUpdateData.paymentReference = data.paymentReference;
     }
 
     if (data.remarks !== undefined) {
@@ -478,7 +493,7 @@ async function updateSale(saleId, data, userId = null) {
             where: { id: existingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product ) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -544,7 +559,7 @@ async function updateSale(saleId, data, userId = null) {
             where: { id: incomingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product ) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -684,7 +699,6 @@ async function updateSale(saleId, data, userId = null) {
         partyId: newPartyId, // always follow updated party
         amount: newReceived,
         paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
-        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
         remark: data.remark ?? existingPayment?.remark ?? null
       };
 
@@ -766,7 +780,7 @@ async function deleteSale(saleId, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found or inactive`, 404);
       }
 
@@ -817,7 +831,7 @@ async function deleteSale(saleId, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "SALE",
-        saleId: Number(saleId)
+        referenceId: Number(saleId)
       }
     });
 
@@ -927,7 +941,6 @@ async function getSaleInvoicePdf(saleId) {
     received_amount: sale.receivedAmount.toString(),
     pending_amount: pending.toFixed(2),
     payment_mode: sale.paymentMode,
-    payment_reference: sale.paymentReference ?? "",
     remarks: sale.remarks ?? "",
     generated_at: new Date().toLocaleString("en-IN"),
     item_rows: itemRowsHtml // 🔥 Inject rows here

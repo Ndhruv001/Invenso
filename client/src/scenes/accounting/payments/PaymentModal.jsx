@@ -66,7 +66,6 @@ const PaymentModal = ({
         ? initialData.date.split("T")[0]
         : new Date().toISOString().split("T")[0],
       amount: initialData?.amount ?? "",
-      paymentReference: initialData?.paymentReference || "",
       remark: initialData?.remark || "",
       paymentMode: initialData?.paymentMode || "",
       referenceType: initialData?.referenceType || ""
@@ -337,18 +336,6 @@ const PaymentModal = ({
                     theme={theme}
                   />
                 </div>
-
-                <TextField
-                  name="paymentReference"
-                  label="Payment Reference"
-                  placeholder="Transaction ID / Cheque No"
-                  icon={Hash}
-                  register={register}
-                  errors={errors}
-                  mode={mode}
-                  isDisabled={isDisabled}
-                  theme={theme}
-                />
 
                 <TextField
                   name="amount"

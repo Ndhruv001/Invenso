@@ -210,7 +210,6 @@ async function createTransport(data, userId = null) {
           referenceType: "TRANSPORT",
           referenceId: parseInt(transport.id),
           paymentMode: data.paymentMode ?? "NONE",
-          paymentReference: `Received for Transport: ${transport.id}`,
           remark: data.remark ?? null
         }
       });
@@ -290,7 +289,6 @@ async function updateTransport(id, data, userId = null) {
         partyId: newPartyId, // Ensures payment follows the new party
         amount: newReceived,
         paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
-        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
         remark: data.remark ?? existingPayment?.remark ?? null
       };
 
@@ -368,7 +366,7 @@ async function deleteTransport(id, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "TRANSPORT",
-        transportId: parseInt(id)
+        referenceId: parseInt(id)
       }
     });
 

@@ -101,62 +101,86 @@ async function listPurchases({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [purchases, totalRows, groupedParties, aggregates, paidAmount] = await prisma.$transaction([
-    prisma.purchase.findMany({
-      where,
-      skip,
-      take,
-      orderBy,
-      include: {
-        party: true,
-        purchaseItems: {
-          include: {
-            product: {
-              include: { category: true }
-            }
+  const [
+  purchases,
+  totalRows,
+  groupedParties,
+  purchaseAggregates,
+  purchaseReturnAggregates,
+  paidAggregates
+] = await prisma.$transaction([
+
+  prisma.purchase.findMany({
+    where,
+    skip,
+    take,
+    orderBy,
+    include: {
+      party: true,
+      purchaseItems: {
+        include: {
+          product: {
+            include: { category: true }
           }
         }
       }
-    }),
+    }
+  }),
 
-    prisma.purchase.count({ where }),
+  prisma.purchase.count({ where }),
 
-    prisma.purchase.groupBy({
-      by: ["partyId"],
-      where
-    }),
+  prisma.purchase.groupBy({
+    by: ["partyId"],
+    where
+  }),
 
-    prisma.purchase.aggregate({
-      where,
-      _sum: {
-        totalAmount: true,
-        totalGstAmount: true,
-        totalTaxableAmount: true,
-        paidAmount: true
-      }
-    }),
-    prisma.payment.aggregate({
-      where: {
-        ...(filters?.partyId && { partyId: filters.partyId }),
-        type: "PAID",
-        referenceType: "PURCHASE"
-      },
-      _sum: {
-        amount: true
-      }
-    })
-  ]);
+  // 🟢 Gross Purchases
+  prisma.purchase.aggregate({
+    where,
+    _sum: {
+      totalAmount: true,
+    }
+  }),
 
+  // 🔴 Purchase Returns
+  prisma.purchaseReturn.aggregate({
+    where,
+    _sum: {
+      totalAmount: true
+    }
+  }),
+
+  // 🔵 Total Paid (do NOT restrict by referenceType)
+  prisma.payment.aggregate({
+    where: {
+      ...(filters?.partyId && { partyId: filters.partyId }),
+      type: "PAID",
+      referenceType: "PURCHASE"
+    },
+    _sum: {
+      amount: true
+    }
+  })
+]);
   /* -------------------- Stats -------------------- */
 
-  const stats = {
-    totalPurchases: totalRows,
-    totalParties: groupedParties.length,
-    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
-    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
-    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalPaid: Number(paidAmount._sum.amount) || 0
-  };
+  const grossPurchases = Number(purchaseAggregates._sum.totalAmount) || 0;
+const totalReturns = Number(purchaseReturnAggregates._sum.totalAmount) || 0;
+const totalPaid = Number(paidAggregates._sum.amount) || 0;
+
+const netPurchases = grossPurchases - totalReturns;
+const outstandingPayable = netPurchases - totalPaid;
+
+const stats = {
+  totalPurchases: totalRows,
+  totalParties: groupedParties.length,
+
+  grossPurchases,
+  totalReturns,
+  netPurchases,
+  totalPaid,
+  outstandingPayable,
+};
 
   /* -------------------- Response -------------------- */
 
@@ -200,7 +224,6 @@ async function createPurchase(data, userId = null) {
     invoiceNumber,
     paidAmount = 0,
     paymentMode,
-    paymentReference,
     remarks,
     items
   } = data;
@@ -247,7 +270,6 @@ async function createPurchase(data, userId = null) {
       totalTaxableAmount,
       paidAmount: Number(paidAmount),
       ...(paymentMode && { paymentMode }),
-      ...(paymentReference && { paymentReference }),
       ...(remarks && { remarks })
     };
 
@@ -271,7 +293,7 @@ async function createPurchase(data, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found`, 404);
       }
 
@@ -328,7 +350,6 @@ async function createPurchase(data, userId = null) {
           referenceType: "PURCHASE",
           referenceId: parseInt(purchase.id),
           paymentMode,
-          paymentReference: `Received for Purchase: ${purchase.id}`,
           remark: remarks
         }
       });
@@ -390,10 +411,6 @@ async function updatePurchase(purchaseId, data, userId = null) {
 
     if (data.paymentMode !== undefined) {
       purchaseUpdateData.paymentMode = data.paymentMode;
-    }
-
-    if (data.paymentReference !== undefined) {
-      purchaseUpdateData.paymentReference = data.paymentReference;
     }
 
     if (data.remarks !== undefined) {
@@ -474,7 +491,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
             where: { id: existingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -536,7 +553,7 @@ async function updatePurchase(purchaseId, data, userId = null) {
             where: { id: incomingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product ) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -662,7 +679,6 @@ async function updatePurchase(purchaseId, data, userId = null) {
         partyId: newPartyId, // always follow updated party
         amount: newPaid,
         paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
-        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
         remark: data.remark ?? existingPayment?.remark ?? null
       };
 
@@ -744,7 +760,7 @@ async function deletePurchase(purchaseId, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found or inactive`, 404);
       }
 
@@ -801,7 +817,7 @@ async function deletePurchase(purchaseId, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "PURCHASE",
-        purchaseId: Number(purchaseId)
+        referenceId: parseInt(purchaseId)
       }
     });
 
@@ -905,7 +921,6 @@ async function getPurchaseInvoicePdf(purchaseId) {
     paid_amount: purchase.paidAmount.toString(),
     pending_amount: pending.toFixed(2),
     payment_mode: purchase.paymentMode,
-    payment_reference: purchase.paymentReference ?? "",
     remarks: purchase.remarks ?? "",
     generated_at: new Date().toLocaleString("en-IN"),
     item_rows: itemRowsHtml // 🔥 Inject rows here

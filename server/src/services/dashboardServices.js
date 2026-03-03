@@ -170,7 +170,6 @@ async function getDashboardSummary() {
     ── */
     prisma.party.aggregate({
       where: {
-        isActive: true,
         currentBalance: { not: 0 }
       },
       _sum: { currentBalance: true }
@@ -184,7 +183,6 @@ async function getDashboardSummary() {
     // Parties that owe us money (positive balance)
     prisma.party.aggregate({
       where: {
-        isActive: true,
         currentBalance: { gt: 0 }
       },
       _sum: { currentBalance: true }
@@ -192,7 +190,6 @@ async function getDashboardSummary() {
     // Parties we owe money (negative balance)
     prisma.party.aggregate({
       where: {
-        isActive: true,
         currentBalance: { lt: 0 }
       },
       _sum: { currentBalance: true }
@@ -244,10 +241,10 @@ async function getDashboardSummary() {
      - expenses
   ───────────────────────────────────────── */
   const netProfitToday =
-    grossProfitToday + transportIncomeToday - profitLossTodayAmt - totalExpenseToday;
+    (grossProfitToday + transportIncomeToday) - (-profitLossTodayAmt + totalExpenseToday);
 
   const netProfitMonth =
-    grossProfitMonth + transportIncomeMonth - profitLossMonthAmt - totalExpenseMonth;
+    (grossProfitMonth + transportIncomeMonth) - (-profitLossMonthAmt + totalExpenseMonth);
 
   /* ─────────────────────────────────────────
      Receivables & Payables
@@ -483,9 +480,6 @@ async function getLowStockProducts() {
   // So we fetch all active products and filter in application
 
   const products = await prisma.product.findMany({
-    where: {
-      isActive: true
-    },
     select: {
       id: true,
       name: true,

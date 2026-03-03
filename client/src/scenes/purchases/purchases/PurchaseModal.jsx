@@ -103,7 +103,6 @@ const PurchaseModal = ({
         : new Date().toISOString().slice(0, 10),
 
       paymentMode: initialData?.paymentMode ?? "NONE",
-      paymentReference: initialData?.paymentReference ?? "",
       paidAmount: Number(initialData?.paidAmount ?? 0),
       remarks: initialData?.remarks ?? "",
       totalAmount: Number(initialData?.totalAmount ?? 0),
@@ -751,18 +750,6 @@ const PurchaseModal = ({
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>
-                        Payment Reference
-                      </label>
-                      <input
-                        type="text"
-                        {...register("paymentReference")}
-                        disabled={isDisabled}
-                        className={`w-48 px-3 py-2 text-sm border ${theme.border} rounded-lg focus:border-blue-500 outline-none ${theme.bg}`}
-                        placeholder="Payment reference"
-                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${theme.text.secondary} mb-1`}>

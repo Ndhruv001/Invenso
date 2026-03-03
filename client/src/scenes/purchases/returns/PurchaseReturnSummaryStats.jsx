@@ -4,54 +4,44 @@
  */
 
 import React from "react";
-import { Users, CreditCard, DollarSign, FileText } from "lucide-react";
+import {
+  RotateCcw,
+  DollarSign,
+  CreditCard,
+  Wallet
+} from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/helpers/formatters";
 
-/**
- * @typedef {Object} PurchaseReturnsSummaryStatsProps
- * @property {Object} stats - API stats object.
- * @property {number} stats.totalParties
- * @property {number} stats.sumTotalAmount
- * @property {number} stats.sumTotalGst
- * @property {number} stats.sumTotalReceived
- */
-
-/**
- * PurchaseReturnsSummaryStats - Renders a responsive grid of StatCards.
- *
- * @param {PurchaseReturnsSummaryStatsProps} props
- * @returns {JSX.Element}
- */
 const PurchaseReturnsSummaryStats = ({ stats }) => {
   const items = [
     {
-      title: "Total Parties",
-      value: stats?.totalParties ?? 0,
-      subtitle: "Vendors and suppliers",
-      icon: Users,
-      color: "success"
-    },
-    {
-      title: "Total Return Amount",
-      value: formatCurrency(stats?.sumTotalAmount) ?? 0,
-      subtitle: "Overall purchase return value (₹)",
-      icon: FileText,
+      title: "Total Purchase Returns",
+      value: stats?.totalPurchaseReturns ?? 0,
+      subtitle: "Number of return bills",
+      icon: RotateCcw,
       color: "primary"
     },
     {
-      title: "Total GST Reversed",
-      value: formatCurrency(stats?.sumTotalGst) ?? 0,
-      subtitle: "Total GST reversed (₹)",
+      title: "Gross Purchase Returns",
+      value: formatCurrency(stats?.grossPurchaseReturns ?? 0),
+      subtitle: "Total returned purchase value (₹)",
       icon: DollarSign,
       color: "warning"
     },
     {
-      title: "Total Received Amount",
-      value: formatCurrency(stats?.sumTotalReceived) ?? 0,
-      subtitle: "Total amount received back (₹)",
+      title: "Refund Received",
+      value: formatCurrency(stats?.totalRefundReceived ?? 0),
+      subtitle: "Amount received from suppliers (₹)",
       icon: CreditCard,
-      color: "info"
+      color: "success"
+    },
+    {
+      title: "Pending Supplier Refund",
+      value: formatCurrency(stats?.pendingRefundFromSupplier ?? 0),
+      subtitle: "Refund yet to be received (₹)",
+      icon: Wallet,
+      color: "danger"
     }
   ];
 

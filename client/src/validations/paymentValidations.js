@@ -36,27 +36,12 @@ const paymentCreateSchema = Yup.object({
     .oneOf(PAYMENT_MODES, "Invalid payment mode")
     .required("Payment mode is required"),
 
-  paymentReference: Yup.string()
-    .trim()
-    .nullable()
-    .max(100, "Payment reference must be less than 100 characters"),
-
   remark: Yup.string().trim().nullable().max(500, "Remark must be less than 500 characters"),
 
   referenceType: Yup.string()
     .oneOf(PAYMENT_REFERENCE, "Invalid reference type")
     .required("Reference type is required"),
 
-  // ---- Reference IDs (logic handled in backend) ----
-  purchaseId: Yup.number().integer().positive().nullable(),
-
-  saleId: Yup.number().integer().positive().nullable(),
-
-  purchaseReturnId: Yup.number().integer().positive().nullable(),
-
-  saleReturnId: Yup.number().integer().positive().nullable(),
-
-  transportId: Yup.number().integer().positive().nullable()
 }).noUnknown(true);
 
 /**
@@ -79,12 +64,6 @@ const paymentUpdateSchema = Yup.object({
     .notRequired(),
 
   paymentMode: Yup.string().oneOf(PAYMENT_MODES, "Invalid payment mode").notRequired(),
-
-  paymentReference: Yup.string()
-    .trim()
-    .nullable()
-    .max(100, "Payment reference must be less than 100 characters")
-    .notRequired(),
 
   remark: Yup.string()
     .trim()

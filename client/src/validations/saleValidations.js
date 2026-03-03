@@ -52,8 +52,6 @@ const saleCreateSchema = Yup.object({
 
   paymentMode: Yup.string().oneOf(PAYMENT_MODES).required(),
 
-  paymentReference: Yup.string().trim().nullable().max(100),
-
   remarks: Yup.string().trim().nullable().max(300),
 
   items: Yup.array().of(saleItemSchema).min(1).required()
@@ -79,8 +77,6 @@ const saleUpdateSchema = Yup.object({
     .notRequired(),
 
   paymentMode: Yup.string().oneOf(PAYMENT_MODES).notRequired(),
-
-  paymentReference: Yup.string().trim().nullable().max(100).notRequired(),
 
   remarks: Yup.string().trim().nullable().max(300).notRequired(),
 

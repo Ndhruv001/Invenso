@@ -97,67 +97,85 @@ async function listPurchaseReturns({
 
   /* -------------------- DB Transaction -------------------- */
 
-  const [purchaseReturns, totalRows, groupedParties, aggregates, receivedAmount] = await prisma.$transaction([
-    prisma.purchaseReturn.findMany({
-      where,
-      skip,
-      take,
-      orderBy,
-      include: {
-        party: true,
-        purchase: {
-          include: { purchaseItems: { include: { product: { include: { category: true } } } } }
-        },
-        purchaseReturnItems: {
-          include: {
-            product: {
-              include: { category: true }
+  const [
+  purchaseReturns,
+  totalRows,
+  groupedParties,
+  returnAggregates,
+  refundReceivedAggregates
+] = await prisma.$transaction([
+
+  prisma.purchaseReturn.findMany({
+    where,
+    skip,
+    take,
+    orderBy,
+    include: {
+      party: true,
+      purchase: {
+        include: {
+          purchaseItems: {
+            include: {
+              product: {
+                include: { category: true }
+              }
             }
           }
         }
-      }
-    }),
-
-    prisma.purchaseReturn.count({ where }),
-
-    prisma.purchaseReturn.groupBy({
-      by: ["partyId"],
-      where
-    }),
-
-    prisma.purchaseReturn.aggregate({
-      where,
-      _sum: {
-        totalAmount: true,
-        totalGstAmount: true,
-        totalTaxableAmount: true,
-        receivedAmount: true
-      }
-    }),
-
-    prisma.payment.aggregate({
-      where: {
-        ...(filters?.partyId && { partyId: filters.partyId }),
-        type: "RECEIVED",
-        referenceType: "PURCHASE_RETURN"
       },
-      _sum: {
-        amount: true
+      purchaseReturnItems: {
+        include: {
+          product: {
+            include: { category: true }
+          }
+        }
       }
-    })
-  ]);
+    }
+  }),
+
+  prisma.purchaseReturn.count({ where }),
+
+  prisma.purchaseReturn.groupBy({
+    by: ["partyId"],
+    where
+  }),
+
+  // 🔴 Gross Purchase Return Activity
+  prisma.purchaseReturn.aggregate({
+    where,
+    _sum: {
+      totalAmount: true,
+    }
+  }),
+
+  // 🔵 Refunds Received from Supplier
+  prisma.payment.aggregate({
+    where: {
+      ...(filters?.partyId && { partyId: filters.partyId }),
+      type: "RECEIVED",
+      referenceType: "PURCHASE_RETURN"
+    },
+    _sum: {
+      amount: true
+    }
+  })
+]);
 
   /* -------------------- Stats -------------------- */
 
-  const stats = {
-    totalPurchaseReturns: totalRows,
-    totalParties: groupedParties.length,
-    sumTotalAmount: Number(aggregates._sum.totalAmount) || 0,
-    sumTotalGst: Number(aggregates._sum.totalGstAmount) || 0,
-    sumTotalTaxable: Number(aggregates._sum.totalTaxableAmount) || 0,
-    sumTotalReceived: Number(receivedAmount._sum.amount) || 0
-  };
+  const grossPurchaseReturns = Number(returnAggregates._sum.totalAmount) || 0;
+const totalRefundReceived = Number(refundReceivedAggregates._sum.amount) || 0;
 
+const pendingRefundFromSupplier = grossPurchaseReturns - totalRefundReceived;
+
+const stats = {
+  totalPurchaseReturns: totalRows,
+  totalParties: groupedParties.length,
+
+  grossPurchaseReturns,
+  totalRefundReceived,
+  pendingRefundFromSupplier,
+};
   /* -------------------- Response -------------------- */
 
   return {
@@ -206,7 +224,6 @@ async function createPurchaseReturn(data, userId = null) {
     purchaseId = null,
     receivedAmount = 0,
     paymentMode,
-    paymentReference,
     reason,
     items
   } = data;
@@ -254,7 +271,6 @@ async function createPurchaseReturn(data, userId = null) {
       totalTaxableAmount,
       receivedAmount: Number(receivedAmount),
       ...(paymentMode && { paymentMode }),
-      ...(paymentReference && { paymentReference }),
       ...(reason && { reason })
     };
 
@@ -278,7 +294,7 @@ async function createPurchaseReturn(data, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found`, 404);
       }
 
@@ -333,7 +349,6 @@ async function createPurchaseReturn(data, userId = null) {
           referenceType: "PURCHASE_RETURN",
           referenceId: parseInt(purchaseReturn.id),
           paymentMode,
-          paymentReference: `Received for Purchase Return: ${purchaseReturn.id}`,
           remark: reason
         }
       });
@@ -392,10 +407,6 @@ async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
 
     if (data.paymentMode !== undefined) {
       purchaseReturnUpdateData.paymentMode = data.paymentMode;
-    }
-
-    if (data.paymentReference !== undefined) {
-      purchaseReturnUpdateData.paymentReference = data.paymentReference;
     }
 
     if (data.reason !== undefined) {
@@ -470,7 +481,7 @@ async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
             where: { id: existingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -523,7 +534,7 @@ async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
             where: { id: incomingItem.productId }
           });
 
-          if (!product || !product.isActive) {
+          if (!product ) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -649,7 +660,6 @@ async function updatePurchaseReturn(purchaseReturnId, data, userId = null) {
         partyId: newPartyId, // always follow updated party
         amount: newReceived,
         paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
-        paymentReference: data.paymentReference ?? existingPayment?.paymentReference ?? null,
         remark: data.remark ?? existingPayment?.remark ?? null
       };
 
@@ -727,7 +737,7 @@ async function deletePurchaseReturn(purchaseReturnId, userId = null) {
         where: { id: item.productId }
       });
 
-      if (!product || !product.isActive) {
+      if (!product ) {
         throw new AppError(`Product ${item.productId} not found or inactive`, 404);
       }
 
@@ -780,7 +790,7 @@ async function deletePurchaseReturn(purchaseReturnId, userId = null) {
     await tx.payment.deleteMany({
       where: {
         referenceType: "PURCHASE_RETURN",
-        purchaseReturnId: Number(purchaseReturnId)
+        referenceId: parseInt(purchaseReturnId)
       }
     });
 
@@ -860,7 +870,6 @@ async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
     received_amount: purchaseReturn.receivedAmount.toString(),
     pending_amount: pending.toFixed(2),
     payment_mode: purchaseReturn.paymentMode,
-    payment_reference: purchaseReturn.paymentReference ?? "",
     reason: purchaseReturn.reason ?? "",
     generated_at: new Date().toLocaleString("en-IN"),
     item_rows: itemRowsHtml // 🔥 Inject rows here

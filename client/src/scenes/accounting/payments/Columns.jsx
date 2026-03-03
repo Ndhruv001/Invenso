@@ -74,8 +74,8 @@ const Columns = (showSelection = false) => {
       accessorKey: "date",
       header: "Date",
       cell: ({ getValue }) => (
-        <span className="font-medium text-sm" style={{ color: theme.text.primary }}>
-          {formatDate(getValue(), "long")}
+        <span className="font-medium text-sm text-left" style={{ color: theme.text.primary }}>
+          {formatDate(getValue())}
         </span>
       ),
       size: 100
@@ -85,11 +85,11 @@ const Columns = (showSelection = false) => {
       header: "Party",
       cell: ({ getValue }) =>
         getValue() ? (
-          <span className="font-medium text-sm" style={{ color: theme.text.primary }}>
+          <span className="font-medium text-sm text-right" style={{ color: theme.text.primary }}>
             {getValue().name}
           </span>
         ) : (
-          <span className="text-xs text-gray-400">N/A</span>
+          <span className="text-xs text-gray-400 text-center">N/A</span>
         ),
       size: 160
     },
