@@ -27,6 +27,8 @@ async function listParties({
 }) {
   /* -------------------- Filters -------------------- */
 
+  const where = {};
+
   if (filters.partyType) {
     where.type = filters.partyType;
   }
@@ -282,8 +284,8 @@ async function updateParty(id, data, userId = null) {
 async function deleteParty(id, userId = null) {
   if (!id) throw new AppError("Party ID is required", 400);
 
+   
   return prisma.$transaction(async tx => {
-    try {
       const existing = await tx.party.findUnique({ where: { id } });
       if (!existing) throw new AppError("Party not found", 404);
 
@@ -302,15 +304,6 @@ async function deleteParty(id, userId = null) {
       });
 
       return true;
-    } catch (error) {
-      if (error.code === "P2003") {
-        throw new AppError(
-          "Cannot delete party: existing sales, purchases, or transactions are linked to it.",
-          P2003
-        );
-      }
-      throw new AppError("Something went wrong while deleting the party", 501);
-    }
   });
 }
 

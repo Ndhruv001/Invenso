@@ -42,9 +42,7 @@ async function listProducts({
   search = "",
   filters = {}
 }) {
-  const where = {
-    isActive: true
-  };
+  const where = {};
 
   /* -------------------- Filters -------------------- */
 
@@ -360,7 +358,6 @@ async function deleteProduct(id, userId = null) {
   if (!id) throw new AppError("Product ID is required", 400);
 
   return await prisma.$transaction(async tx => {
-    try {
       const existing = await tx.product.findUnique({ where: { id } });
       if (!existing) throw new AppError("Product not found", 404);
 
@@ -379,15 +376,6 @@ async function deleteProduct(id, userId = null) {
       });
 
       return true;
-    } catch (error) {
-      if (error.code === "P2003") {
-        throw new AppError(
-          "Cannot delete party: existing sales, purchases, or transactions are linked to it.",
-          P2003
-        );
-      }
-      throw new AppError("Something went wrong when deleting product", 501);
-    }
   });
 }
 

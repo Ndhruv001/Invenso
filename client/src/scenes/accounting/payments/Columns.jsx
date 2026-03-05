@@ -117,8 +117,8 @@ const Columns = (showSelection = false) => {
       size: 120
     },
     {
-      accessorKey: "paymentReference",
-      header: "Reference",
+      accessorKey: "referenceId",
+      header: "Reference Id",
       cell: ({ getValue }) =>
         getValue() ? (
           <span className="text-sm block text-center" style={{ color: theme.text.primary }}>

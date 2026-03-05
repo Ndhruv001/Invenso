@@ -101,7 +101,7 @@ function App() {
         {/* Single Routes */}
         <Route path="products" element={<Products />} />
         <Route path="transports" element={<Transports />} />
-        <Route path="reports" element={<ComingSoon />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="notifications" element={<ComingSoon />} />
 
         {/* Admin Routes */}

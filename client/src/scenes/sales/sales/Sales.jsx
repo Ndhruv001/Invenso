@@ -269,7 +269,7 @@ const Sales = () => {
         }}
       />
 
-      <DataTable
+      <DataTable 
         data={sales}
         columns={columns}
         totalRows={totalRows}

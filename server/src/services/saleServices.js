@@ -174,7 +174,7 @@ const stats = {
   netSales,
   totalReceived,
   outstandingReceivable,
-  totalProfit: (Number(saleAggregates._sum.totalProfit) - Number(saleReturnAggregates._sum.totalProfitLoss )) || 0
+  totalProfit: (Number(saleAggregates._sum.totalProfit) - Number(-saleReturnAggregates._sum.totalProfitLoss )) || 0
 };
 
   /* -------------------- Response -------------------- */

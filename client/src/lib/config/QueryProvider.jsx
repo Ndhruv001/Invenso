@@ -46,7 +46,7 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         if (error.type === "AUTH_ERROR") return false;
         if (error.status >= 400 && error.status < 500) return false;
-        return failureCount < 3;
+        return failureCount < 1;
       },
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       keepPreviousData: true
@@ -55,7 +55,7 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         if (error.type === "VALIDATION_ERROR") return false;
         if (error.type === "PERMISSION_ERROR") return false;
-        return failureCount < 2;
+        return failureCount < 1;
       },
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000)
     }

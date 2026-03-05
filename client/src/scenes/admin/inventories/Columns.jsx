@@ -25,7 +25,7 @@ const Columns = () => {
       accessorKey: "createdAt",
       header: () => <div className="text-center">Timestamp</div>,
       cell: ({ getValue }) => (
-        <div className="text-center text-xs whitespace-nowrap">{formatDate(getValue())}</div>
+        <div className="text-center text-xs whitespace-nowrap">{formatDate(getValue(), "long")}</div>
       ),
       size: 140
     },

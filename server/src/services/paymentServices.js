@@ -241,6 +241,12 @@ async function updatePayment(id, data, userId = null) {
   return prisma.$transaction(async tx => {
     const existing = await tx.payment.findUnique({ where: { id } });
     if (!existing) throw new AppError("Payment not found", 404);
+    if (existing.referenceId) {
+      throw new AppError(
+        "Updation not allowed. This payment is associated with a recorded transaction.",
+        400
+      );
+    }
 
     const oldAmount = Number(existing.amount);
     const newAmount = data.amount !== undefined ? Number(data.amount) : oldAmount;
@@ -323,6 +329,12 @@ async function deletePayment(id, userId = null) {
   return prisma.$transaction(async tx => {
     const existing = await tx.payment.findUnique({ where: { id } });
     if (!existing) throw new AppError("Payment not found", 404);
+    if (existing.referenceId) {
+      throw new AppError(
+        "Deletion not allowed. This payment is associated with a recorded transaction.",
+        400
+      );
+    }
 
     /* -------------------- Revert Party Balance -------------------- */
 

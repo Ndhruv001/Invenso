@@ -62,7 +62,7 @@ const Columns = () => {
     {
       accessorKey: "createdAt",
       header: "Timestamp",
-      cell: ({ getValue }) => <span className="text-xs">{formatDate(getValue())}</span>,
+      cell: ({ getValue }) => <span className="text-xs">{formatDate(getValue(), "long")}</span>,
       size: 130
     },
     {

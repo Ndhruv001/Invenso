@@ -122,6 +122,7 @@ export const deleteParty = async id => {
     if (error.response?.status === 404) throw new Error("Party not found or already deleted");
     if (error.response?.status === 409)
       throw new Error("Cannot delete party. It may be used in transactions.");
+     
     handleAxiosError(error, `Failed to delete party ${id}`);
   }
 };

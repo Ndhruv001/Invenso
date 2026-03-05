@@ -1,7 +1,6 @@
 /**
  * DashboardSummaryStats.jsx
- * Displays key summary statistics for the dashboard in a card format.
- * Each card shows a specific metric with an icon, primary value (today), and secondary value (this month).
+ * Displays ERP-correct net business summary statistics.
  */
 
 import React from "react";
@@ -9,90 +8,69 @@ import {
   DollarSign,
   ShoppingCart,
   TrendingUp,
-  CreditCard,
-  ArrowUpRight,
-  ArrowDownRight,
   Wallet,
-  Receipt
+  CreditCard,
+  ArrowLeftRight
 } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/helpers/formatters";
 
 const DashboardSummaryStats = ({ stats }) => {
-  console.log("🚀 ~ DashboardSummaryStats ~ stats:", stats);
   const items = [
     {
-      title: "Total Sales",
-      value: formatCurrency(stats?.sales?.today ?? 0),
-      secondaryValue: formatCurrency(stats?.sales?.thisMonth ?? 0),
+      title: "Net Revenue",
+      value: formatCurrency(stats?.revenue?.today || 0),
+      secondaryValue: formatCurrency(stats?.revenue?.thisMonth || 0),
       secondaryLabel: "This Month",
-      subtitle: "Revenue from sales",
+      subtitle: "Sales after returns",
       icon: DollarSign,
       color: "purple"
     },
     {
-      title: "Total Purchases",
-      value: formatCurrency(stats?.purchases?.today ?? 0),
-      secondaryValue: formatCurrency(stats?.purchases?.thisMonth ?? 0),
+      title: "Net Purchases",
+      value: formatCurrency(stats?.purchases?.today || 0),
+      secondaryValue: formatCurrency(stats?.purchases?.thisMonth || 0),
       secondaryLabel: "This Month",
-      subtitle: "Amount spent on purchases",
+      subtitle: "Purchases after returns",
       icon: ShoppingCart,
       color: "blue"
     },
     {
-      title: "Net Profit",
-      value: formatCurrency(stats?.netProfit?.today ?? 0),
-      secondaryValue: formatCurrency(stats?.netProfit?.thisMonth ?? 0),
+      title: "Net Cash Flow",
+      value: formatCurrency(stats?.cashFlow?.today || 0),
+      secondaryValue: formatCurrency(stats?.cashFlow?.thisMonth || 0),
       secondaryLabel: "This Month",
-      subtitle: "Profit after expenses",
+      subtitle: "Received minus paid",
+      icon: ArrowLeftRight,
+      color: "info"
+    },
+    {
+      title: "Net Profit",
+      value: formatCurrency(stats?.netProfit?.today || 0),
+      secondaryValue: formatCurrency(stats?.netProfit?.thisMonth || 0),
+      secondaryLabel: "This Month",
+      subtitle: "After returns & expenses",
       icon: TrendingUp,
       color: "green"
     },
     {
-      title: "Total Expenses",
-      value: formatCurrency(stats?.expenses?.today ?? 0),
-      secondaryValue: formatCurrency(stats?.expenses?.thisMonth ?? 0),
-      secondaryLabel: "This Month",
-      subtitle: "Operating expenses",
-      icon: Receipt,
-      color: "orange"
-    },
-    {
-      title: "Received",
-      value: formatCurrency(stats?.received?.today ?? 0),
-      secondaryValue: formatCurrency(stats?.received?.thisMonth ?? 0),
-      secondaryLabel: "This Month",
-      subtitle: "Payments received",
-      icon: ArrowDownRight,
-      color: "info"
-    },
-    {
-      title: "Paid",
-      value: formatCurrency(stats?.paid?.today ?? 0),
-      secondaryValue: formatCurrency(stats?.paid?.thisMonth ?? 0),
-      secondaryLabel: "This Month",
-      subtitle: "Payments made",
-      icon: ArrowUpRight,
-      color: "red"
-    },
-    {
       title: "Total Receivables",
-      value: formatCurrency(stats?.receivables?.total ?? 0),
-      subtitle: "Amount to be received",
+      value: formatCurrency(stats?.receivables?.total || 0),
+      subtitle: "Customers owe us",
       icon: Wallet,
       color: "success"
     },
     {
       title: "Total Payables",
-      value: formatCurrency(stats?.payables?.total ?? 0),
-      subtitle: "Amount to be paid",
+      value: formatCurrency(stats?.payables?.total || 0),
+      subtitle: "We owe suppliers",
       icon: CreditCard,
       color: "danger"
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item, idx) => (
         <StatCard key={idx} {...item} />
       ))}
