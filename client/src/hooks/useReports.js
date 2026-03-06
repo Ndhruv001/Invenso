@@ -29,10 +29,13 @@ export const useReports = (module, filters = {}) => {
 };
 
 export const useDownloadPartyLedger = () => {
+    
   return useMutation({
     mutationKey: ["download-party-ledger"],
 
-    mutationFn: downloadPartyLedgerPdf,
+    mutationFn: (filters) => {
+      return downloadPartyLedgerPdf(filters);
+    },
 
     onSuccess: (blob, variables) => {
       const { partyId } = variables;

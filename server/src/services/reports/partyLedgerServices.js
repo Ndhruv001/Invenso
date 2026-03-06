@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import {generatePdfFromTemplate} from "../pdfServices.js"
 
 /**
  * Get Party Ledger

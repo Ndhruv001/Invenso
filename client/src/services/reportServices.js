@@ -62,7 +62,7 @@ export const downloadPartyLedgerPdf = async filters => {
       responseType: "blob" // 🔥 Required for file download
     });
 
-    return response.data; // return Blob
+    return response; // return Blob
   } catch (error) {
     handleAxiosError(error, `Failed to download ledger for party ${partyId}`);
   }

@@ -4,6 +4,7 @@ import React, { useState, useCallback } from "react";
 import { FolderOpen } from "lucide-react";
 
 import { useDownloadPartyLedger } from "@/hooks/useReports";
+import ConfirmationModal from "@/components/common/ConfirmationModal";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { toast } from "react-toastify";
 
@@ -110,7 +111,8 @@ function ReportView({ moduleKey, config, moduleOptions, onModuleChange }) {
   const columns = config.getColumns();
   const { SummaryStats } = config;
 
-  const { openDialog } = useConfirmationDialog();
+  // Confirmation dialog hook
+    const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
   const downloadLedgerMutation = useDownloadPartyLedger();
 
   const handleDownloadLedger = useCallback(() => {
@@ -194,6 +196,8 @@ function ReportView({ moduleKey, config, moduleOptions, onModuleChange }) {
         refetch={refetch}
         {...queryStatus}
       />
+
+      {dialogConfig.isOpen && <ConfirmationModal {...dialogConfig} onCancel={closeDialog} />}
     </div>
   );
 }
