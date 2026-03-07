@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getReport, downloadPartyLedgerPdf } from "@/services/reportServices";
+import { getReport, downloadPartyLedgerPdf, downloadTransportLedgerPdf } from "@/services/reportServices";
 
 // -----------------------------------------
 // Query Keys
@@ -54,8 +54,35 @@ export const useDownloadPartyLedger = () => {
     }
   });
 };
+export const useDownloadTransportLedger = () => {
+    
+  return useMutation({
+    mutationKey: ["download-transport-ledger"],
+
+    mutationFn: (filters) => {
+      return downloadTransportLedgerPdf(filters);
+    },
+
+    onSuccess: (blob, variables) => {
+      const { partyId } = variables;
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `transport-ledger-${partyId}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+};
 
 export default {
   useReports,
-  useDownloadPartyLedger
+  useDownloadPartyLedger,
+  useDownloadTransportLedger
 };

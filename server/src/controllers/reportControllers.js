@@ -1,6 +1,7 @@
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import * as reportServices from "../services/reportServices.js";
 import * as partyLedgerServices from "../services/reports/partyLedgerServices.js"
+import * as transportLedgerServices from "../services/reports/transportLedgerServices.js"
 import { successResponse } from "../utils/responseUtils.js";
 
 const generateReport = asyncHandler(async (req, res) => {
@@ -69,5 +70,64 @@ const printPartyLedgerPdf = asyncHandler(async (req, res) => {
   return res.status(200).send(pdfBuffer);
 });
 
-export default {generateReport, getPartyLedgerPdf, printPartyLedgerPdf};
-export { generateReport, getPartyLedgerPdf, printPartyLedgerPdf };
+/**
+ * GET /transport-ledger/pdf
+ * Download transport ledger PDF
+ */
+const getTransportLedgerPdf = asyncHandler(async (req, res) => {
+
+  const { partyId, dateFrom, dateTo } = req.query;
+
+  if (!partyId || !dateFrom || !dateTo) {
+    throw new Error("partyId, dateFrom and dateTo are required");
+  }
+
+  // Call service
+  const pdfBuffer = await transportLedgerServices.getTransportLedgerPdf({
+    partyId: Number(partyId),
+    dateFrom,
+    dateTo
+  });
+
+  // Headers for download
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=transport-ledger-${partyId}.pdf`
+  );
+
+  return res.status(200).send(pdfBuffer);
+});
+
+
+/**
+ * GET /transport-ledger/print
+ * Print / preview transport ledger PDF
+ */
+const printTransportLedgerPdf = asyncHandler(async (req, res) => {
+
+  const { partyId, dateFrom, dateTo } = req.query;
+
+  if (!partyId || !dateFrom || !dateTo) {
+    throw new Error("partyId, dateFrom and dateTo are required");
+  }
+
+  // Call service
+  const pdfBuffer = await transportLedgerServices.getTransportLedgerPdf({
+    partyId: Number(partyId),
+    dateFrom,
+    dateTo
+  });
+
+  // Headers for browser preview
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename=transport-ledger-${partyId}.pdf`
+  );
+
+  return res.status(200).send(pdfBuffer);
+});
+
+export default {generateReport, getPartyLedgerPdf, printPartyLedgerPdf, getTransportLedgerPdf, printTransportLedgerPdf};
+export { generateReport, getPartyLedgerPdf, printPartyLedgerPdf, getTransportLedgerPdf, printTransportLedgerPdf };

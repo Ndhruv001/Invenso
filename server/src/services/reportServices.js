@@ -1,5 +1,6 @@
 // Import module specific services
 import { getPartyLedger } from "./reports/partyLedgerServices.js";
+import { getTransportLedger } from "./reports/transportLedgerServices.js";
 
 /**
  * Main Report Generator
@@ -22,6 +23,8 @@ const generateReport = async (module, filters) => {
   switch (module) {
     case "party":
       return await getPartyLedger(updatedFilters);
+      case "transport": 
+      return await getTransportLedger(updatedFilters)
     default:
       throw new Error("Invalid report module");
   }

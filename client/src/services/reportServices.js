@@ -67,10 +67,32 @@ export const downloadPartyLedgerPdf = async filters => {
     handleAxiosError(error, `Failed to download ledger for party ${partyId}`);
   }
 };
+export const downloadTransportLedgerPdf = async filters => {
+  const { partyId, dateFrom, dateTo } = filters || {};
+
+  if (!partyId || !dateFrom || !dateTo) {
+    throw new Error("partyId, dateFrom and dateTo are required");
+  }
+
+  try {
+    const response = await axiosInstance.get(`/reports/download/transport-ledger`, {
+      params: {
+        partyId,
+        dateFrom,
+        dateTo
+      },
+      responseType: "blob" // 🔥 Required for file download
+    });
+
+    return response; // return Blob
+  } catch (error) {
+    handleAxiosError(error, `Failed to download transport ledger for party ${partyId}`);
+  }
+};
 
 // Named export
 export const reportsApi = {
-  getReport, downloadPartyLedgerPdf
+  getReport, downloadPartyLedgerPdf, downloadTransportLedgerPdf
 };
 
 export default reportsApi;

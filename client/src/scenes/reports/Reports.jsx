@@ -2,88 +2,115 @@
 
 import React, { useState, useCallback } from "react";
 import { FolderOpen } from "lucide-react";
-
-import { useDownloadPartyLedger } from "@/hooks/useReports";
-import ConfirmationModal from "@/components/common/ConfirmationModal";
-import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { toast } from "react-toastify";
 
+import { useDownloadPartyLedger, useDownloadTransportLedger, useReports } from "@/hooks/useReports";
+import ConfirmationModal from "@/components/common/ConfirmationModal";
+import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import { useTheme } from "@/hooks/useTheme";
 import { useTableControls } from "@/hooks/useTableControls";
-import { useReports } from "@/hooks/useReports";
 
 import ReportDataFilter from "@/components/common/ReportDataFilter";
 import ActionRibbon from "@/components/common/ActionRibbon";
 import DataTable from "@/components/common/DataTable";
 import { MODULE_OPTIONS } from "@/constants/MODULE_OPTIONS";
 
-// Module-specific imports
 import PartyLedgerColumns from "./parties/Columns";
 import PartyLedgerSummaryStats from "./parties/PartyLedgerSummaryStats";
-// import TransportLedgerColumns from "./transport/Columns";
-// import TransportLedgerSummaryStats from "./transport/TransportLedgerSummaryStats";
+import TransportLedgerColumns from "./transport/Columns";
+import TransportLedgerSummaryStats from "./transport/TransportLedgerSummaryStats";
 
 // ─────────────────────────────────────────────────────────────
-// getModuleConfig
-// Single place that defines everything per module.
-// Switch makes it easy to add new modules later.
+// SHARED FILTER OPTIONS
+// Both party and transport ledgers use the same filter shape.
 // ─────────────────────────────────────────────────────────────
-function getModuleConfig(moduleKey) {
-  switch (moduleKey) {
-    case "party":
-      return {
-        filterKeys: ["partyId", "dateFrom", "dateTo"],
-        filterOptions: [
-          {
-            key: "partyId",
-            label: "Party",
-            type: "partySearch",
-            placeholder: "Search party by name"
-          },
-          {
-            key: "dateFrom",
-            label: "Date From",
-            type: "date"
-          },
-          {
-            key: "dateTo",
-            label: "Date To",
-            type: "date"
-          }
-        ],
-        getColumns: PartyLedgerColumns,
-        SummaryStats: PartyLedgerSummaryStats
-        // useData:   usePartyLedger,
-      };
+const LEDGER_FILTER_KEYS = ["partyId", "dateFrom", "dateTo"];
 
-    // ── Add new modules below ──────────────────────────────
-    // case "transport":
-    //   return {
-    //     filterKeys: ["transportId", "dateFrom", "dateTo"],
-    //     filterOptions: [...],
-    //     getColumns:   TransportLedgerColumns,
-    //     SummaryStats: TransportLedgerSummaryStats,
-    //     useData:      useTransportLedger,
-    //   };
-
-    default:
-      return null;
+const LEDGER_FILTER_OPTIONS = [
+  {
+    key: "partyId",
+    label: "Party",
+    type: "partySearch",
+    placeholder: "Search party by name"
+  },
+  {
+    key: "dateFrom",
+    label: "Date From",
+    type: "date"
+  },
+  {
+    key: "dateTo",
+    label: "Date To",
+    type: "date"
   }
+];
+
+// ─────────────────────────────────────────────────────────────
+// MODULE REGISTRY
+// Add new modules here. Each entry is self-contained.
+// ─────────────────────────────────────────────────────────────
+const MODULE_REGISTRY = {
+  party: {
+    filterKeys: LEDGER_FILTER_KEYS,
+    filterOptions: LEDGER_FILTER_OPTIONS,
+    getColumns: PartyLedgerColumns,
+    SummaryStats: PartyLedgerSummaryStats,
+    printPath: "party-ledger"
+  },
+  transport: {
+    filterKeys: LEDGER_FILTER_KEYS,
+    filterOptions: LEDGER_FILTER_OPTIONS,
+    getColumns: TransportLedgerColumns,
+    SummaryStats: TransportLedgerSummaryStats,
+    printPath: "transport-ledger"
+  }
+};
+
+function getModuleConfig(moduleKey) {
+  return MODULE_REGISTRY[moduleKey] ?? null;
 }
 
 // ─────────────────────────────────────────────────────────────
-// EmptyState — shown before any module is selected
+// DOWNLOAD MUTATION MAP
+// Maps moduleKey → the correct download mutation hook result.
+// Keeps ReportView free of per-module conditionals.
+// ─────────────────────────────────────────────────────────────
+function useDownloadMutations() {
+  return {
+    party: useDownloadPartyLedger(),
+    transport: useDownloadTransportLedger()
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// EmptyState
 // ─────────────────────────────────────────────────────────────
 function EmptyState({ theme }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center py-24 gap-3 ${theme.text?.secondary ?? "text-gray-400"}`}
+      className={`flex flex-col items-center justify-center py-24 gap-3 ${
+        theme.text?.secondary ?? "text-gray-400"
+      }`}
     >
       <FolderOpen className="w-12 h-12 opacity-40" strokeWidth={1.2} />
       <p className="text-base font-medium">Select a report module to get started</p>
       <p className="text-sm opacity-60">Choose a module from the dropdown above</p>
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helper — extract & validate common ledger filter params
+// Returns { partyId, dateFrom, dateTo } or null if incomplete.
+// ─────────────────────────────────────────────────────────────
+function extractLedgerFilters(filters) {
+  const partyId = filters?.filterOptions?.partyId || "";
+  const dateFrom = filters?.filterOptions?.dateFrom;
+  const dateTo = filters?.filterOptions?.dateTo;
+
+  if (!partyId || !dateFrom || !dateTo) return null;
+
+  return { partyId, dateFrom, dateTo };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -109,59 +136,56 @@ function ReportView({ moduleKey, config, moduleOptions, onModuleChange }) {
   const stats = reportData?.stats ?? null;
 
   const columns = config.getColumns();
-  const { SummaryStats } = config;
+  const { SummaryStats, printPath } = config;
 
-  // Confirmation dialog hook
-    const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
-  const downloadLedgerMutation = useDownloadPartyLedger();
+  // Confirmation dialog
+  const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
 
-  const handleDownloadLedger = useCallback(() => {
-    const partyId = filters?.filterOptions?.partyId || ""
-  const dateFrom = filters?.filterOptions?.dateFrom;
-  const dateTo = filters?.filterOptions?.dateTo;
+  // All download mutations — pick the right one by moduleKey
+  const downloadMutations = useDownloadMutations();
+  const downloadMutation = downloadMutations[moduleKey];
 
-    if (!partyId || !dateFrom || !dateTo) {
+  // ── Generic download handler ──────────────────────────────
+  const handleDownload = useCallback(() => {
+    const params = extractLedgerFilters(filters);
+
+    if (!params) {
       toast.error("Please select party and date range");
       return;
     }
 
     openDialog({
-      title: "Download Party Ledger",
-      message: `Download ledger for selected party?`,
+      title: "Download Ledger",
+      message: "Download ledger for the selected filters?",
       onConfirm: async () => {
         try {
-          await downloadLedgerMutation.mutateAsync({
-            partyId,
-            dateFrom,
-            dateTo
-          });
-
+          await downloadMutation.mutateAsync(params);
           toast.success("Ledger downloaded successfully");
         } catch (err) {
           toast.error(err?.message || "Failed to download ledger");
         }
       }
     });
-  }, [downloadLedgerMutation, openDialog, filters]);
+  }, [downloadMutation, openDialog, filters]);
 
-  const handlePrintLedger = useCallback(() => {
-    const partyId = filters?.filterOptions?.partyId || ""
-  const dateFrom = filters?.filterOptions?.dateFrom;
-  const dateTo = filters?.filterOptions?.dateTo;
+  // ── Generic print handler ─────────────────────────────────
+  const handlePrint = useCallback(() => {
+    const params = extractLedgerFilters(filters);
 
-    if (!partyId || !dateFrom || !dateTo) {
+    if (!params) {
       toast.error("Please select party and date range");
       return;
     }
 
-    const url = `${import.meta.env.VITE_API_BASE_URL}/reports/print/party-ledger?partyId=${partyId}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
+    const { partyId, dateFrom, dateTo } = params;
+    const url = `${import.meta.env.VITE_API_BASE_URL}/reports/print/${printPath}?partyId=${partyId}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
 
     window.open(url, "_blank");
-  }, [filters]);
+  }, [filters, printPath]);
 
   return (
     <div className="space-y-6">
-      {/* Filter bar — includes module dropdown + dynamic filters */}
+      {/* Filter bar — module dropdown + dynamic filters */}
       <ReportDataFilter
         moduleOptions={moduleOptions}
         selectedModule={moduleKey}
@@ -174,14 +198,14 @@ function ReportView({ moduleKey, config, moduleOptions, onModuleChange }) {
         className="sticky top-0 z-10 bg-inherit"
       />
 
-      {/* Summary stats — each module supplies its own component */}
+      {/* Per-module summary stats */}
       <SummaryStats stats={stats} />
 
       {/* Action ribbon */}
       <ActionRibbon
         resourceName={moduleKey}
         actions={["print", "download"]}
-        handlers={{ print: handlePrintLedger, download: handleDownloadLedger }}
+        handlers={{ print: handlePrint, download: handleDownload }}
       />
 
       {/* Ledger table */}
@@ -204,12 +228,10 @@ function ReportView({ moduleKey, config, moduleOptions, onModuleChange }) {
 
 // ─────────────────────────────────────────────────────────────
 // Reports — root component
-// Only owns module selection state.
-// Everything else lives in ReportView (per-module).
+// Owns only module-selection state; all else lives in ReportView.
 // ─────────────────────────────────────────────────────────────
 function Reports() {
   const { theme } = useTheme();
-
   const [selectedModule, setSelectedModule] = useState("");
 
   const handleModuleChange = useCallback(moduleKey => {
@@ -225,7 +247,7 @@ function Reports() {
       {config ? (
         /*
          * key={selectedModule} forces a full remount of ReportView whenever
-         * the module changes — filters, pagination, and sorting all reset cleanly.
+         * the module changes — filters, pagination, and sorting all reset.
          */
         <ReportView
           key={selectedModule}
@@ -236,7 +258,7 @@ function Reports() {
         />
       ) : (
         <>
-          {/* Keep the filter bar visible (module dropdown only) before selection */}
+          {/* Keep module dropdown visible before a module is selected */}
           <ReportDataFilter
             moduleOptions={MODULE_OPTIONS}
             selectedModule={selectedModule}
@@ -247,7 +269,6 @@ function Reports() {
             onClearFilters={() => {}}
             className="sticky top-0 z-10 bg-inherit"
           />
-
           <EmptyState theme={theme} />
         </>
       )}
@@ -256,5 +277,4 @@ function Reports() {
 }
 
 Reports.displayName = "Reports";
-
 export default Reports;
