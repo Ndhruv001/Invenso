@@ -256,7 +256,7 @@ model PurchaseReturn {
   id                 Int               @id @default(autoincrement())
   date               DateTime          @default(now())
   partyId            Int
-  purchaseId          Int?
+  purchaseId          Int
   totalAmount        Decimal           @db.Decimal(15, 2)
   totalGstAmount     Decimal           @db.Decimal(15, 2)
   totalTaxableAmount Decimal           @db.Decimal(15, 2)
@@ -268,7 +268,7 @@ model PurchaseReturn {
   updatedAt          DateTime          @updatedAt
 
   party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
-  purchase        Purchase?         @relation(fields: [purchaseId], references: [id])
+  purchase        Purchase         @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
   purchaseReturnItems PurchaseReturnItem[]
   inventoryLogs   InventoryLog[]     @relation("PurchaseReturnInventoryLogs")
 
@@ -375,7 +375,7 @@ model SaleReturn {
   updatedAt          DateTime          @updatedAt
 
   party           Party             @relation(fields: [partyId], references: [id], onDelete: Restrict)
-  sale            Sale              @relation(fields: [saleId], references: [id])
+  sale            Sale              @relation(fields: [saleId], references: [id], onDelete: Restrict)
   saleReturnItems SaleReturnItem[]
   inventoryLogs  InventoryLog[]     @relation("SaleReturnInventoryLogs")
 

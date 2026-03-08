@@ -16,7 +16,7 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
-import { useDeleteOldAuditLogs, useSentInvoicesOnWhatsApp } from "@/hooks/useAdmin";
+import { useDeleteOldAuditLogsAndInventoryLogs, useSentInvoicesOnWhatsApp } from "@/hooks/useAdmin";
 
 // ---------------------------
 // Config
@@ -33,11 +33,11 @@ const CRON_JOBS = [
       "This will dispatch all pending invoices to their respective parties via WhatsApp. Continue?"
   },
   {
-    key: "deleteOldAuditLogs",
-    label: "Delete Old Audit Logs",
-    description: "Delete all audit logs which are older than 14 days.",
+    key: "deleteOldAuditLogsAndInventoryLogs",
+    label: "Delete Old Audit Logs & Inventory Logs ",
+    description: "Delete all audit logs & inventory logs which are older than 14 days.",
     icon: Trash2,
-    confirmTitle: "Delete Old Audit Logs",
+    confirmTitle: "Delete Old Audit Logs & Inventory Logs",
     confirmMessage: "This will delete all audit logs which are older than 14 days. Continue?"
   },
   {
@@ -112,7 +112,7 @@ const System = () => {
   const [loading, setLoading] = useState({});
 
   const sentInvoicesOnWhatsAppMutation = useSentInvoicesOnWhatsApp();
-  const deleteOldAuditLogsMutation = useDeleteOldAuditLogs();
+  const deleteOldAuditLogsAndInventoryLogs = useDeleteOldAuditLogsAndInventoryLogs();
 
   const handleRun = useCallback(
     job => {
@@ -125,8 +125,8 @@ const System = () => {
             if (job.key === "pendingInvoices") {
               await sentInvoicesOnWhatsAppMutation.mutateAsync();
             }
-            if (job.key === "deleteOldAuditLogs") {
-              await deleteOldAuditLogsMutation.mutateAsync();
+            if (job.key === "deleteOldAuditLogsAndInventoryLogs") {
+              await deleteOldAuditLogsAndInventoryLogs.mutateAsync();
             }
             toast.success(`${job.label} completed successfully`);
           } catch (err) {
@@ -137,7 +137,7 @@ const System = () => {
         }
       });
     },
-    [openDialog, sentInvoicesOnWhatsAppMutation, deleteOldAuditLogsMutation]
+    [openDialog, sentInvoicesOnWhatsAppMutation, deleteOldAuditLogsAndInventoryLogs]
   );
 
   // TODO: wire individual setting handlers
@@ -162,7 +162,9 @@ const System = () => {
               className={`flex items-center justify-between gap-4 px-4 py-3 ${theme.card}`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-base shrink-0">{React.createElement(job.icon, { size: 20 })}</span>
+                <span className="text-base shrink-0">
+                  {React.createElement(job.icon, { size: 20 })}
+                </span>
                 <div className="min-w-0">
                   <p className={`text-sm font-medium leading-snug ${theme.text.primary}`}>
                     {job.label}
@@ -216,7 +218,9 @@ const System = () => {
               `}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-base shrink-0">{React.createElement(item.icon, { size: 20 })}</span>
+                <span className="text-base shrink-0">
+                  {React.createElement(item.icon, { size: 20 })}
+                </span>
                 <div className="min-w-0">
                   <p className={`text-sm font-medium leading-snug ${theme.text.primary}`}>
                     {item.label}

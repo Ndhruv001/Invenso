@@ -59,18 +59,6 @@ const getTransportLedger = async (filters = {}) => {
     });
   });
 
-  payments.forEach(p => {
-    ledger.push({
-      voucherType: "Payment",
-      voucherNumber: `PM-${p.id}`,
-      date: p.date,
-      from: "Payment",
-      to: "Payment",
-      amount: Number(p.amount),
-      type: "PAYMENT"
-    });
-  });
-
   // -----------------------------
   // 4️⃣ Sort Ledger
   // -----------------------------

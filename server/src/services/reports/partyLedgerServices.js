@@ -48,7 +48,7 @@ const getPartyLedger = async (filters = {}) => {
   // -----------------------------
   // 4️⃣ Current Period Data
   // -----------------------------
-  const [sales, purchases, payments, saleReturns, purchaseReturns] =
+  const [sales, purchases, payments, saleReturns, purchaseReturns, transports] =
     await Promise.all([
       prisma.sale.findMany({
         where: {
@@ -79,8 +79,15 @@ const getPartyLedger = async (filters = {}) => {
           partyId: Number(partyId),
           date: { gte: startDate, lte: endDate }
         }
-      })
+      }), 
+      prisma.transport.findMany({
+      where: {
+        partyId: Number(partyId),
+        date: { gte: startDate, lte: endDate }
+      }
+    }),
     ]);
+
 
   // -----------------------------
   // 5️⃣ Convert to Ledger Format
@@ -128,12 +135,22 @@ const getPartyLedger = async (filters = {}) => {
       credit: Number(p.totalAmount)
     });
   });
+  transports.forEach(p => {
+    ledger.push({
+      date: p.date,
+      particulars: "Transportation",
+      voucherType: "Transport",
+      voucherNumber: p.id,
+      debit: Number(p.amount),
+      credit: 0
+    });
+  });
 
   payments.forEach(pay => {
     if (pay.type === "RECEIVED") {
       ledger.push({
         date: pay.date,
-        particulars: "Payment Received",
+        particulars: pay.paymentMode,
         voucherType: "Receipt",
         voucherNumber: pay.id,
         debit: 0,
@@ -142,7 +159,7 @@ const getPartyLedger = async (filters = {}) => {
     } else {
       ledger.push({
         date: pay.date,
-        particulars: "Payment Paid",
+        particulars: pay.paymentMode,
         voucherType: "Payment",
         voucherNumber: pay.id,
         debit: Number(pay.amount),

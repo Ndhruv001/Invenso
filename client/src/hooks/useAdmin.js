@@ -1,16 +1,16 @@
 import { useMutation } from "@tanstack/react-query";
-import { sentInvoicesOnWhatsApp, deleteOldAuditLogs } from "@/services/adminServices";
+import { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs } from "@/services/adminServices";
 
 const useSentInvoicesOnWhatsApp = () => {
   return useMutation({
     mutationFn: () => sentInvoicesOnWhatsApp()
   });
 };
-const useDeleteOldAuditLogs = () => {
+const useDeleteOldAuditLogsAndInventoryLogs = () => {
   return useMutation({
-    mutationFn: () => deleteOldAuditLogs()
+    mutationFn: () => deleteOldAuditLogsAndInventoryLogs()
   });
 };
 
-export default {useSentInvoicesOnWhatsApp, useDeleteOldAuditLogs};
-export { useSentInvoicesOnWhatsApp, useDeleteOldAuditLogs };
+export default {useSentInvoicesOnWhatsApp, useDeleteOldAuditLogsAndInventoryLogs};
+export { useSentInvoicesOnWhatsApp, useDeleteOldAuditLogsAndInventoryLogs };

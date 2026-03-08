@@ -161,14 +161,25 @@ async function getDashboardSummary() {
    * + (Other Income like Transport)
    * - (Operating Expenses)
    */
+
+  const salesProfit = n(salesT._sum.totalProfit);
+const returnProfitLoss = n(sReturnT._sum.totalProfitLoss);
+const transportAmount = n(transT._sum.amount);
+const expenseAmount = n(expT._sum.amount);
+
+console.log("Sales Profit:", salesProfit);
+console.log("Sales Return Profit/Loss:", returnProfitLoss);
+console.log("Transport Amount:", transportAmount);
+console.log("Expense Amount:", expenseAmount);
+
   const netProfitToday =
-    n(salesT._sum.totalProfit) -
-    n(-sReturnT._sum.totalProfitLoss) +
+    n(salesT._sum.totalProfit) +
+    n(sReturnT._sum.totalProfitLoss) +
     n(transT._sum.amount) -
     n(expT._sum.amount);
   const netProfitMonth =
-    n(salesM._sum.totalProfit) -
-    n(-sReturnM._sum.totalProfitLoss) +
+    n(salesM._sum.totalProfit) +
+    n(sReturnM._sum.totalProfitLoss) +
     n(transM._sum.amount) -
     n(expM._sum.amount);
 

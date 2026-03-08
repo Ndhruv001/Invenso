@@ -8,13 +8,13 @@ export const sentInvoicesOnWhatsApp = async () => {
     throw new Error(error?.response?.data?.error || error?.message || "Failed to send invoices");
   }
 };
-export const deleteOldAuditLogs = async () => {
+export const deleteOldAuditLogsAndInventoryLogs = async () => {
   try {
-    await axiosInstance.post("/admin/run-delete-old-audit-logs");
+    await axiosInstance.post("/admin/run-delete-old-audit-and-inventory-logs");
     return;
   } catch (error) {
-    throw new Error(error?.response?.data?.error || error?.message || "Failed to delete audit logs.");
+    throw new Error(error?.response?.data?.error || error?.message || "Failed to delete audit logs & inventory logs.");
   }
 };
 
-export default { sentInvoicesOnWhatsApp, deleteOldAuditLogs };
+export default { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs };

@@ -28,15 +28,22 @@ async function listAuditLogs({ page = 1, limit = 20, sortBy = "createdAt", sortO
   };
 }
 
-async function deleteOldAuditLogs() {
+async function deleteOldAuditLogsAndInventoryLogs() {
   try {
-    console.log("🧹 Cleaning old audit logs...");
+    console.log("🧹 Cleaning old audit logs & inventory logs...");
 
     // Date 14 days ago
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 14);
 
-    const result = await prisma.auditLog.deleteMany({
+    const auditResult = await prisma.auditLog.deleteMany({
+      where: {
+        createdAt: {
+          lt: cutoffDate
+        }
+      }
+    });
+    const inventoryResult = await prisma.inventoryLog.deleteMany({
       where: {
         createdAt: {
           lt: cutoffDate
@@ -44,17 +51,18 @@ async function deleteOldAuditLogs() {
       }
     });
 
-    console.log(`✅ Deleted ${result.count} audit logs older than 14 days`);
+    const result = auditResult.count + inventoryResult.count;
+    console.log(`✅ Deleted ${result} audit logs & inventory logs older than 14 days`);
 
-    return result.count;
+    return result;
   } catch (error) {
     console.error("❌ Audit log cleanup failed:", error);
     throw error;
   }
 }
 
-export { listAuditLogs, deleteOldAuditLogs };
+export { listAuditLogs, deleteOldAuditLogsAndInventoryLogs };
 export default {
   listAuditLogs,
-  deleteOldAuditLogs
+  deleteOldAuditLogsAndInventoryLogs
 };
