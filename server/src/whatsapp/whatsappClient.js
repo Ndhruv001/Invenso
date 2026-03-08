@@ -10,7 +10,13 @@ export const client = new Client({
     dataPath: "./sessions"
   }),
   puppeteer: {
-    headless: true
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
+    ]
   }
 });
 
@@ -33,6 +39,10 @@ client.on("auth_failure", msg => {
 
 client.on("disconnected", reason => {
   console.log("⚠️ WhatsApp Disconnected:", reason);
+});
+
+client.on("error", err => {
+  console.error("WhatsApp Client Error:", err);
 });
 
 client.initialize();
