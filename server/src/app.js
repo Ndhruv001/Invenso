@@ -26,7 +26,7 @@ app.set("trust proxy", 1);
 
 // ── Security
 app.use(helmetConfig());
-app.use(cors(corsOptions));
+app.use("*", cors(corsOptions));
 app.use(globalLimiter);
 app.use(cookieParser());
 
