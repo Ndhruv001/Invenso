@@ -19,7 +19,7 @@ app.listen(PORT, "0.0.0.0", async () => {
 
   try {
     console.log("Loading WhatsApp Client...");
-    await import("./whatsapp/whatsappClient.js");
+    // await import("./whatsapp/whatsappClient.js");
 
     console.log("Loading Invoice Cron...");
     await import("./crons/invoiceWhatsAppCrons.js");
