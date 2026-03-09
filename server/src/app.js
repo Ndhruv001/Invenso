@@ -22,7 +22,7 @@ dotenv.config();
 const app = express();
 
 // Behind reverse proxies (nginx, load balancer)
-app.set("trust proxy", process.env.TRUST_PROXY === "true");
+app.set("trust proxy", 1);
 
 // ── Security
 app.use(helmetConfig());
