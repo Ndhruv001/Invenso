@@ -18,26 +18,46 @@ const hasPermission = (userRole, requiredRoles = []) => {
 
 /**
  * ProtectedRoute
- *
- * - Calls useMe() → verifies cookie via backend
- * - If loading → show loader
- * - If not authenticated → redirect to login
- * - If role not allowed → redirect to unauthorized
- * - Otherwise → render children
  */
-const ProtectedRoute = ({ children, requiredRoles = [], fallbackPath = "/login" }) => {
+const ProtectedRoute = ({
+  children,
+  requiredRoles = [],
+  fallbackPath = "/login"
+}) => {
   const location = useLocation();
 
-  const { data: user, isLoading, isError } = useMe();
+  const { data: user, isLoading, error } = useMe();
 
-  // 🔹 While checking authentication
+  // 🔹 Still checking authentication
   if (isLoading) {
     return <div>Checking authentication...</div>;
   }
 
-  // 🔹 If cookie invalid / not logged in
-  if (isError || !user) {
-    return <Navigate to={fallbackPath} state={{ from: location }} replace />;
+  // 🔹 Only redirect if backend CONFIRMED 401
+  if (error?.response?.status === 401) {
+    return (
+      <Navigate
+        to={fallbackPath}
+        state={{ from: location }}
+        replace
+      />
+    );
+  }
+
+  // 🔹 If temporary network issue → don't force logout
+  if (error && !error.response) {
+    return <div>Network issue. Please refresh.</div>;
+  }
+
+  // 🔹 If somehow user is null (extra safety)
+  if (!user) {
+    return (
+      <Navigate
+        to={fallbackPath}
+        state={{ from: location }}
+        replace
+      />
+    );
   }
 
   // 🔹 Role-based protection
@@ -66,7 +86,6 @@ export const withRoleProtection = (Component, requiredRoles = []) => {
 
 /**
  * usePermissions
- * Allows checking roles inside components (UI level control)
  */
 export const usePermissions = () => {
   const { data: user } = useMe();

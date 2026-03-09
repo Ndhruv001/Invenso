@@ -13,9 +13,9 @@ const useLogin = () => {
   return useMutation({
     mutationFn: ({ username, password }) => login({ username, password }),
 
-    onSuccess: () => {
+    onSuccess: async () => {
       // Refetch authenticated user
-      queryClient.invalidateQueries(["me"]);
+      await queryClient.invalidateQueries(["me"]);
     }
   });
 };
