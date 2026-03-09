@@ -6,15 +6,14 @@ import { generateToken } from "../utils/jwt.js";
 
 const loginUser = async (username, password) => {
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || user.password !== password) {
+  if (!user) {
     throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
   }
 
-  //& for future --
-  // const match = await comparePassword(password, user.password);
-  // if (!match) {
-  //   throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
-  // }
+  const match = await comparePassword(password, user.password);
+  if (!match) {
+    throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
+  }
 
   const token = generateToken({ id: user.id, username: user.username });
   return { token, user };
