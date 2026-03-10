@@ -31,9 +31,22 @@ const errorRotateTransport = new DailyRotateFile({
 // ✅ ALWAYS log to console (important for Render)
 const consoleTransport = new transports.Console({
   format: format.combine(
+    format.timestamp(),
     format.colorize(),
-    format.printf(({ level, message, timestamp, stack }) => {
-      return `${timestamp} [${level}]: ${stack || message}`;
+    format.printf(({ level, message, timestamp, stack, ...meta }) => {
+      let log = stack || message;
+
+      // If message is object, stringify it
+      if (typeof message === "object") {
+        log = JSON.stringify(message, null, 2);
+      }
+
+      // If extra metadata exists, stringify it too
+      if (Object.keys(meta).length) {
+        log += "\n" + JSON.stringify(meta, null, 2);
+      }
+
+      return `${timestamp} [${level}]: ${log}`;
     })
   )
 });

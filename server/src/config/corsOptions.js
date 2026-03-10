@@ -1,7 +1,6 @@
 // CORS: Configure cross-origin resource sharing
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log("CORS request origin:", origin);
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
       "http://localhost:5173",
       "https://invenso-sigma.vercel.app"
