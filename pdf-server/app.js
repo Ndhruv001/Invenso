@@ -58,7 +58,9 @@ app.post("/generate-pdf", async (req, res) => {
       });
     }
 
+    console.log("Generating PDF...");
     pdfBuffer = await generatePdfFromTemplate(templateName, data);
+     console.log("PDF GENERATED SUCCESSFULLY");
 
     res.set({
       "Content-Type": "application/pdf",
