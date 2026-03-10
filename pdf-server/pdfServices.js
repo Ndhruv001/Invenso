@@ -91,10 +91,10 @@ async function generatePdfFromTemplate(templateName, data) {
 
     const candidatePaths = [
       process.env.PUPPETEER_EXECUTABLE_PATH,
+      "/usr/bin/chromium",             // ✅ what apt-get installs on Render
       "/usr/bin/google-chrome-stable",
       "/usr/bin/google-chrome",
       "/usr/bin/chromium-browser",
-      "/usr/bin/chromium",
       "/snap/bin/chromium",
     ].filter(Boolean);
 
@@ -110,15 +110,25 @@ async function generatePdfFromTemplate(templateName, data) {
       }
     }
 
-    // Fallback to puppeteer bundled
+    // Last resort: puppeteer bundled (only works if npm install downloaded it)
     if (!executablePath) {
-      console.log(`  ⚠️  No system Chrome found, falling back to puppeteer.executablePath()`);
       try {
-        executablePath = puppeteer.executablePath();
-        console.log(`  Puppeteer path: ${executablePath}`);
-        console.log(`  Exists: ${fs.existsSync(executablePath) ? "✅ yes" : "❌ NO - this will fail!"}`);
+        // Temporarily remove env var so puppeteer returns its real internal cache path
+        const savedEnv = process.env.PUPPETEER_EXECUTABLE_PATH;
+        delete process.env.PUPPETEER_EXECUTABLE_PATH;
+        const bundledPath = puppeteer.executablePath();
+        process.env.PUPPETEER_EXECUTABLE_PATH = savedEnv;
+
+        console.log(`  ⚠️  Trying puppeteer bundled path: ${bundledPath}`);
+        console.log(`  Exists: ${fs.existsSync(bundledPath) ? "✅ yes" : "❌ NO - this will fail!"}`);
+
+        if (fs.existsSync(bundledPath)) {
+          executablePath = bundledPath;
+        } else {
+          throw new Error(`No Chrome found. Tried: ${candidatePaths.join(", ")} and bundled: ${bundledPath}`);
+        }
       } catch (e) {
-        throw new Error(`Cannot resolve any Chrome executable. Last error: ${e.message}`);
+        throw new Error(`Cannot resolve any Chrome executable: ${e.message}`);
       }
     }
 
