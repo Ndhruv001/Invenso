@@ -87,50 +87,20 @@ async function generatePdfFromTemplate(templateName, data) {
     console.log(`  ✅ Replaced ${replacedCount}/${Object.keys(data).length} placeholders`);
 
     // ── STEP 3: Resolve Chrome executable ─────────────────────
-    console.log(`\n🔍 [3/5] Resolving Chrome executable...`);
+console.log(`\n🔍 [3/5] Resolving Chrome executable...`);
 
-    const candidatePaths = [
-      process.env.PUPPETEER_EXECUTABLE_PATH,
-      "/usr/bin/chromium",             // ✅ what apt-get installs on Render
-      "/usr/bin/google-chrome-stable",
-      "/usr/bin/google-chrome",
-      "/usr/bin/chromium-browser",
-      "/snap/bin/chromium",
-    ].filter(Boolean);
-
-    let executablePath = null;
-
-    for (const candidate of candidatePaths) {
-      if (fs.existsSync(candidate)) {
-        executablePath = candidate;
-        console.log(`  ✅ Found Chrome at: ${candidate}`);
-        break;
-      } else {
-        console.log(`  ⬜ Not found: ${candidate}`);
-      }
-    }
-
-    // Last resort: puppeteer bundled (only works if npm install downloaded it)
-    if (!executablePath) {
-      try {
-        // Temporarily remove env var so puppeteer returns its real internal cache path
-        const savedEnv = process.env.PUPPETEER_EXECUTABLE_PATH;
-        delete process.env.PUPPETEER_EXECUTABLE_PATH;
-        const bundledPath = puppeteer.executablePath();
-        process.env.PUPPETEER_EXECUTABLE_PATH = savedEnv;
-
-        console.log(`  ⚠️  Trying puppeteer bundled path: ${bundledPath}`);
-        console.log(`  Exists: ${fs.existsSync(bundledPath) ? "✅ yes" : "❌ NO - this will fail!"}`);
-
-        if (fs.existsSync(bundledPath)) {
-          executablePath = bundledPath;
-        } else {
-          throw new Error(`No Chrome found. Tried: ${candidatePaths.join(", ")} and bundled: ${bundledPath}`);
-        }
-      } catch (e) {
-        throw new Error(`Cannot resolve any Chrome executable: ${e.message}`);
-      }
-    }
+let executablePath;
+try {
+  executablePath = puppeteer.executablePath();
+  console.log(`  Puppeteer path: ${executablePath}`);
+  console.log(`  Exists: ${fs.existsSync(executablePath) ? "✅ yes" : "❌ NO"}`);
+  
+  if (!fs.existsSync(executablePath)) {
+    throw new Error(`Chrome not found at puppeteer path: ${executablePath}`);
+  }
+} catch (e) {
+  throw new Error(`Cannot resolve Chrome executable: ${e.message}`);
+}
 
     // ── STEP 4: Launch browser ─────────────────────────────────
     console.log(`\n🚀 [4/5] Launching browser...`);
