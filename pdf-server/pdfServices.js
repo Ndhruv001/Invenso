@@ -20,6 +20,7 @@ async function generatePdfFromTemplate(templateName, data) {
       html = html.replaceAll(`{{${key}}}`, value ?? "");
     }
 
+    console.log("Executable Path:", puppeteer.executablePath());
     // 2️⃣ Launch Chrome (Render-safe)
     browser = await puppeteer.launch({
       headless: "new",
