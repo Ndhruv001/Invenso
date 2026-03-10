@@ -1,5 +1,5 @@
 import prisma from "../../config/prisma.js";
-import {generatePdfFromTemplate} from "../pdfServices.js"
+import axios from "axios";
 
 /**
  * Get Party Ledger
@@ -294,10 +294,17 @@ async function getPartyLedgerPdf(filters = {}) {
   };
 
   // 7️⃣ Generate PDF
-  const pdfBuffer = await generatePdfFromTemplate(
-    "partyLedgerTemplate.html",
+
+  const response = await axios.post(
+  process.env.PDF_SERVICE_URL + "/generate-pdf",
+  {
+    templateName: "partyLedgerTemplate.html",
     data
-  );
+  },
+  { responseType: "arraybuffer" }
+);
+
+const pdfBuffer = response.data;
 
   return pdfBuffer;
 }

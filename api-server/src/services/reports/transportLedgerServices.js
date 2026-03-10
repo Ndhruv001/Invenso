@@ -1,5 +1,5 @@
 import prisma from "../../config/prisma.js";
-import { generatePdfFromTemplate } from "../pdfServices.js";
+import axios from "axios";
 
 const getTransportLedger = async (filters = {}) => {
   const { partyId, dateFrom, dateTo } = filters;
@@ -144,7 +144,17 @@ async function getTransportLedgerPdf(filters = {}) {
   };
 
   // 5️⃣ Generate PDF
-  const pdfBuffer = await generatePdfFromTemplate("transportLedgerTemplate.html", data);
+
+  const response = await axios.post(
+  process.env.PDF_SERVICE_URL + "/generate-pdf",
+  {
+    templateName: "transportLedgerTemplate.html",
+    data
+  },
+  { responseType: "arraybuffer" }
+);
+
+const pdfBuffer = response.data;
 
   return pdfBuffer;
 }

@@ -12,7 +12,7 @@
 
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
-import { generatePdfFromTemplate } from "../services/pdfServices.js";
+import axios from "axios";
 
 /**
  * Helper: Build date filter for Prisma
@@ -876,8 +876,17 @@ async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
   };
 
   // 5. Generate PDF
-  const pdfBuffer = await generatePdfFromTemplate("purchaseReturnInvoiceTemplate.html", data);
 
+const response = await axios.post(
+  process.env.PDF_SERVICE_URL + "/generate-pdf",
+  {
+    templateName: "purchaseReturnInvoiceTemplate.html",
+    data
+  },
+  { responseType: "arraybuffer" }
+);
+
+const pdfBuffer = response.data;
   return pdfBuffer;
 }
 

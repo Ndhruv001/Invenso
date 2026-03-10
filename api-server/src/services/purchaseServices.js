@@ -1,6 +1,18 @@
+/**
+ * purchaseServices.js
+ * Prisma-based services for Purchase resource.
+ *
+ * Functions:
+ * - listPurchases with filters, pagination, stats
+ * - getPurchaseById
+ * - createPurchase with purchase items, inventory logs, stock update, payment & party balance update, audit log
+ * - updatePurchase with checking diff on payment, updating party balance, stock adjustments, audit log
+ * - deletePurchase with undo of stock, inventory log reversal, payment & party balance undo, deleting purchase items & purchase, audit log
+ */
+
 import prisma from "../config/prisma.js";
 import AppError from "../utils/appErrorUtils.js";
-import { generatePdfFromTemplate } from "../services/pdfServices.js";
+import axios from "axios";
 
 /**
  * Helper: Build date filter for Prisma
@@ -15,11 +27,7 @@ function buildDateFilter({ from, to }) {
   return Object.keys(cond).length ? cond : undefined;
 }
 
-/**
- * listSales
- * List sales with filters, pagination, search, stats
- */
-async function listSales({
+async function listPurchases({
   page = 1,
   limit = 10,
   sortBy = "date",
@@ -94,22 +102,22 @@ async function listSales({
   /* -------------------- DB Transaction -------------------- */
 
   const [
-  sales,
+  purchases,
   totalRows,
   groupedParties,
-  saleAggregates,
-  saleReturnAggregates,
-  receivedAggregates
+  purchaseAggregates,
+  purchaseReturnAggregates,
+  paidAggregates
 ] = await prisma.$transaction([
-  
-  prisma.sale.findMany({
+
+  prisma.purchase.findMany({
     where,
     skip,
     take,
     orderBy,
     include: {
       party: true,
-      saleItems: {
+      purchaseItems: {
         include: {
           product: {
             include: { category: true }
@@ -119,68 +127,65 @@ async function listSales({
     }
   }),
 
-  prisma.sale.count({ where }),
+  prisma.purchase.count({ where }),
 
-  prisma.sale.groupBy({
+  prisma.purchase.groupBy({
     by: ["partyId"],
     where
   }),
 
-  // Gross Sales Aggregates
-  prisma.sale.aggregate({
+  // 🟢 Gross Purchases
+  prisma.purchase.aggregate({
     where,
     _sum: {
       totalAmount: true,
-      totalProfit: true
     }
   }),
 
-  // 🔴 Sale Returns Aggregates
-  prisma.saleReturn.aggregate({
+  // 🔴 Purchase Returns
+  prisma.purchaseReturn.aggregate({
     where,
     _sum: {
-      totalAmount: true,
-      totalProfitLoss: true
+      totalAmount: true
     }
   }),
 
-  // 🔵 Total Received (DO NOT filter by referenceType)
+  // 🔵 Total Paid (do NOT restrict by referenceType)
   prisma.payment.aggregate({
     where: {
       ...(filters?.partyId && { partyId: filters.partyId }),
-      type: "RECEIVED",
-      referenceType: "SALE"
+      type: "PAID",
+      referenceType: "PURCHASE"
     },
     _sum: {
       amount: true
     }
   })
 ]);
-
   /* -------------------- Stats -------------------- */
 
- const grossSales = Number(saleAggregates._sum.totalAmount) || 0;
-const totalReturns = Number(saleReturnAggregates._sum.totalAmount) || 0;
-const totalReceived = Number(receivedAggregates._sum.amount) || 0;
+  const grossPurchases = Number(purchaseAggregates._sum.totalAmount) || 0;
+const totalReturns = Number(purchaseReturnAggregates._sum.totalAmount) || 0;
+const totalPaid = Number(paidAggregates._sum.amount) || 0;
 
-const netSales = grossSales - totalReturns;
-const outstandingReceivable = netSales - totalReceived;
+const netPurchases = grossPurchases - totalReturns;
+const outstandingPayable = netPurchases - totalPaid;
 
 const stats = {
-  totalInvoices: totalRows,
+  totalPurchases: totalRows,
   totalParties: groupedParties.length,
-  grossSales,
+
+  grossPurchases,
   totalReturns,
-  netSales,
-  totalReceived,
-  outstandingReceivable,
-  totalProfit: (Number(saleAggregates._sum.totalProfit) - Number(-saleReturnAggregates._sum.totalProfitLoss )) || 0
+  netPurchases,
+  totalPaid,
+  outstandingPayable,
 };
 
   /* -------------------- Response -------------------- */
 
   return {
-    data: sales,
+    data: purchases,
     pagination: {
       page,
       limit,
@@ -192,42 +197,39 @@ const stats = {
 }
 
 /**
- * Get sale by ID including items and party
+ * Get purchase by ID including items and party
  */
-async function getSaleById(id) {
-  if (!id) throw new AppError("Sale ID is required", 400);
+async function getPurchaseById(id) {
+  if (!id) throw new AppError("Purchase ID is required", 400);
 
-  const sale = await prisma.sale.findUnique({
+  const purchase = await prisma.purchase.findUnique({
     where: { id },
-    include: {
-      saleItems: true,
-      party: true
-    }
+    include: { purchaseItems: true, party: true }
   });
 
-  if (!sale) throw new AppError("Sale not found", 404);
+  if (!purchase) throw new AppError("Purchase not found", 404);
 
-  return sale;
+  return purchase;
 }
 
 /**
- * Create sale with items, inventory logs, stock, payment, party balance, audit log
- * @param {Object} data sale data with items array
+ * Create purchase with items, inventory logs, stock, payment, party balance, audit log
+ * @param {Object} data purchase data with items array
  * @param {number|null} userId
  */
-async function createSale(data, userId = null) {
+async function createPurchase(data, userId = null) {
   const {
     date,
     partyId,
     invoiceNumber,
-    receivedAmount = 0,
+    paidAmount = 0,
     paymentMode,
     remarks,
     items
   } = data;
 
   if (!Array.isArray(items) || items.length === 0) {
-    throw new AppError("Sale items are required", 400);
+    throw new AppError("Purchase items are required", 400);
   }
 
   return prisma.$transaction(async tx => {
@@ -235,11 +237,8 @@ async function createSale(data, userId = null) {
     let totalAmount = 0;
     let totalTaxableAmount = 0;
     let totalGstAmount = 0;
-    let totalProfit = 0;
 
-    const itemsData = [];
-
-    for (const item of items) {
+    const itemsData = items.map(item => {
       const quantity = Number(item.quantity);
       const pricePerUnit = Number(item.pricePerUnit);
       const gstRate = Number(item.gstRate);
@@ -247,6 +246,49 @@ async function createSale(data, userId = null) {
       const gstAmount = Number(item.gstAmount);
       const amount = Number(item.amount);
 
+      totalTaxableAmount += taxableAmount;
+      totalGstAmount += gstAmount;
+      totalAmount += amount;
+      return {
+        productId: item.productId,
+        quantity,
+        pricePerUnit,
+        gstRate,
+        taxableAmount,
+        gstAmount,
+        amount
+      };
+    });
+
+    /* -------------------- Build Purchase Data -------------------- */
+    const purchaseData = {
+      ...(date && { date }),
+      partyId,
+      ...(invoiceNumber && { invoiceNumber }),
+      totalAmount,
+      totalGstAmount,
+      totalTaxableAmount,
+      paidAmount: Number(paidAmount),
+      ...(paymentMode && { paymentMode }),
+      ...(remarks && { remarks })
+    };
+
+    /* -------------------- Create Purchase -------------------- */
+    const purchase = await tx.purchase.create({
+      data: purchaseData
+    });
+
+    /* -------------------- Create Items + Inline Inventory -------------------- */
+    for (const item of itemsData) {
+      // 1. Create the item record
+      await tx.purchaseItem.create({
+        data: {
+          purchaseId: purchase.id,
+          ...item
+        }
+      });
+
+      // 2. Inline Inventory Logic (Replacing the function call)
       const product = await tx.product.findUnique({
         where: { id: item.productId }
       });
@@ -256,113 +298,57 @@ async function createSale(data, userId = null) {
       }
 
       const balanceBefore = Number(product.currentStock);
+      const balanceAfter = balanceBefore + item.quantity;
 
-      // Stock validation (SALE = OUT)
-      if (balanceBefore < quantity) {
-        throw new AppError(`Insufficient stock for product ${product.name}`, 400);
-      }
+      // Calculate new average cost price
+      const oldAvgCostPrice = Number(product.avgCostPrice ?? 0);
 
-      const costPrice = Number(product.avgCostPrice || 0);
-      const profit = (pricePerUnit - costPrice) * quantity;
+      const newAvgCostPrice =
+        balanceBefore === 0 || oldAvgCostPrice === 0
+          ? item.pricePerUnit
+          : (balanceBefore * oldAvgCostPrice + item.quantity * item.pricePerUnit) /
+            (balanceBefore + item.quantity);
 
-      totalTaxableAmount += taxableAmount;
-      totalGstAmount += gstAmount;
-      totalAmount += amount;
-      totalProfit += profit;
-
-      itemsData.push({
-        productId: item.productId,
-        quantity,
-        pricePerUnit,
-        gstRate,
-        taxableAmount,
-        gstAmount,
-        amount,
-        profit
-      });
-    }
-
-    /* -------------------- Build Sale Data -------------------- */
-    const saleData = {
-      ...(date && { date }),
-      partyId,
-      ...(invoiceNumber && { invoiceNumber }),
-      totalAmount,
-      totalGstAmount,
-      totalTaxableAmount,
-      totalProfit,
-      receivedAmount: Number(receivedAmount),
-      ...(paymentMode && { paymentMode }),
-      ...(remarks && { remarks })
-    };
-
-    /* -------------------- Create Sale -------------------- */
-    const sale = await tx.sale.create({
-      data: saleData
-    });
-
-    /* -------------------- Create Items + Inline Inventory -------------------- */
-    for (const item of itemsData) {
-      // 1. Create sale item
-      await tx.saleItem.create({
-        data: {
-          saleId: sale.id,
-          ...item
-        }
-      });
-
-      // 2. Inline Inventory Logic (SALE = SUBTRACT)
-      const product = await tx.product.findUnique({
-        where: { id: item.productId }
-      });
-
-      const balanceBefore = Number(product.currentStock);
-      const balanceAfter = balanceBefore - item.quantity;
-
-      // calculate new average sell price (for reporting/profit analysis) - OPTIONAL
-      const oldAvgSellPrice = Number(product.avgSellPrice ?? 0);
-
-      const newAvgSellPrice =
-        oldAvgSellPrice === 0 ? item.pricePerUnit : (oldAvgSellPrice + item.pricePerUnit) / 2;
-
+      // Log the movement
       await tx.inventoryLog.create({
         data: {
           productId: item.productId,
           quantity: item.quantity,
-          type: "SUBTRACT",
-          referenceType: "SALE",
-          saleId: sale.id,
-          remark: `Sale #${sale.id}`,
+          type: "ADD",
+          referenceType: "PURCHASE",
+          purchaseId: purchase.id, // Linked to the new purchase ID
+          remark: `Purchase #${purchase.id}`,
           balanceBefore,
           balanceAfter
         }
       });
 
+      // Update actual stock
       await tx.product.update({
         where: { id: item.productId },
-        data: { currentStock: balanceAfter, avgSellPrice: newAvgSellPrice }
+        data: { currentStock: balanceAfter, avgCostPrice: newAvgCostPrice }
       });
     }
 
     /* -------------------- Party Balance Update -------------------- */
-    const receivableAmount = totalAmount - Number(receivedAmount);
-    if (partyId && receivableAmount > 0) {
+    const payableAmount = totalAmount - Number(paidAmount);
+    if (partyId && payableAmount > 0) {
       await tx.party.update({
         where: { id: partyId },
-        data: { currentBalance: { decrement: receivableAmount } }
+        data: { currentBalance: { increment: payableAmount } }
       });
     }
 
     /* -------------------- Payment Entry -------------------- */
-    if (partyId && Number(receivedAmount) > 0) {
+    if (partyId && Number(paidAmount) > 0) {
       await tx.payment.create({
         data: {
           date,
           partyId,
-          type: "RECEIVED",
-          amount: Number(receivedAmount),
-          referenceType: "SALE",
-          referenceId: parseInt(sale.id),
+          type: "PAID",
+          amount: Number(paidAmount),
+          referenceType: "PURCHASE",
+          referenceId: parseInt(purchase.id),
           paymentMode,
           remark: remarks
         }
@@ -372,69 +358,70 @@ async function createSale(data, userId = null) {
     /* -------------------- Audit Log -------------------- */
     await tx.auditLog.create({
       data: {
-        tableName: "sales",
-        recordId: String(sale.id),
+        tableName: "purchases",
+        recordId: String(purchase.id),
         action: "CREATE",
-        newValue: JSON.stringify(sale),
+        newValue: JSON.stringify(purchase),
         userId
       }
     });
 
-    return sale;
+    return purchase;
   });
 }
 
 /**
- * Update sale with diff-based stock, party balance & audit log
+ * Update purchase, including payment, purchase items, stock, party balance, audit log
+ * @param {number} id purchase id
+ * @param {Object} data update data incl. purchaseItems array
+ * @param {number|null} userId
  */
-async function updateSale(saleId, data, userId = null) {
-  if (!saleId) {
-    throw new AppError("Sale ID is required", 400);
+async function updatePurchase(purchaseId, data, userId = null) {
+  if (!purchaseId) {
+    throw new AppError("Purchase ID is required", 400);
   }
 
   return prisma.$transaction(async tx => {
-    const existingSale = await tx.sale.findUnique({
-      where: { id: saleId },
-      include: { saleItems: true }
+    const existingPurchase = await tx.purchase.findUnique({
+      where: { id: purchaseId },
+      include: { purchaseItems: true }
     });
 
-    if (!existingSale) {
-      throw new AppError("Sale not found", 404);
+    if (!existingPurchase) {
+      throw new AppError("Purchase not found", 404);
     }
 
-    const saleUpdateData = {};
+    const purchaseUpdateData = {};
     let itemsWereModified = false;
-    let saleWasUpdated = false;
+    let purchaseWasUpdated = false;
 
     /* ------------------------------
-       Sale fields (partial updates)
+       Purchase fields (partial updates)
     ------------------------------ */
     if (data.partyId !== undefined) {
-      saleUpdateData.partyId = data.partyId;
+      purchaseUpdateData.partyId = data.partyId;
     }
 
     if (data.invoiceNumber !== undefined) {
-      saleUpdateData.invoiceNumber = Number(data.invoiceNumber);
+      purchaseUpdateData.invoiceNumber = Number(data.invoiceNumber);
     }
-
-    if (data.receivedAmount !== undefined) {
-      saleUpdateData.receivedAmount = data.receivedAmount;
+    if (data.paidAmount !== undefined) {
+      purchaseUpdateData.paidAmount = Number(data.paidAmount);
     }
 
     if (data.paymentMode !== undefined) {
-      saleUpdateData.paymentMode = data.paymentMode;
+      purchaseUpdateData.paymentMode = data.paymentMode;
     }
 
     if (data.remarks !== undefined) {
-      saleUpdateData.remarks = data.remarks;
+      purchaseUpdateData.remarks = data.remarks;
     }
-
     if (data.date !== undefined) {
-      saleUpdateData.date = data.date;
+      purchaseUpdateData.date = data.date;
     }
 
     /* ------------------------------
-       Sale items (ONLY if sent)
+       Purchase items (ONLY if sent)
     ------------------------------ */
     if (Array.isArray(data.items)) {
       itemsWereModified = true;
@@ -443,7 +430,9 @@ async function updateSale(saleId, data, userId = null) {
         .filter(item => typeof item.id === "number")
         .map(item => item.id);
 
-      const itemsToDelete = existingSale.saleItems.filter(item => !incomingIds.includes(item.id));
+      const itemsToDelete = existingPurchase.purchaseItems.filter(
+        item => !incomingIds.includes(item.id)
+      );
 
       /* ---- STEP 1: DELETE removed items ---- */
       for (const itemToDelete of itemsToDelete) {
@@ -453,18 +442,25 @@ async function updateSale(saleId, data, userId = null) {
 
         if (product) {
           const stockBefore = Number(product.currentStock);
-          const stockAfter = stockBefore + Number(itemToDelete.quantity); // SALE undo
+          const stockAfter = stockBefore - Number(itemToDelete.quantity);
+
+          if (stockAfter < 0) {
+            throw new AppError(
+              `Cannot delete item: would result in negative stock for product ${product.name}`,
+              400
+            );
+          }
 
           await tx.inventoryLog.create({
             data: {
               productId: product.id,
-              type: "ADD",
+              type: "SUBTRACT",
               quantity: itemToDelete.quantity,
-              referenceType: "SALE",
-              saleId,
+              referenceType: "PURCHASE",
+              purchaseId: Number(purchaseId),
               balanceBefore: stockBefore,
               balanceAfter: stockAfter,
-              remark: "Item removed from sale"
+              remark: "Item removed from purchase"
             }
           });
 
@@ -474,7 +470,7 @@ async function updateSale(saleId, data, userId = null) {
           });
         }
 
-        await tx.saleItem.delete({
+        await tx.purchaseItem.delete({
           where: { id: itemToDelete.id }
         });
       }
@@ -483,17 +479,19 @@ async function updateSale(saleId, data, userId = null) {
       for (const incomingItem of data.items) {
         /* ---- UPDATE existing item ---- */
         if (incomingItem.id) {
-          const existingItem = existingSale.saleItems.find(item => item.id === incomingItem.id);
+          const existingItem = existingPurchase.purchaseItems.find(
+            item => item.id === incomingItem.id
+          );
 
           if (!existingItem) {
-            throw new AppError("Sale item not found", 404);
+            throw new AppError("Purchase item not found", 404);
           }
 
           const product = await tx.product.findUnique({
             where: { id: existingItem.productId }
           });
 
-          if (!product ) {
+          if (!product) {
             throw new AppError("Product not found or inactive", 404);
           }
 
@@ -505,27 +503,28 @@ async function updateSale(saleId, data, userId = null) {
 
           if (qtyDiff !== 0) {
             const stockBefore = Number(product.currentStock);
-            const stockAfter = stockBefore - qtyDiff; // SALE logic
+            const stockAfter = stockBefore + qtyDiff;
 
             if (stockAfter < 0) {
               throw new AppError(`Insufficient stock for product ${product.name}`, 400);
             }
 
-            // calculate new average sale price (for reporting/profit analysis) - OPTIONAL
-            const oldAvgSellPrice = Number(product.avgSellPrice ?? 0);
+            // Calculate new average cost price
+            const oldAvgCostPrice = Number(product.avgCostPrice ?? 0);
 
-            const newAvgSellPrice =
-              oldAvgSellPrice === 0
-                ? incomingItem.pricePerUnit
-                : (oldAvgSellPrice + incomingItem.pricePerUnit) / 2;
+            const newAvgCostPrice =
+              balanceBefore === 0 || oldAvgCostPrice === 0
+                ? item.pricePerUnit
+                : (balanceBefore * oldAvgCostPrice + item.quantity * item.pricePerUnit) /
+                  (balanceBefore + item.quantity);
 
             await tx.inventoryLog.create({
               data: {
                 productId: product.id,
-                type: qtyDiff > 0 ? "SUBTRACT" : "ADD",
+                type: qtyDiff > 0 ? "ADD" : "SUBTRACT",
                 quantity: Math.abs(qtyDiff),
-                referenceType: "SALE",
-                saleId,
+                referenceType: "PURCHASE",
+                purchaseId: Number(purchaseId),
                 balanceBefore: stockBefore,
                 balanceAfter: stockAfter
               }
@@ -533,15 +532,11 @@ async function updateSale(saleId, data, userId = null) {
 
             await tx.product.update({
               where: { id: product.id },
-              data: { currentStock: stockAfter, avgSellPrice: newAvgSellPrice }
+              data: { currentStock: stockAfter, avgCostPrice: newAvgCostPrice }
             });
           }
 
-          const costPrice = Number(product.avgCostPrice || 0);
-          const profit =
-            (Number(incomingItem.pricePerUnit ?? existingItem.pricePerUnit) - costPrice) * newQty;
-
-          await tx.saleItem.update({
+          await tx.purchaseItem.update({
             where: { id: existingItem.id },
             data: {
               quantity: newQty,
@@ -549,8 +544,7 @@ async function updateSale(saleId, data, userId = null) {
               gstRate: incomingItem.gstRate ?? existingItem.gstRate,
               gstAmount: incomingItem.gstAmount ?? existingItem.gstAmount,
               taxableAmount: incomingItem.taxableAmount ?? existingItem.taxableAmount,
-              amount: incomingItem.amount ?? existingItem.amount,
-              profit
+              amount: incomingItem.amount ?? existingItem.amount
             }
           });
         } else {
@@ -564,123 +558,109 @@ async function updateSale(saleId, data, userId = null) {
           }
 
           const stockBefore = Number(product.currentStock);
+          const stockAfter = stockBefore + Number(incomingItem.quantity);
 
-          const stockAfter = stockBefore - Number(incomingItem.quantity);
-
-          if (stockAfter < 0) {
-            throw new AppError(`Insufficient stock for product ${product.name}`, 400);
-          }
-
-          // calculate new average sell price (for reporting/profit analysis) - OPTIONAL
-          const oldAvgSellPrice = Number(product.avgSellPrice ?? 0);
-
-          const newAvgSellPrice =
-            oldAvgSellPrice === 0
-              ? incomingItem.pricePerUnit
-              : (oldAvgSellPrice + incomingItem.pricePerUnit) / 2;
+          await tx.inventoryLog.create({
+            data: {
+              productId: product.id,
+              type: "ADD",
+              quantity: incomingItem.quantity,
+              referenceType: "PURCHASE",
+              purchaseId: Number(purchaseId),
+              balanceBefore: stockBefore,
+              balanceAfter: stockAfter
+            }
+          });
 
           await tx.product.update({
             where: { id: product.id },
-            data: { currentStock: stockAfter, avgSellPrice: newAvgSellPrice }
+            data: { currentStock: stockAfter }
           });
 
-          const costPrice = Number(product.avgCostPrice || 0);
-          const profit =
-            (Number(incomingItem.pricePerUnit) - costPrice) * Number(incomingItem.quantity);
-
-          await tx.saleItem.create({
+          await tx.purchaseItem.create({
             data: {
-              saleId,
+              purchaseId,
               productId: incomingItem.productId,
               quantity: incomingItem.quantity,
               pricePerUnit: incomingItem.pricePerUnit,
               gstRate: incomingItem.gstRate,
               gstAmount: incomingItem.gstAmount,
               taxableAmount: incomingItem.taxableAmount,
-              amount: incomingItem.amount,
-              profit
-            }
-          });
-
-          await tx.inventoryLog.create({
-            data: {
-              productId: product.id,
-              type: "SUBTRACT",
-              quantity: incomingItem.quantity,
-              referenceType: "SALE",
-              saleId,
-              balanceBefore: stockBefore,
-              balanceAfter: stockAfter
+              amount: incomingItem.amount
             }
           });
         }
       }
 
-      /* ---- Recalculate totals & profit ---- */
-      const allItems = await tx.saleItem.findMany({
-        where: { saleId }
+      /* ---- Recalculate totals after items changed ---- */
+      const allItems = await tx.purchaseItem.findMany({
+        where: { purchaseId }
       });
 
-      saleUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.amount), 0);
+      purchaseUpdateData.totalAmount = allItems.reduce((sum, i) => sum + Number(i.amount), 0);
 
-      saleUpdateData.totalTaxableAmount = allItems.reduce(
+      purchaseUpdateData.totalTaxableAmount = allItems.reduce(
         (sum, i) => sum + Number(i.taxableAmount),
         0
       );
 
-      saleUpdateData.totalGstAmount = allItems.reduce((sum, i) => sum + Number(i.gstAmount), 0);
-
-      saleUpdateData.totalProfit = allItems.reduce((sum, i) => sum + Number(i.profit), 0);
+      purchaseUpdateData.totalGstAmount = allItems.reduce((sum, i) => sum + Number(i.gstAmount), 0);
     }
 
     /* ------------------------------
-       Update sale record
+       Update purchase record
     ------------------------------ */
-    const updatedSale =
-      Object.keys(saleUpdateData).length > 0
-        ? await tx.sale.update({
-            where: { id: saleId },
-            data: saleUpdateData
+    const updatedPurchase =
+      Object.keys(purchaseUpdateData).length > 0
+        ? await tx.purchase.update({
+            where: { id: purchaseId },
+            data: purchaseUpdateData
           })
-        : existingSale;
+        : existingPurchase;
 
-    if (Object.keys(saleUpdateData).length > 0 || itemsWereModified) {
-      saleWasUpdated = true;
+    if (Object.keys(purchaseUpdateData).length > 0) {
+      purchaseWasUpdated = true;
+    }
+
+    if (itemsWereModified) {
+      purchaseWasUpdated = true;
     }
 
     /* ------------------------------
        Party balance adjustment (UNIFIED LOGIC)
+       This runs AFTER all updates are complete
     ------------------------------ */
-    const oldPartyId = existingSale.partyId;
-    const oldTotal = Number(existingSale.totalAmount);
-    const oldReceived = Number(existingSale.receivedAmount || 0);
-    const oldReceivable = oldTotal - oldReceived;
+    const oldPartyId = existingPurchase.partyId;
+    const oldTotal = Number(existingPurchase.totalAmount);
+    const oldPaid = Number(existingPurchase.paidAmount || 0);
+    const oldPayable = oldTotal - oldPaid;
 
-    const newPartyId = updatedSale.partyId;
-    const newTotal = Number(updatedSale.totalAmount);
-    const newReceived = Number(updatedSale.receivedAmount || 0);
-    const newReceivable = newTotal - newReceived;
+    const newPartyId = updatedPurchase.partyId;
+    const newTotal = Number(updatedPurchase.totalAmount);
+    const newPaid = Number(updatedPurchase.paidAmount || 0);
+    const newPayable = newTotal - newPaid;
 
     const partyChanged = oldPartyId !== newPartyId;
 
     if (partyChanged) {
-      // reverse old receivable, apply new receivable
+      // Party changed: reverse old payable, apply new payable
       await tx.party.update({
         where: { id: oldPartyId },
-        data: { currentBalance: { increment: oldReceivable } }
+        data: { currentBalance: { increment: -oldPayable } }
       });
 
       await tx.party.update({
         where: { id: newPartyId },
-        data: { currentBalance: { decrement: newReceivable } }
+        data: { currentBalance: { increment: newPayable } }
       });
     } else {
-      const receivableDiff = newReceivable - oldReceivable;
+      // Same party: apply payable diff
+      const payableDiff = newPayable - oldPayable;
 
-      if (receivableDiff !== 0) {
+      if (payableDiff !== 0) {
         await tx.party.update({
           where: { id: oldPartyId },
-          data: { currentBalance: { decrement: receivableDiff } }
+          data: { currentBalance: { increment: payableDiff } }
         });
       }
     }
@@ -689,15 +669,15 @@ async function updateSale(saleId, data, userId = null) {
 
     const existingPayment = await tx.payment.findFirst({
       where: {
-        referenceType: "SALE",
-        referenceId: parseInt(saleId)
+        referenceType: "PURCHASE",
+        referenceId: parseInt(purchaseId)
       }
     });
 
-    if (newReceived > 0) {
+    if (newPaid > 0) {
       const paymentData = {
         partyId: newPartyId, // always follow updated party
-        amount: newReceived,
+        amount: newPaid,
         paymentMode: data.paymentMode ?? existingPayment?.paymentMode ?? "NONE",
         remark: data.remark ?? existingPayment?.remark ?? null
       };
@@ -713,9 +693,9 @@ async function updateSale(saleId, data, userId = null) {
         await tx.payment.create({
           data: {
             ...paymentData,
-            type: "RECEIVED",
-            referenceType: "SALE",
-            referenceId: parseInt(saleId)
+            type: "PAID",
+            referenceType: "PURCHASE",
+            referenceId: parseInt(purchaseId)
           }
         });
       }
@@ -727,55 +707,55 @@ async function updateSale(saleId, data, userId = null) {
     }
 
     /* ------------------------------
-       Audit log
+       Audit log (only if something changed)
     ------------------------------ */
-    if (saleWasUpdated) {
+    if (purchaseWasUpdated) {
       await tx.auditLog.create({
         data: {
-          tableName: "sales",
-          recordId: String(saleId),
+          tableName: "purchases",
+          recordId: String(purchaseId),
           action: "UPDATE",
-          oldValue: JSON.stringify(existingSale),
-          newValue: JSON.stringify(updatedSale),
+          oldValue: JSON.stringify(existingPurchase),
+          newValue: JSON.stringify(updatedPurchase),
           userId
         }
       });
     }
 
-    return updatedSale;
+    return updatedPurchase;
   });
 }
 
 /**
- * Delete sale:
+ * Delete purchase:
  * - Undo stock and inventory logs
- * - Undo party balance on total receivable
+ * - Undo party balance on total payable
  * - Delete payment if any
- * - Delete sale items and sale
+ * - Delete purchase items and purchase
  * - Audit log
  */
-async function deleteSale(saleId, userId = null) {
-  if (!saleId) {
-    throw new AppError("Sale ID is required", 400);
+async function deletePurchase(purchaseId, userId = null) {
+  if (!purchaseId) {
+    throw new AppError("Purchase ID is required", 400);
   }
 
   return prisma.$transaction(async tx => {
     /* ----------------------------------------
-       1. Load sale with items
+       1. Load purchase with items
     ---------------------------------------- */
-    const existingSale = await tx.sale.findUnique({
-      where: { id: saleId },
-      include: { saleItems: true }
+    const existingPurchase = await tx.purchase.findUnique({
+      where: { id: purchaseId },
+      include: { purchaseItems: true }
     });
 
-    if (!existingSale) {
-      throw new AppError("Sale not found", 404);
+    if (!existingPurchase) {
+      throw new AppError("Purchase not found", 404);
     }
 
     /* ----------------------------------------
-       2. REVERSE INVENTORY (undo stock subtraction)
+       2. REVERSE INVENTORY (undo stock addition)
     ---------------------------------------- */
-    for (const item of existingSale.saleItems) {
+    for (const item of existingPurchase.purchaseItems) {
       const product = await tx.product.findUnique({
         where: { id: item.productId }
       });
@@ -785,21 +765,27 @@ async function deleteSale(saleId, userId = null) {
       }
 
       const stockBefore = Number(product.currentStock);
-      const stockAfter = stockBefore + Number(item.quantity); // SALE undo
+      const stockAfter = stockBefore - Number(item.quantity);
 
+      if (stockAfter < 0) {
+        throw new AppError("Stock underflow while deleting purchase", 400);
+      }
+
+      // Inventory reversal log
       await tx.inventoryLog.create({
         data: {
           productId: product.id,
-          type: "ADD",
+          type: "SUBTRACT",
           quantity: item.quantity,
-          referenceType: "SALE",
-          saleId: Number(saleId),
-          remark: `Sale #${saleId} deleted`,
+          referenceType: "PURCHASE",
+          purchaseId: Number(purchaseId),
+          remark: `Purchase #${purchaseId} deleted`,
           balanceBefore: stockBefore,
           balanceAfter: stockAfter
         }
       });
 
+      // Update product stock
       await tx.product.update({
         where: { id: product.id },
         data: { currentStock: stockAfter }
@@ -807,18 +793,18 @@ async function deleteSale(saleId, userId = null) {
     }
 
     /* ----------------------------------------
-       3. REVERSE PARTY BALANCE (receivable undo)
+       3. REVERSE PARTY BALANCE (payable undo)
     ---------------------------------------- */
-    if (existingSale.partyId) {
-      const receivableAmount =
-        Number(existingSale.totalAmount) - Number(existingSale.receivedAmount || 0);
+    if (existingPurchase.partyId) {
+      const payableAmount =
+        Number(existingPurchase.totalAmount) - Number(existingPurchase.paidAmount || 0);
 
-      if (receivableAmount !== 0) {
+      if (payableAmount !== 0) {
         await tx.party.update({
-          where: { id: existingSale.partyId },
+          where: { id: existingPurchase.partyId },
           data: {
             currentBalance: {
-              increment: receivableAmount
+              increment: -payableAmount
             }
           }
         });
@@ -826,27 +812,27 @@ async function deleteSale(saleId, userId = null) {
     }
 
     /* ----------------------------------------
-       4. DELETE ALL PAYMENTS LINKED TO SALE
+       4. DELETE ALL PAYMENTS LINKED TO PURCHASE
     ---------------------------------------- */
     await tx.payment.deleteMany({
       where: {
-        referenceType: "SALE",
-        referenceId: Number(saleId)
+        referenceType: "PURCHASE",
+        referenceId: parseInt(purchaseId)
       }
     });
 
     /* ----------------------------------------
-       5. DELETE SALE ITEMS (cascade safe)
+       5. DELETE PURCHASE ITEMS (cascade safe)
     ---------------------------------------- */
-    await tx.saleItem.deleteMany({
-      where: { saleId }
+    await tx.purchaseItem.deleteMany({
+      where: { purchaseId }
     });
 
     /* ----------------------------------------
-       6. DELETE SALE
+       6. DELETE PURCHASE
     ---------------------------------------- */
-    await tx.sale.delete({
-      where: { id: saleId }
+    await tx.purchase.delete({
+      where: { id: purchaseId }
     });
 
     /* ----------------------------------------
@@ -854,10 +840,10 @@ async function deleteSale(saleId, userId = null) {
     ---------------------------------------- */
     await tx.auditLog.create({
       data: {
-        tableName: "sales",
-        recordId: String(saleId),
+        tableName: "purchases",
+        recordId: String(purchaseId),
         action: "DELETE",
-        oldValue: JSON.stringify(existingSale),
+        oldValue: JSON.stringify(existingPurchase),
         userId
       }
     });
@@ -866,52 +852,46 @@ async function deleteSale(saleId, userId = null) {
   });
 }
 
-async function getSaleSuggestionsByPartyId(partyId) {
+// services/purchaseServices.js
+
+async function getPurchaseSuggestionsByPartyId(partyId) {
   if (!partyId) {
     throw new AppError("Party ID is required", 400);
   }
 
-  const sales = await prisma.sale.findMany({
+  const purchases = await prisma.purchase.findMany({
     where: {
       partyId: Number(partyId)
     },
     orderBy: {
       date: "desc"
     },
-    take: 50, // suggestions only
+    take: 50, // suggestions only, not full list
     include: {
       party: true,
-      saleItems: {
-        include: {
-          product: {
-            include: {
-              category: true
-            }
-          }
-        }
-      }
+      purchaseItems: { include: { product: { include: { category: true } } } }
     }
   });
 
-  return sales;
+  return purchases;
 }
 
-async function getSaleInvoicePdf(saleId) {
+async function getPurchaseInvoicePdf(purchaseId) {
   // 1. Fetch sale + items + party from DB
-  const sale = await prisma.sale.findUnique({
-    where: { id: saleId },
+  const purchase = await prisma.purchase.findUnique({
+    where: { id: purchaseId },
     include: {
       party: true,
-      saleItems: {
+      purchaseItems: {
         include: { product: true }
       }
     }
   });
 
-  if (!sale) throw new Error("Sale not found");
+  if (!purchase) throw new Error("purchase not found");
 
   // 2. Build item rows HTML
-  const itemRowsHtml = sale.saleItems
+  const itemRowsHtml = purchase.purchaseItems
     .map(
       (item, index) => `
     <tr>
@@ -929,44 +909,53 @@ async function getSaleInvoicePdf(saleId) {
     .join("");
 
   // 3. Calculate pending amount
-  const pending = Number(sale.totalAmount) - Number(sale.receivedAmount);
+  const pending = Number(purchase.totalAmount) - Number(purchase.paidAmount);
 
   // 4. Build data object (must match template placeholders)
   const data = {
-    invoice_number: String(sale.invoiceNumber),
-    invoice_date: sale.date.toLocaleDateString("en-IN"),
-    party_name: sale.party.name,
-    party_phone: sale.party.phone ?? "",
-    total_amount: sale.totalAmount.toString(),
-    received_amount: sale.receivedAmount.toString(),
+    invoice_number: String(purchase.invoiceNumber),
+    invoice_date: purchase.date.toLocaleDateString("en-IN"),
+    party_name: purchase.party.name,
+    party_phone: purchase.party.phone ?? "",
+    total_amount: purchase.totalAmount.toString(),
+    paid_amount: purchase.paidAmount.toString(),
     pending_amount: pending.toFixed(2),
-    payment_mode: sale.paymentMode,
-    remarks: sale.remarks ?? "",
+    payment_mode: purchase.paymentMode,
+    remarks: purchase.remarks ?? "",
     generated_at: new Date().toLocaleString("en-IN"),
     item_rows: itemRowsHtml // 🔥 Inject rows here
   };
 
   // 5. Generate PDF
-  const pdfBuffer = await generatePdfFromTemplate("saleInvoiceTemplate.html", data);
+  const response = await axios.post(
+  process.env.PDF_SERVICE_URL + "/generate-pdf",
+  {
+    templateName: "purchaseInvoiceTemplate.html",
+    data
+  },
+  { responseType: "arraybuffer" }
+);
+
+const pdfBuffer = response.data;
 
   return pdfBuffer;
 }
 
 export {
-  listSales,
-  getSaleById,
-  createSale,
-  updateSale,
-  deleteSale,
-  getSaleSuggestionsByPartyId,
-  getSaleInvoicePdf
+  listPurchases,
+  getPurchaseById,
+  createPurchase,
+  updatePurchase,
+  deletePurchase,
+  getPurchaseSuggestionsByPartyId,
+  getPurchaseInvoicePdf
 };
 export default {
-  listSales,
-  getSaleById,
-  createSale,
-  updateSale,
-  deleteSale,
-  getSaleSuggestionsByPartyId,
-  getSaleInvoicePdf
+  listPurchases,
+  getPurchaseById,
+  createPurchase,
+  updatePurchase,
+  deletePurchase,
+  getPurchaseSuggestionsByPartyId,
+  getPurchaseInvoicePdf
 };
