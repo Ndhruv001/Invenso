@@ -121,6 +121,7 @@ app.get("/health", async (req, res) => {
       200
     );
   } catch (error) {
+    console.log("Health check failed:", error.message );
     req.logger.error("Health check failed:", { error: error.message });
     return errorResponse(
       res,
@@ -157,6 +158,7 @@ app.use((req, res, next) => {
 // ── Global Error Handler (ALWAYS uses errorResponse)
 app.use((error, req, res, next) => {
   const statusCode = error.status || error.statusCode || 500;
+  console.log("Global Error Handler: ", error)
 
   req.logger.error("Unhandled error", {
     message: error.message,

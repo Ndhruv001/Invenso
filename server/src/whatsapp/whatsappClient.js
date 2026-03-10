@@ -22,7 +22,7 @@ export const client = new Client({
 
 client.on("qr", qr => {
   console.log("🧾 QR RECEIVED — Scan this to login");
-  qrcode.generate(qr, { small: true });
+  // qrcode.generate(qr, { small: true });
 });
 
 client.on("authenticated", () => {
