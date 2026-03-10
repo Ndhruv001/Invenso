@@ -1,5 +1,6 @@
 import pkg from "whatsapp-web.js";
-import { client } from "./whatsappClient.js";
+// import { client } from "./whatsappClient.js";
+const client = {}
 
 const { MessageMedia } = pkg;
 
