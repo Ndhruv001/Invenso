@@ -13,7 +13,7 @@ async function generatePdfFromTemplate(templateName, data) {
     console.log("🧾 PDF SERVICE START");
 
     // 1️⃣ Load template
-    const templatePath = path.join(__dirname, "../templates", templateName);
+    const templatePath = path.join(__dirname, "templates", templateName);
     let html = fs.readFileSync(templatePath, "utf-8");
 
     for (const [key, value] of Object.entries(data)) {
