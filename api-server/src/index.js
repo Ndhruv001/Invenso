@@ -18,16 +18,16 @@ app.listen(PORT, "0.0.0.0", async () => {
   console.log("STEP 2: Express started");
 
   try {
-    console.log("Loading WhatsApp Client...");
+    // console.log("Loading WhatsApp Client...");
     // await import("./whatsapp/whatsappClient.js");
 
-    console.log("Loading Invoice Cron...");
-    await import("./crons/invoiceWhatsAppCrons.js");
+    // console.log("Loading Invoice Cron...");
+    // await import("./crons/invoiceWhatsAppCrons.js");
 
-    console.log("Loading Audit Cron...");
-    await import("./crons/auditLogCleanupCrons.js");
+    // console.log("Loading Audit Cron...");
+    // await import("./crons/auditLogCleanupCrons.js");
 
-    console.log("All background services started successfully");
+    // console.log("All background services started successfully");
   } catch (err) {
     console.error("BACKGROUND SERVICE FAILED:", err);
   }
