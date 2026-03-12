@@ -8,12 +8,11 @@ import { getSaleReturnInvoicePdf } from "../services/saleReturnServices.js";
 import { sendInvoiceOnWhatsApp, sendInvoiceSummaryToHost } from "./whatsappSender.js";
 
 let isProcessing = false;
-let limitedBatch = 0;
 
 // Random delay helper (1–7 sec)
 const delayRandom = async () => {
   const randomMs = Math.floor(Math.random() * (7000 - 1000 + 1)) + 1000;
-  console.log(`⏳ Waiting ${randomMs} ms before next message...`);
+  console.log(`⏳ Waiting ${randomMs}ms before next message...`);
   return new Promise(resolve => setTimeout(resolve, randomMs));
 };
 
@@ -26,8 +25,13 @@ export const processDailyWhatsAppInvoices = async () => {
   isProcessing = true;
   console.log("🚀 WhatsApp Invoice Automation Started...");
 
+  // ✅ Track counts for summary
+  let successCount = 0;
+  let failCount = 0;
+  let limitedBatch = [];
+
   try {
-    // 1️⃣ Fetch pending invoices
+    // 1. Fetch pending invoices
     const invoices = await getTodayPendingInvoicesForWhatsApp(50);
 
     if (!invoices.length) {
@@ -35,64 +39,61 @@ export const processDailyWhatsAppInvoices = async () => {
       return;
     }
 
-    // 3️⃣ Strict global limit (50 total)
+    // 2. Apply global limit
     limitedBatch = invoices.slice(0, 50);
+    console.log(`📦 Processing ${limitedBatch.length} invoices...`);
 
-    console.log(`📦 Processing ${limitedBatch.length} invoices (Global Limit Applied)`);
-
-    // 4️⃣ Sequential processing
+    // 3. Sequential processing
     for (const invoice of limitedBatch) {
       const { id, type } = invoice;
-
       console.log(`\n📄 Processing ${type.toUpperCase()} ID: ${id}`);
 
       try {
         await markWhatsAppProcessing(id, type, true);
 
+        // 4. Route correct PDF generator
         let pdfBuffer;
-
-        // 5️⃣ Route correct PDF generator
         if (type === "sale") {
           pdfBuffer = await getSaleInvoicePdf(id);
         } else if (type === "saleReturn") {
           pdfBuffer = await getSaleReturnInvoicePdf(id);
         } else {
-          throw new Error("Invalid invoice type");
+          throw new Error(`Invalid invoice type: ${type}`);
         }
 
         console.log("📄 PDF generated successfully.");
 
-        // 6️⃣ Send WhatsApp
+        // 5. Send WhatsApp
         await sendInvoiceOnWhatsApp(invoice, pdfBuffer, type);
 
-        // 7️⃣ Update DB success
+        // 6. Update DB success
         await updateDBForInvoiceWhatsAppStatus(id, type, true);
 
-        console.log(`✅ ${type} ID ${id} completed successfully.`);
+        successCount++;
+        console.log(`✅ ${type} ID ${id} completed. (${successCount} done)`);
 
-        // 8️⃣ Random delay (human-like)
-        await delayRandom();
+        // 7. Random delay — skip after last invoice
+        const isLast = invoice === limitedBatch[limitedBatch.length - 1];
+        if (!isLast) await delayRandom();
       } catch (error) {
+        failCount++;
         console.error(`❌ Failed processing ${type} ID ${id}:`, error.message);
-
-        // 9️⃣ Increment retry count
         await updateDBForInvoiceWhatsAppStatus(id, type, false);
-
         console.log(`🔁 Retry count updated for ${type} ID ${id}`);
       } finally {
-        isProcessing = false;
+        // ✅ Only unmark processing for THIS invoice — NOT the global lock
         await markWhatsAppProcessing(id, type, false);
-        console.log("🔓 Automation lock released.");
       }
     }
 
-    console.log("\n🎯 WhatsApp Invoice Automation Completed Successfully.");
+    console.log(`\n🎯 Automation Completed. ✅ ${successCount} succeeded, ❌ ${failCount} failed.`);
   } catch (error) {
     console.error("🔥 Critical Automation Failure:", error);
   } finally {
+    // ✅ Global lock released ONCE — after ALL invoices are done
     isProcessing = false;
-    await sendInvoiceSummaryToHost(limitedBatch?.length);
-    console.log("🔓 Automation lock released, due to end of all invoices.");
+    console.log("🔓 Global automation lock released.");
+    await sendInvoiceSummaryToHost(limitedBatch?.length, successCount, failCount);
   }
 };
 
