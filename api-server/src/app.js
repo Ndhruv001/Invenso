@@ -106,7 +106,7 @@ app.use(`${BASE}/cheques`, chequeRoutes);
 app.use(`${BASE}/reports`, reportRoutes);
 
 // ── Health Check (uses successResponse)
-app.get("/health", async (req, res) => {
+app.get(`${BASE}/health`, async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     return successResponse(
