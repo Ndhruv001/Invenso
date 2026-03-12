@@ -44,7 +44,7 @@ import ComingSoon from "./components/common/ComingSoon";
 import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
 import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
 import BlurOverlay from "@/components/common/BlurOverlay.jsx";
-import healthCheckWithRetry from "./lib/helpers/healthCheckWithRetry";
+import {healthCheckWithRetry} from "./lib/helpers/healthCheckWithRetry.js";
 
 function App() {
   const { isScreenHidden } = useHideScreenContext();

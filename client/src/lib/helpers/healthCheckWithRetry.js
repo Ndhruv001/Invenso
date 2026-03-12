@@ -1,4 +1,4 @@
-import healthCheckEndPoint from "@/services/adminServices"
+import {healthCheckEndPoint} from "@/services/adminServices"
 
 export async function healthCheckWithRetry(retries = 3) {
   try {
