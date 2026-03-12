@@ -17,7 +17,7 @@ export const deleteOldAuditLogsAndInventoryLogs = async () => {
   }
 };
 
- export const healthCheckEndPoint = async () => {
+ const healthCheckEndPoint = async () => {
   try {
     return await axiosInstance.get("/health");
   } catch (error) {
@@ -27,3 +27,5 @@ export const deleteOldAuditLogsAndInventoryLogs = async () => {
 };
 
 export default { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs, healthCheckEndPoint };
+
+export {healthCheckEndPoint}
