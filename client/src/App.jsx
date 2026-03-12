@@ -52,7 +52,7 @@ function App() {
   useEffect(() => {
     healthCheckWithRetry()
       .then(() => console.log("Server ready"))
-      .catch(() => console.log("Server waking up"));
+      .catch((error) => console.log("Server waking up", error));
   }, []);
 
   return (
