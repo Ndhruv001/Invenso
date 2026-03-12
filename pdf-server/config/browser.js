@@ -1,12 +1,13 @@
+// config/browser.js
 import puppeteer from "puppeteer";
 
-let browser;
+// Use globalThis to survive multiple module evaluations
+const BROWSER_KEY = "__puppeteer_browser__";
 
 export async function getBrowser(executablePath) {
-
-  if (!browser) {
-
-    browser = await puppeteer.launch({
+  if (!globalThis[BROWSER_KEY]) {
+    console.log("  🚀 Launching NEW browser instance...");
+    globalThis[BROWSER_KEY] = await puppeteer.launch({
       headless: "new",
       executablePath,
       args: [
@@ -19,10 +20,8 @@ export async function getBrowser(executablePath) {
       ],
       timeout: 60000,
     });
-
   }
-
-  return browser;
+  return globalThis[BROWSER_KEY];
 }
 
 export default getBrowser;
