@@ -30,7 +30,6 @@ const handleAxiosError = (error, defaultMsg) => {
 export const getDashboardSummary = async () => {
   try {
     const { data } = await axiosInstance.get("/dashboards/summary");
-    console.log("🚀 ~ getDashboardSummary ~ data:", data)
 
     return data;
   } catch (error) {

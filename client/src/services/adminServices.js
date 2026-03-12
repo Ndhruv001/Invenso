@@ -19,7 +19,9 @@ export const deleteOldAuditLogsAndInventoryLogs = async () => {
 
  const healthCheckEndPoint = async () => {
   try {
-    return await axiosInstance.get("/health");
+    const result =  await axiosInstance.get("/health");
+    console.log("🚀 ~ healthCheckEndPoint ~ result:", result)
+    return result;
   } catch (error) {
     console.error("Server is down:", error);
     throw new Error(error.message || "Server is down");

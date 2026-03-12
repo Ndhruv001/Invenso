@@ -9,6 +9,7 @@ export async function healthCheckWithRetry(retries = 3) {
 
     return res;
   } catch (error) {
+    console.log("🚀 ~ healthCheckWithRetry ~ r:", r)
     if (retries === 0) throw error;
 
     await new Promise(resolve => setTimeout(resolve, 6000));
