@@ -1,5 +1,5 @@
 // controllers/auth.controller.js
-import { loginUser, logoutUser } from "../services/authServices.js";
+import { loginUser } from "../services/authServices.js";
 import asyncHandler from "../utils/asyncHandlerUtils.js";
 import { successResponse } from "../utils/responseUtils.js";
 
@@ -24,10 +24,15 @@ const login = asyncHandler(async (req, res) => {
   );
 });
 const logout = asyncHandler(async (req, res) => {
-  await logoutUser();
 
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+  });
+
   return successResponse(res, "User logged out successfully", null, 200);
+
 });
 
 const me = asyncHandler(async (req, res) => {

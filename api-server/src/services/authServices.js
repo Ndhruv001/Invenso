@@ -19,9 +19,5 @@ const loginUser = async (username, password) => {
   return { token, user };
 };
 
-const logoutUser = async () => {
-  return true; // placeholder for business logic
-};
-
-export default { loginUser, logoutUser };
-export { loginUser, logoutUser };
+export default { loginUser  };
+export { loginUser };

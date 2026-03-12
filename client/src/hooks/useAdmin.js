@@ -1,5 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
-import { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs } from "@/services/adminServices";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs, healthCheckEndPoint } from "@/services/adminServices";
 
 const useSentInvoicesOnWhatsApp = () => {
   return useMutation({
@@ -11,6 +11,11 @@ const useDeleteOldAuditLogsAndInventoryLogs = () => {
     mutationFn: () => deleteOldAuditLogsAndInventoryLogs()
   });
 };
+const useHealthCheckEndPoint = () => {
+  return useQuery({
+    queryFn:  () =>  healthCheckEndPoint()
+  });
+};
 
-export default {useSentInvoicesOnWhatsApp, useDeleteOldAuditLogsAndInventoryLogs};
-export { useSentInvoicesOnWhatsApp, useDeleteOldAuditLogsAndInventoryLogs };
+export default {useSentInvoicesOnWhatsApp, useDeleteOldAuditLogsAndInventoryLogs, useHealthCheckEndPoint};
+export { useSentInvoicesOnWhatsApp, useDeleteOldAuditLogsAndInventoryLogs, useHealthCheckEndPoint };

@@ -33,7 +33,7 @@ const useLogout = () => {
 
     onSuccess: () => {
       // Remove cached user data
-      queryClient.removeQueries(["me"]);
+      queryClient.invalidateQueries(["me"]);
     }
   });
 };

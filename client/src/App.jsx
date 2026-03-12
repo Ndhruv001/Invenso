@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import LoginPage from "@/scenes/login/LoginPage.jsx";
 import MainLayout from "@/components/layout/MainLayout.jsx";
@@ -44,9 +44,16 @@ import ComingSoon from "./components/common/ComingSoon";
 import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
 import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
 import BlurOverlay from "@/components/common/BlurOverlay.jsx";
+import healthCheckWithRetry from "./lib/helpers/healthCheckWithRetry";
 
 function App() {
   const { isScreenHidden } = useHideScreenContext();
+
+  useEffect(() => {
+    healthCheckWithRetry()
+      .then(() => console.log("Server ready"))
+      .catch(() => console.log("Server waking up"));
+  }, []);
 
   return (
     <Routes>

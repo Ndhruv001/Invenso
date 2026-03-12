@@ -12,7 +12,7 @@ import helmetConfig from "./config/helmetConfig.js";
 import corsOptions from "./config/corsOptions.js";
 import { globalLimiter } from "./config/limiter.js";
 
-import { generatePdfFromTemplate } from "./pdfServices.js";
+import { generatePdfQueued } from "./pdfServices.js";
 
 dotenv.config();
 
@@ -59,7 +59,7 @@ app.post("/generate-pdf", async (req, res) => {
     }
 
     console.log("Generating PDF...");
-    pdfBuffer = await generatePdfFromTemplate(templateName, data);
+    pdfBuffer = await generatePdfQueued(templateName, data);
      console.log("PDF GENERATED SUCCESSFULLY");
 
     res.set({

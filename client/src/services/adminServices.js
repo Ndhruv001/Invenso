@@ -17,4 +17,13 @@ export const deleteOldAuditLogsAndInventoryLogs = async () => {
   }
 };
 
-export default { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs };
+const healthCheckEndPoint = async () => {
+  try {
+    return await axiosInstance.get("/health");
+  } catch (error) {
+    console.error("Server is down:", error);
+    throw new Error(error.message || "Server is down");
+  }
+};
+
+export default { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs, healthCheckEndPoint };

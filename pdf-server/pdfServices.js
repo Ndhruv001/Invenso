@@ -2,180 +2,109 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import pdfQueue from "./config/pdfQueue";
+import getBrowser from "./config/browser";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🔍 Helper: log system info once on startup
-function logSystemInfo() {
-  console.log("=".repeat(60));
-  console.log("🖥️  SYSTEM INFO");
-  console.log("=".repeat(60));
-
-  const checks = {
-    "Node version": () => process.version,
-    "Platform": () => process.platform,
-    "Arch": () => process.arch,
-    "CWD": () => process.cwd(),
-    "PUPPETEER_EXECUTABLE_PATH env": () => process.env.PUPPETEER_EXECUTABLE_PATH || "(not set)",
-    "Puppeteer default executablePath": () => {
-      try { return puppeteer.executablePath(); }
-      catch (e) { return `ERROR: ${e.message}`; }
-    },
-    "Chrome at /usr/bin/google-chrome-stable": () => {
-      try { execSync("which google-chrome-stable"); return "✅ found"; }
-      catch { return "❌ not found"; }
-    },
-    "Chrome at /usr/bin/chromium-browser": () => {
-      try { execSync("which chromium-browser"); return "✅ found"; }
-      catch { return "❌ not found"; }
-    },
-    "Chrome at /usr/bin/chromium": () => {
-      try { execSync("which chromium"); return "✅ found"; }
-      catch { return "❌ not found"; }
-    },
-    "Chrome version (system)": () => {
-      try { return execSync("google-chrome-stable --version 2>/dev/null || chromium --version 2>/dev/null || echo 'none'").toString().trim(); }
-      catch { return "❌ could not determine"; }
-    },
-  };
-
-  for (const [label, fn] of Object.entries(checks)) {
-    try { console.log(`  ${label}: ${fn()}`); }
-    catch (e) { console.log(`  ${label}: ERROR - ${e.message}`); }
-  }
-
-  console.log("=".repeat(60));
-}
-
-// Run once at module load
-logSystemInfo();
-
+// ─────────────────────────────────────────────
+// Core PDF Generator (NOT queued)
+// ─────────────────────────────────────────────
 async function generatePdfFromTemplate(templateName, data) {
-  let browser;
-  const startTime = Date.now();
-
-  console.log("\n" + "=".repeat(60));
-  console.log("🧾 PDF GENERATION START");
-  console.log(`  Template: ${templateName}`);
-  console.log(`  Data keys: ${Object.keys(data).join(", ")}`);
-  console.log(`  Timestamp: ${new Date().toISOString()}`);
-  console.log("=".repeat(60));
+  let page;
 
   try {
-    // ── STEP 1: Resolve template ───────────────────────────────
+    // 1. Load Template
     const templatePath = path.join(__dirname, "templates", templateName);
-    console.log(`\n📄 [1/5] Loading template...`);
-    console.log(`  Path: ${templatePath}`);
 
     if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template not found at: ${templatePath}`);
+      throw new Error(`Template not found: ${templatePath}`);
     }
 
     let html = fs.readFileSync(templatePath, "utf-8");
-    console.log(`  ✅ Template loaded (${html.length} chars)`);
 
-    // ── STEP 2: Inject data ────────────────────────────────────
-    console.log(`\n🔧 [2/5] Injecting template data...`);
-    let replacedCount = 0;
+    // 2. Inject Data
     for (const [key, value] of Object.entries(data)) {
-      const before = html;
       html = html.replaceAll(`{{${key}}}`, value ?? "");
-      if (html !== before) replacedCount++;
     }
-    console.log(`  ✅ Replaced ${replacedCount}/${Object.keys(data).length} placeholders`);
 
-    // ── STEP 3: Resolve Chrome executable ─────────────────────
-console.log(`\n🔍 [3/5] Resolving Chrome executable...`);
+    if (html.length > 500000) {
+      throw new Error("HTML too large for PDF");
+    }
 
-let executablePath;
-try {
-  executablePath = puppeteer.executablePath();
-  console.log(`  Puppeteer path: ${executablePath}`);
-  console.log(`  Exists: ${fs.existsSync(executablePath) ? "✅ yes" : "❌ NO"}`);
-  
-  if (!fs.existsSync(executablePath)) {
-    throw new Error(`Chrome not found at puppeteer path: ${executablePath}`);
-  }
-} catch (e) {
-  throw new Error(`Cannot resolve Chrome executable: ${e.message}`);
-}
+    // 3. Resolve Chrome Executable
+    let executablePath;
+    try {
+      executablePath = puppeteer.executablePath();
 
-    // ── STEP 4: Launch browser ─────────────────────────────────
-    console.log(`\n🚀 [4/5] Launching browser...`);
-    console.log(`  executablePath: ${executablePath}`);
+      if (!fs.existsSync(executablePath)) {
+        throw new Error(`Chrome not found at: ${executablePath}`);
+      }
+    } catch (err) {
+      throw new Error(`Failed to resolve Chrome executable: ${err.message}`);
+    }
 
-    const launchArgs = [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--single-process",
-      "--no-zygote",
-    ];
-    console.log(`  args: ${launchArgs.join(" ")}`);
+    // 4. Get Browser (shared instance)
+    const browser = await getBrowser(executablePath);
 
-    const launchStart = Date.now();
-    browser = await puppeteer.launch({
-      headless: "new",
-      executablePath,
-      args: launchArgs,
-      timeout: 60000,
-    });
+    page = await browser.newPage();
+    page.setDefaultNavigationTimeout(0);
 
-    console.log(`  ✅ Browser launched in ${Date.now() - launchStart}ms`);
-    const version = await browser.version();
-    console.log(`  Browser version: ${version}`);
-
-    // ── STEP 5: Generate PDF ───────────────────────────────────
-    console.log(`\n📑 [5/5] Generating PDF...`);
-
-    const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 800 });
 
-    // Log any page-level errors
-    page.on("error", (err) => console.error(`  ⚠️  Page crash: ${err.message}`));
-    page.on("pageerror", (err) => console.error(`  ⚠️  Page JS error: ${err.message}`));
-    page.on("console", (msg) => console.log(`  [page console] ${msg.type()}: ${msg.text()}`));
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      if (type === "image" || type === "font" || type === "media") {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
 
-    console.log(`  Setting page content...`);
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
-    console.log(`  ✅ Content loaded`);
+    page.on("error", (err) => {
+      console.error("Page crashed:", err.message);
+    });
 
-    const pdfStart = Date.now();
+    page.on("pageerror", (err) => {
+      console.error("Page JS error:", err.message);
+    });
+
+    // 5. Generate PDF
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded",
+      timeout: 0,
+    });
+
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+      margin: {
+        top: "0",
+        bottom: "0",
+        left: "0",
+        right: "0",
+      },
     });
 
-    console.log(`  ✅ PDF generated in ${Date.now() - pdfStart}ms`);
-    console.log(`  PDF size: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
-
-    console.log(`\n✅ TOTAL PDF GENERATION TIME: ${Date.now() - startTime}ms`);
-    console.log("=".repeat(60) + "\n");
-
     return pdfBuffer;
-
   } catch (error) {
-    console.error("\n" + "=".repeat(60));
-    console.error("❌ PDF GENERATION FAILED");
-    console.error("=".repeat(60));
-    console.error(`  Error type:    ${error.constructor.name}`);
-    console.error(`  Error message: ${error.message}`);
-    console.error(`  Failed after:  ${Date.now() - startTime}ms`);
-    console.error(`  Stack trace:\n${error.stack}`);
-    console.error("=".repeat(60) + "\n");
+    console.error("PDF Generation Failed:", error.message);
     throw error;
-
   } finally {
-    if (browser) {
-      await browser.close();
-      console.log("🔒 Browser closed");
+    if (page) {
+      await page.close();
     }
   }
 }
 
+// ─────────────────────────────────────────────
+// Queued Version (THIS is what you call)
+// ─────────────────────────────────────────────
+export async function generatePdfQueued(templateName, data) {
+  return pdfQueue.add(() => generatePdfFromTemplate(templateName, data));
+}
+
 export { generatePdfFromTemplate };
-export default generatePdfFromTemplate;
+export default generatePdfQueued;
