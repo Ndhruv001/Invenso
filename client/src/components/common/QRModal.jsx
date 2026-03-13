@@ -8,7 +8,7 @@ function QRModal({ isOpen, onClose, message, imageUrl, imageAlt = "QR Code", isL
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 transition-opacity"
       style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
       onClick={onClose}
     >
@@ -19,7 +19,7 @@ function QRModal({ isOpen, onClose, message, imageUrl, imageAlt = "QR Code", isL
         {/* Close button */}
         <button
           onClick={onClose}
-          className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${theme.hover} ${theme.text.muted}`}
+          className={`absolute top-3 right-3 p-1 cursor-pointer rounded-full transition-colors ${theme.hover} ${theme.text.muted}`}
           aria-label="Close modal"
         >
           <X size={18} />
