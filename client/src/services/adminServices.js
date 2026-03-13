@@ -25,5 +25,13 @@ export const deleteOldAuditLogsAndInventoryLogs = async () => {
     throw new Error(error.message || "Server is down");
   }
 };
+ export const getQRCode = async () => {
+  try {
+    return  await axiosInstance.get("/health");//& change the url
+  } catch (error) {
+    console.error("Failed to fetch QR code:", error);
+    throw new Error(error.message || "Failed to fetchh QR code");
+  }
+};
 
-export default { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs, healthCheckEndPoint };
+export default { sentInvoicesOnWhatsApp, deleteOldAuditLogsAndInventoryLogs, healthCheckEndPoint , getQRCode };
