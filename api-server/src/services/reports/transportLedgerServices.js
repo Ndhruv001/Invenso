@@ -146,15 +146,15 @@ async function getTransportLedgerPdf(filters = {}) {
   // 5️⃣ Generate PDF
 
   const response = await axios.post(
-  process.env.PDF_SERVICE_URL + "/generate-pdf",
-  {
-    templateName: "transportLedgerTemplate.html",
-    data
-  },
-  { responseType: "arraybuffer" }
-);
+    process.env.PDF_SERVICE_URL + "/pdf/generate-pdf",
+    {
+      templateName: "transportLedgerTemplate.html",
+      data
+    },
+    { responseType: "arraybuffer" }
+  );
 
-const pdfBuffer = response.data;
+  const pdfBuffer = response.data;
 
   return pdfBuffer;
 }

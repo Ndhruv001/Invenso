@@ -18,7 +18,11 @@ import { useTheme } from "@/hooks/useTheme";
 import { useConfirmationDialog } from "@/hooks/useConfirmationDialog";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
 import QRModal from "@/components/common/QRModal";
-import { useDeleteOldAuditLogsAndInventoryLogs, useSentInvoicesOnWhatsApp, useGetQRCode } from "@/hooks/useAdmin";
+import {
+  useDeleteOldAuditLogsAndInventoryLogs,
+  useSentInvoicesOnWhatsApp,
+  useGetQRCode
+} from "@/hooks/useAdmin";
 
 // ---------------------------
 // Config
@@ -119,11 +123,10 @@ const System = () => {
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
   const [loading, setLoading] = useState({});
   const [qrModalOpen, setQrModalOpen] = useState(false);
-const [qrImageUrl, setQrImageUrl] = useState(null);
-const [qrLoading, setQrLoading] = useState(false);
+  const [qrImageUrl, setQrImageUrl] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
-
-const { refetch: fetchQRCode } = useGetQRCode();
+  const { refetch: fetchQRCode } = useGetQRCode();
   const sentInvoicesOnWhatsAppMutation = useSentInvoicesOnWhatsApp();
   const deleteOldAuditLogsAndInventoryLogs = useDeleteOldAuditLogsAndInventoryLogs();
 
@@ -153,25 +156,24 @@ const { refetch: fetchQRCode } = useGetQRCode();
     [openDialog, sentInvoicesOnWhatsAppMutation, deleteOldAuditLogsAndInventoryLogs]
   );
 
-  const handleSetting = useCallback( async key => {
-   if (key === "openQR") {
-  setQrLoading(true);
-  setQrModalOpen(true);        // open modal immediately with a spinner
-  const { data } = await fetchQRCode();
-  setQrImageUrl(data);         // once resolved, set the URL
-  setQrLoading(false);
-  return;
-}
+  const handleSetting = useCallback(async key => {
+    if (key === "openQR") {
+      setQrLoading(true);
+      setQrModalOpen(true); // open modal immediately with a spinner
+      const { data } = await fetchQRCode();
+      setQrImageUrl(data?.qr); // once resolved, set the URL
+      setQrLoading(false);
+      return;
+    }
     // TODO: wire individual setting handlers
     toast.info("Coming soon");
   }, []);
 
-  
-const handleQrClose = () => {
-  setQrModalOpen(false);
-  setQrImageUrl(null);    // clear so stale QR isn't shown on next open
-  setQrLoading(false);    // safety reset
-};
+  const handleQrClose = () => {
+    setQrModalOpen(false);
+    setQrImageUrl(null); // clear so stale QR isn't shown on next open
+    setQrLoading(false); // safety reset
+  };
 
   return (
     <div
@@ -277,12 +279,12 @@ const handleQrClose = () => {
       {dialogConfig.isOpen && <ConfirmationModal {...dialogConfig} onCancel={closeDialog} />}
 
       <QRModal
-  isOpen={qrModalOpen}
-  onClose={handleQrClose}
-  imageUrl={qrImageUrl}
-  isLoading={qrLoading}
-  message="Scan this QR code to pair your device."
-/>
+        isOpen={qrModalOpen}
+        onClose={handleQrClose}
+        imageUrl={qrImageUrl}
+        isLoading={qrLoading}
+        message="Scan this QR code to pair your device."
+      />
     </div>
   );
 };

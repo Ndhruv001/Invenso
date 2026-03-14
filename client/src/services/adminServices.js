@@ -27,7 +27,7 @@ export const deleteOldAuditLogsAndInventoryLogs = async () => {
 };
  export const getQRCode = async () => {
   try {
-    return  await axiosInstance.get("/health");//& change the url
+    return await axiosInstance.get("/whatsapp/status");
   } catch (error) {
     console.error("Failed to fetch QR code:", error);
     throw new Error(error.message || "Failed to fetchh QR code");

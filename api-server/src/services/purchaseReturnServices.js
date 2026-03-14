@@ -878,7 +878,7 @@ async function getPurchaseReturnInvoicePdf(purchaseReturnId) {
   // 5. Generate PDF
 
 const response = await axios.post(
-  process.env.PDF_SERVICE_URL + "/generate-pdf",
+  process.env.PDF_SERVICE_URL + "/pdf/generate-pdf",
   {
     templateName: "purchaseReturnInvoiceTemplate.html",
     data

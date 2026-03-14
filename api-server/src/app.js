@@ -84,6 +84,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import chequeRoutes from "./routes/chequeRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js"
+import whatsappRoutes from "./routes/whatsappRoutes.js"
 
 app.use(`${BASE}/auth`, authRoutes);
 app.use(`${BASE}/products`, productRoutes);
@@ -104,6 +105,7 @@ app.use(`${BASE}/admin`, adminRoutes);
 app.use(`${BASE}/dashboards`, dashboardRoutes);
 app.use(`${BASE}/cheques`, chequeRoutes);
 app.use(`${BASE}/reports`, reportRoutes);
+app.use(`${BASE}/whatsapp`, whatsappRoutes);
 
 // ── Health Check (uses successResponse)
 app.get(`${BASE}/health`, async (req, res) => {

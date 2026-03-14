@@ -1,10 +1,11 @@
 import pkg from "whatsapp-web.js";
-// import { client } from "./whatsappClient.js";
+import { client } from "./config/whatsappClient.js";
 const client = {}
 
 const { MessageMedia } = pkg;
 
-export async function sendInvoiceOnWhatsApp(invoice, pdfBuffer, type = "sale") {
+export async function sendInvoiceOnWhatsApp(data) {
+  const { invoice, pdfBase64, type } = data;
   console.log(`📤 Preparing to send ${type} invoice ID: ${invoice.id}`);
 
   // 1️⃣ Validate phone
@@ -27,9 +28,10 @@ export async function sendInvoiceOnWhatsApp(invoice, pdfBuffer, type = "sale") {
   // 3️⃣ Create PDF media from buffer
   const media = new MessageMedia(
     "application/pdf",
-    pdfBuffer.toString("base64"),
+    pdfBase64,
     `${type}_Invoice_${invoice.invoiceNumber || invoice.id}.pdf`
   );
+
 
   // 4️⃣ Prepare message text
   const pendingAmount =

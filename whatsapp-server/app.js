@@ -11,8 +11,8 @@ import compression from "compression";
 import helmetConfig from "./config/helmetConfig.js";
 import corsOptions from "./config/corsOptions.js";
 import { globalLimiter } from "./config/limiter.js";
-
-import { generatePdfQueued } from "./pdfServices.js";
+import { getWhatsappState } from "./config/whatsappClient.js";
+import { sendInvoiceOnWhatsApp } from "./whatsappServices.js";
 
 dotenv.config();
 
@@ -37,44 +37,38 @@ app.use(
 );
 
 // ── Health check
-app.get("/pdf/health", (req, res) => {
+app.get("/whatsapp/health", (req, res) => {
   res.status(200).json({
-    status: "PDF service healthy",
+    status: "WhatsApp service healthy",
     uptime: process.uptime(),
     environment: process.env.NODE_ENV,
   });
 });
 
-// ── PDF Route
-app.post("/pdf/generate-pdf", async (req, res) => {
-  let pdfBuffer;
+app.get("/whatsapp/status", (req, res) => {
+  const state = getWhatsappState();
 
+  if (state.status === "connected") {
+    return res.json({ status: "connected" });
+  }
+
+  if (state.status === "qr") {
+    return res.json({
+      status: "qr",
+      qr: state.qr
+    });
+  }
+
+  return res.json({ status: state.status });
+});
+
+app.post("/whatsapp/send-invoice", async (req, res) => {
   try {
-    const { templateName, data } = req.body;
-
-    if (!templateName) {
-      return res.status(400).json({
-        error: "templateName is required",
-      });
-    }
-
-    console.log("Generating PDF...");
-    pdfBuffer = await generatePdfQueued(templateName, data);
-     console.log("PDF GENERATED SUCCESSFULLY");
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=document.pdf",
-      "Content-Length": pdfBuffer.length,
-    });
-
-    return res.send(pdfBuffer);
+    const result = await sendInvoiceOnWhatsApp(req.body);
+    return res.json(result);
   } catch (error) {
-    console.error("PDF generation failed:", error.message);
-
-    return res.status(500).json({
-      error: "PDF generation failed",
-    });
+    console.error(error);
+    return res.status(500).json({ error: error.message });
   }
 });
 

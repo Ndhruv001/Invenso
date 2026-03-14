@@ -5,7 +5,7 @@ import {
 } from "../services/invoiceAutomationServices.js";
 import { getSaleInvoicePdf } from "../services/saleServices.js";
 import { getSaleReturnInvoicePdf } from "../services/saleReturnServices.js";
-import { sendInvoiceOnWhatsApp, sendInvoiceSummaryToHost } from "./whatsappSender.js";
+import axios from "axios";
 
 let isProcessing = false;
 
@@ -64,7 +64,16 @@ export const processDailyWhatsAppInvoices = async () => {
         console.log("📄 PDF generated successfully.");
 
         // 5. Send WhatsApp
-        await sendInvoiceOnWhatsApp(invoice, pdfBuffer, type);
+        const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL;
+
+await axios.post(
+  `${WHATSAPP_SERVICE_URL}/whatsapp/send-invoice`,
+  {
+    invoice,
+    pdfBase64: pdfBuffer.toString("base64"),
+    type
+  },
+);
 
         // 6. Update DB success
         await updateDBForInvoiceWhatsAppStatus(id, type, true);

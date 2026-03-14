@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import LoginPage from "@/scenes/login/LoginPage.jsx";
 import MainLayout from "@/components/layout/MainLayout.jsx";
@@ -45,15 +45,26 @@ import InventoryLogs from "@/scenes/admin/inventories/InventoryLogs.jsx";
 import { useHideScreenContext } from "@/context/HideScreenContext.jsx";
 import BlurOverlay from "@/components/common/BlurOverlay.jsx";
 import {healthCheckWithRetry} from "./lib/helpers/healthCheckWithRetry.js";
+import { useQueryClient } from "@tanstack/react-query";
 
 function App() {
   const { isScreenHidden } = useHideScreenContext();
+  
 
-  useEffect(() => {
-    healthCheckWithRetry()
-      .then(() => console.log("Server ready"))
-      .catch((error) => console.log("Server waking up", error));
-  }, []);
+const queryClient = useQueryClient();
+
+useEffect(() => {
+  healthCheckWithRetry()
+    .then(() => {
+      console.log("Server ready");
+
+      // Refetch auth state
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    })
+    .catch(() => {
+      console.log("Server waking up...");
+    });
+}, []);
 
   return (
     <Routes>
