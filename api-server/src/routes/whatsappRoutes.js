@@ -11,7 +11,7 @@ router.get("/status", async (req, res) => {
     const response = await axios.get(`${WHATSAPP_SERVICE_URL}/whatsapp/status`);
     console.log("🚀 ~ response:", response);
 
-    return res.json(response);
+    return res.json(response?.data);
   } catch (error) {
     console.error("WhatsApp service error:", error.message);
 

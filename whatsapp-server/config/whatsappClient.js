@@ -83,5 +83,6 @@ client.on("auth_failure", () => {
 
 // ====== INITIALIZE ======
 export const initializeWhatsapp = () => {
+  console.log("🚀 Initializing WhatsApp client...");
   client.initialize();
 };
