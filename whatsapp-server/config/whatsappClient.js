@@ -19,7 +19,15 @@ export const client = new Client({
   }),
   puppeteer: {
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+    executablePath: puppeteer.executablePath(), // ✅ reads PUPPETEER_CACHE_DIR
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--single-process",  // ✅ needed for Render
+      "--no-zygote"        // ✅ needed for Render
+    ]
   }
 });
 
