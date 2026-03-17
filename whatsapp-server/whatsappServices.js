@@ -28,9 +28,8 @@ export async function sendInvoiceOnWhatsApp(data) {
   const media = new MessageMedia(
     "application/pdf",
     pdfBase64,
-    `${type}_Invoice_${invoice.invoiceNumber || invoice.id}.pdf`
+    `${type}_Invoice_${invoice.invoiceNumber || invoice.id}.pdf`,
   );
-
 
   // 4️⃣ Prepare message text
   const pendingAmount =
@@ -63,14 +62,22 @@ ${invoice.type === "sale" ? "कृपया अटैच किया हुआ
 
 /**
  * Send summary message to host/admin after invoices are sent
- * @param {Number} totalInvoices - Total invoices sent successfully
+ *  totalInvoices: limitedBatch?.length,
+      successCount,
+      failCount,
+      failedInvoices
  */
-export async function sendInvoiceSummaryToHost(totalInvoices = 0) {
+export async function sendInvoiceSummaryToHost(
+  totalInvoices = 0,
+  successCount,
+  failCount,
+  failedInvoices,
+) {
   console.log("📊 Preparing host summary message...");
 
   // 🔹 YOUR HOST NUMBER (CHANGE THIS)
-  let hostPhone = process.env.HOST_MOBILE_NUMBER || "" // <-- put your WhatsApp number here
-
+  let hostPhone = process.env.HOST_MOBILE_NUMBER || "";
+  // (No change here)
 
   // Clean number
   hostPhone = hostPhone.replace(/\D/g, "");
@@ -81,9 +88,19 @@ export async function sendInvoiceSummaryToHost(totalInvoices = 0) {
     throw new Error("WhatsApp client not ready");
   }
 
+  // 🔹 ADDED: Failed invoice list formatting (if exists)
+  const failedList =
+    failedInvoices && failedInvoices.length
+      ? `\n\n❌ Failed Invoice IDs:\n${failedInvoices.join("\n")}`
+      : "";
+
+  // 🔹 UPDATED: Now using all received parameters properly
   const message = `✅ Invoice Sending Completed
 
-📦 Total Invoices Sent Successfully: ${totalInvoices}
+📊 Total Processed: ${totalInvoices}
+✅ Success: ${successCount}
+❌ Failed: ${failCount}
+Failed Invoices: ${failedList}
 
 🕒 Time: ${new Date().toLocaleString()}
 

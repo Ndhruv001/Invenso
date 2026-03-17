@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import fs from "fs";
 import path from "path";
 
-const { Client, LocalAuth } = pkg;
+const { Client } = pkg;
 
 // ====== GLOBAL STATE ======
 let latestQR = null;
@@ -33,8 +33,11 @@ function resolveChromePath() {
 
 // ====== CLIENT SETUP ======
 export const client = new Client({
-  authStrategy: new LocalAuth({
-    dataPath: "./sessions",
+   authStrategy: new MongoAuth({
+    mongoUri: process.env.MONGO_URI,   // Add this to Render environment variables
+    dbName: "whatsapp",
+    collectionName: "sessions",
+    clientId: "my-bot",               // Use a unique name per bot instance
   }),
   puppeteer: {
     headless: true,

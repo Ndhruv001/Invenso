@@ -89,12 +89,6 @@ const SETTINGS_ITEMS = [
     description: "View a full trail of system and user activity",
     icon: ClipboardList
   },
-  {
-    key: "openQR",
-    label: "Open QR",
-    description: "View the QR code for quick device pairing or sharing",
-    icon: QrCode
-  }
 ];
 
 // ---------------------------
@@ -123,6 +117,7 @@ const System = () => {
   const { dialogConfig, openDialog, closeDialog } = useConfirmationDialog();
   const [loading, setLoading] = useState({});
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [whatsappData, setWhatsappData] = useState(null)
   const [qrImageUrl, setQrImageUrl] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
 
@@ -157,10 +152,11 @@ const System = () => {
   );
 
   const handleSetting = useCallback(async key => {
-    if (key === "openQR") {
+    if (key === "whatsapp") {
       setQrLoading(true);
       setQrModalOpen(true); // open modal immediately with a spinner
       const { data } = await fetchQRCode();
+      setWhatsappData(data)
       setQrImageUrl(data?.qr); // once resolved, set the URL
       setQrLoading(false);
       return;
@@ -283,7 +279,7 @@ const System = () => {
         onClose={handleQrClose}
         imageUrl={qrImageUrl}
         isLoading={qrLoading}
-        message="Scan this QR code to pair your device."
+        message={whatsappData?.status === "connected" ? "Authentication successful" : "Scan this QR code to pair your device" }
       />
     </div>
   );

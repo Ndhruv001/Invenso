@@ -21,6 +21,7 @@ build/
 ############################
 sessions/
 *.session
+temp_sessions
 
 
 .wwebjs_cache/

@@ -12,7 +12,7 @@ import helmetConfig from "./config/helmetConfig.js";
 import corsOptions from "./config/corsOptions.js";
 import { globalLimiter } from "./config/limiter.js";
 import { getWhatsappState } from "./config/whatsappClient.js";
-import { sendInvoiceOnWhatsApp } from "./whatsappServices.js";
+import { sendInvoiceOnWhatsApp, sendInvoiceSummaryToHost } from "./whatsappServices.js";
 
 dotenv.config();
 
@@ -71,6 +71,17 @@ app.post("/whatsapp/send-invoice", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+app.post("/whatsapp/send-summary-to-host", async (req, res) => {
+  try {
+    const result = await sendInvoiceSummaryToHost(req.body);
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+
 
 // ── 404
 app.use((req, res) => {

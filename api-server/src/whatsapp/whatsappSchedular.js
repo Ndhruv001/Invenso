@@ -29,6 +29,8 @@ export const processDailyWhatsAppInvoices = async () => {
   let successCount = 0;
   let failCount = 0;
   let limitedBatch = [];
+  let failedInvoices = [];
+  const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL;
 
   try {
     // 1. Fetch pending invoices
@@ -64,16 +66,11 @@ export const processDailyWhatsAppInvoices = async () => {
         console.log("📄 PDF generated successfully.");
 
         // 5. Send WhatsApp
-        const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL;
-
-await axios.post(
-  `${WHATSAPP_SERVICE_URL}/whatsapp/send-invoice`,
-  {
-    invoice,
-    pdfBase64: pdfBuffer.toString("base64"),
-    type
-  },
-);
+        await axios.post(`${WHATSAPP_SERVICE_URL}/whatsapp/send-invoice`, {
+          invoice,
+          pdfBase64: pdfBuffer.toString("base64"),
+          type
+        });
 
         // 6. Update DB success
         await updateDBForInvoiceWhatsAppStatus(id, type, true);
@@ -86,6 +83,7 @@ await axios.post(
         if (!isLast) await delayRandom();
       } catch (error) {
         failCount++;
+        failedInvoices.push(id);
         console.error(`❌ Failed processing ${type} ID ${id}:`, error.message);
         await updateDBForInvoiceWhatsAppStatus(id, type, false);
         console.log(`🔁 Retry count updated for ${type} ID ${id}`);
@@ -102,7 +100,14 @@ await axios.post(
     // ✅ Global lock released ONCE — after ALL invoices are done
     isProcessing = false;
     console.log("🔓 Global automation lock released.");
-    await sendInvoiceSummaryToHost(limitedBatch?.length, successCount, failCount);
+
+    await sendInvoiceSummaryToHost(limitedBatch?.length, successCount, failCount, failedInvoices);
+    await axios.post(`${WHATSAPP_SERVICE_URL}/whatsapp/send-summary-to-host`, {
+      totalInvoices: limitedBatch?.length,
+      successCount,
+      failCount,
+      failedInvoices
+    });
   }
 };
 
