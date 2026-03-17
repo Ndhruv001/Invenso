@@ -1,4 +1,5 @@
 import pkg from "whatsapp-web.js";
+import { MongoAuth } from "./mongoAuth";
 import QRCode from "qrcode";
 import fs from "fs";
 import path from "path";
