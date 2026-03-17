@@ -2,6 +2,7 @@ import pkg from "whatsapp-web.js";
 import { MongoClient } from "mongodb";
 
 const {BaseAuthStrategy} = pkg;
+console.log("🚀 ~ pkg:", pkg)
 
 export class MongoAuth extends BaseAuthStrategy {
   constructor({ mongoUri, dbName = "whatsapp", collectionName = "sessions", clientId = "default" }) {
